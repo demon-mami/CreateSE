@@ -63,7 +63,10 @@
 
         <div class="pair-grid">
           <div class="pair-side don-side">
-            <div class="pair-side-title"><span class="dot don-dot"></span>Don — LOW</div>
+            <div class="pair-side-head">
+              <div class="pair-side-title"><span class="dot don-dot"></span>Don — LOW</div>
+              <button id="favDonButton" class="favorite-button side-favorite" type="button">DON ★</button>
+            </div>
             <select id="donSelect"></select>
             <div id="donMeta" class="pair-meta"></div>
             <div class="pair-actions">
@@ -74,7 +77,10 @@
           </div>
 
           <div class="pair-side kat-side">
-            <div class="pair-side-title"><span class="dot kat-dot"></span>Kat — HIGH</div>
+            <div class="pair-side-head">
+              <div class="pair-side-title"><span class="dot kat-dot"></span>Kat — HIGH</div>
+              <button id="favKatButton" class="favorite-button side-favorite" type="button">KAT ★</button>
+            </div>
             <select id="katSelect"></select>
             <div id="katMeta" class="pair-meta"></div>
             <div class="pair-actions">
@@ -85,21 +91,14 @@
           </div>
         </div>
 
-        <div class="pair-rule-row">
+        <div class="pair-rule-row pair-rule-only">
           <span id="pairRule" class="pair-rule"></span>
-          <button id="savePairButton" class="save-pair-button" type="button">☆ Save Pair</button>
         </div>
 
-        <div class="pair-eval" aria-label="Pair評価">
-          <button data-pair-eval="KEEP" type="button">KEEP</button>
-          <button data-pair-eval="MAYBE" type="button">MAYBE</button>
-          <button data-pair-eval="DROP" type="button">DROP</button>
+        <div class="pair-footer-actions">
+          <button id="favSetButton" class="favorite-button set-favorite" type="button">SET ★</button>
+          <button id="exportFavoritesButton" class="favorite-button export" type="button">CSV出力</button>
         </div>
-
-        <details class="saved-pairs">
-          <summary>Saved Pairs <span id="savedCount">0</span></summary>
-          <div id="savedPairsList" class="saved-list"></div>
-        </details>
       </div>
     </section>
 
@@ -144,8 +143,8 @@
   <script src="./charts.js?v=0.2"></script>
   <script src="/osutaiko-mami-viewer/app-v4.js?v=c22e29e4"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./lab.js?v=0.1"></script>
-  <script src="./pair-ranking.js?v=0.4"></script>
+  <script src="./lab.js?v=0.2"></script>
+  <script src="./pair-ranking.js?v=0.5"></script>
   <script src="./chart-loader.js?v=0.2"></script>
 </body>
 </html>
