@@ -8,8 +8,9 @@
   const grid = $('hitsoundGrid');
   const roleDonButton = $('roleDonButton');
   const roleKatButton = $('roleKatButton');
-  const roleDonValue = $('roleDonValue');
-  const roleKatValue = $('roleKatValue');
+  const silentButton = $('silentButton');
+  const previewButton = $('previewButton');
+  const recommendationLine = $('recommendationLine');
 
   if (!CANDIDATES.length || !controller || !favorites || !grid || !roleDonButton || !roleKatButton) return;
 
@@ -25,7 +26,6 @@
     'Tom',
     'Timbale',
     'Rimshot',
-    'Snare',
     'Cowbell',
     'Agogo',
     'Woodblock',
@@ -36,6 +36,7 @@
   function groupedCandidates() {
     const groups = new Map();
     for (const candidate of CANDIDATES) {
+      if (candidate.excluded) continue;
       const family = displayFamily(candidate);
       if (!groups.has(family)) groups.set(family, []);
       groups.get(family).push(candidate);
@@ -50,8 +51,7 @@
 
     const orderIndex = family => {
       const preferred = preferredOrder.indexOf(family);
-      if (preferred >= 0) return preferred;
-      return preferredOrder.length + 1;
+      return preferred >= 0 ? preferred : preferredOrder.length + 1;
     };
 
     return Array.from(groups.entries()).sort((a, b) => {
@@ -71,70 +71,35 @@
 
   function buildGrid() {
     const groups = groupedCandidates();
-    grid.innerHTML = `
-      <div class="hs-silent-row">
-        <button class="hs-key hs-silent" type="button" data-hs-id="${SILENT_ID}" title="無音" aria-label="無音"><span>—</span></button>
-      </div>
-      ${groups.map(([family, candidates]) => `
-        <section class="hs-family" data-family="${family}">
-          <div class="hs-family-title">${family}</div>
-          <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
-        </section>
-      `).join('')}
-    `;
+    grid.innerHTML = groups.map(([family, candidates]) => `
+      <section class="hs-family" data-family="${family}">
+        <div class="hs-family-title">${family}</div>
+        <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
+      </section>
+    `).join('');
   }
 
-  function favoriteRoleSets() {
-    const stored = favorites.read();
-    const don = new Set(stored.don);
-    const kat = new Set(stored.kat);
-
-    for (const key of stored.set) {
-      const [dId, kId] = String(key).split('|');
-      if (dId) don.add(dId);
-      if (kId) kat.add(kId);
-    }
-    return { don, kat };
+  function paintRecommendation() {
+    if (!recommendationLine) return;
+    const ids = favorites.recommendedFor(activeSide, controller.getSelection());
+    const numbers = ids
+      .map(byId)
+      .filter(candidate => candidate && !candidate.excluded)
+      .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber))
+      .map(candidate => candidate.sourceNumber);
+    recommendationLine.textContent = `推奨：${numbers.length ? numbers.join(' ') : '—'}`;
   }
 
-  function candidateLabel(id) {
-    if (id === SILENT_ID) return '—';
-    return byId(id)?.sourceNumber || '—';
-  }
-
-  function paintRoleButtons() {
+  function paint() {
     const selection = controller.getSelection();
-    roleDonValue.textContent = candidateLabel(selection.don);
-    roleKatValue.textContent = candidateLabel(selection.kat);
     roleDonButton.classList.toggle('target', activeSide === 'don');
     roleKatButton.classList.toggle('target', activeSide === 'kat');
     roleDonButton.setAttribute('aria-pressed', activeSide === 'don' ? 'true' : 'false');
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
-  }
-
-  function paintGrid() {
-    const selection = controller.getSelection();
-    const saved = favoriteRoleSets();
-
-    grid.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
-      const id = button.dataset.hsId;
-      button.classList.remove('selected-don','selected-kat','fav-don','fav-kat','recommended');
-
-      if (id === selection.don) button.classList.add('selected-don');
-      if (id === selection.kat) button.classList.add('selected-kat');
-      if (id !== SILENT_ID && saved.don.has(id)) button.classList.add('fav-don');
-      if (id !== SILENT_ID && saved.kat.has(id)) button.classList.add('fav-kat');
-
-      if (id !== SILENT_ID && id !== selection.don && id !== selection.kat) {
-        if (activeSide === 'kat' && selection.don !== SILENT_ID && favorites.isRecommendedPair(selection.don, id)) {
-          button.classList.add('recommended');
-        } else if (activeSide === 'don' && selection.kat !== SILENT_ID && favorites.isRecommendedPair(id, selection.kat)) {
-          button.classList.add('recommended');
-        }
-      }
-    });
-
-    paintRoleButtons();
+    roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${byId(selection.don)?.sourceNumber || '—'}`;
+    roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${byId(selection.kat)?.sourceNumber || '—'}`;
+    grid.dataset.activeSide = activeSide;
+    paintRecommendation();
   }
 
   async function choose(id) {
@@ -143,18 +108,21 @@
       await controller.setSide(activeSide, id);
     } finally {
       grid.classList.remove('busy');
-      paintGrid();
+      paint();
     }
   }
 
-  roleDonButton.addEventListener('click', () => {
-    activeSide = 'don';
-    paintGrid();
-  });
-  roleKatButton.addEventListener('click', () => {
-    activeSide = 'kat';
-    paintGrid();
-  });
+  function setActiveSide(side) {
+    if (side !== 'don' && side !== 'kat') return;
+    controller.stopPreview();
+    activeSide = side;
+    paint();
+  }
+
+  roleDonButton.addEventListener('click', () => setActiveSide('don'));
+  roleKatButton.addEventListener('click', () => setActiveSide('kat'));
+  silentButton?.addEventListener('click', () => choose(SILENT_ID).catch(error => alert(error.message)));
+  previewButton?.addEventListener('click', () => controller.togglePreview(activeSide).catch(error => alert(error.message)));
 
   grid.addEventListener('click', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
@@ -162,9 +130,8 @@
     choose(button.dataset.hsId).catch(error => alert(error.message));
   });
 
-  window.addEventListener('hitsound-selection-change', paintGrid);
-  window.addEventListener('hitsound-favorites-change', paintGrid);
+  window.addEventListener('hitsound-selection-change', paint);
 
   buildGrid();
-  paintGrid();
+  paint();
 })();
