@@ -4,19 +4,22 @@
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   if (!CANDIDATES.length) return;
 
-  const sourceNumber = candidate => {
-    const match = String(candidate?.id || '').match(/(\d+)$/);
-    return match ? match[1].padStart(3, '0') : '000';
-  };
+  // Human-facing numbering is now a compact two-digit pitch rank.
+  // Internal candidate IDs / ZIP entry names stay unchanged so existing assets and
+  // stored favorites remain compatible.
+  const ordered = [...CANDIDATES].sort((a, b) =>
+    (a.pitch ?? Number.POSITIVE_INFINITY) - (b.pitch ?? Number.POSITIVE_INFINITY) ||
+    (a.globalRank ?? Number.POSITIVE_INFINITY) - (b.globalRank ?? Number.POSITIVE_INFINITY) ||
+    String(a.id).localeCompare(String(b.id))
+  );
 
-  // Stable source numbering only. Favorite state is intentionally not reflected
-  // through select text colors or option decorations.
-  for (const candidate of CANDIDATES) {
-    if (!candidate.originalName) candidate.originalName = candidate.name;
-    candidate.sourceNumber = sourceNumber(candidate);
-    const prefix = `${candidate.sourceNumber}_`;
-    if (!String(candidate.name).startsWith(prefix)) {
-      candidate.name = `${prefix}${candidate.originalName}`;
-    }
-  }
+  ordered.forEach((candidate, index) => {
+    if (!candidate.originalName) candidate.originalName = String(candidate.name || '');
+    if (!candidate.originalFamily) candidate.originalFamily = candidate.family || 'Other';
+
+    candidate.sourceNumber = String(10 + index); // 52 candidates -> 10..61
+    candidate.name = `${candidate.sourceNumber}.wav`;
+  });
+
+  window.HITSOUND_NUMBERED_CANDIDATES = ordered;
 })();
