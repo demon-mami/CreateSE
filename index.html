@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#0d0e11">
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
+  <style>
+.chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}.chart-info{position:relative;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.chart-info>div{min-width:0}.chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35}.chart-hits{position:absolute;right:8px;bottom:6px;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}@media(max-width:430px){.chart-info{grid-template-columns:1fr}.chart-info strong{padding-right:54px}}
+  </style>
 </head>
 <body>
   <main class="app-shell">
@@ -18,25 +21,28 @@
     </header>
 
     <section class="source-panel panel">
-      <div class="source-row native-file-row">
-        <div class="native-file-wrap">
-          <input id="oszInput" class="native-file-input" type="file" accept=".osz,.OSZ">
-        </div>
-        <p id="fileName" class="file-name"></p>
-      </div>
-
-      <label class="difficulty-field">
-        <span class="label">Difficulty</span>
-        <select id="difficultySelect" disabled>
-          <option>OSZを読み込んでください</option>
+      <label class="chart-field">
+        <span class="label">TEST CHART</span>
+        <select id="chartSelect">
+          <option value="">譜面を選択してください</option>
         </select>
       </label>
 
-      <div class="song-line">
-        <strong id="songTitle">—</strong>
-        <span id="songMeta">—</span>
+      <div class="chart-info">
+        <div>
+          <span class="label">TITLE</span>
+          <strong id="songTitle">—</strong>
+        </div>
+        <div>
+          <span class="label">DIFFICULTY</span>
+          <strong id="fixedDifficulty">—</strong>
+        </div>
+        <span id="songMeta" class="chart-hits">—</span>
       </div>
 
+      <input id="oszInput" type="file" accept=".osz,.OSZ" hidden>
+      <select id="difficultySelect" hidden disabled><option>固定難易度</option></select>
+      <p id="fileName" hidden></p>
       <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
       <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
 
@@ -135,7 +141,9 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./fetch-bridge.js?v=0.1"></script>
   <script src="./candidates.js?v=0.1"></script>
+  <script src="./charts.js?v=0.2"></script>
   <script src="https://cdn.jsdelivr.net/gh/demon-mami/osutaiko-mami-viewer@c22e29e4ce9cd8ae8c7a5ec3f2c4c9388c6b66c9/app-v4.js"></script>
   <script src="./lab.js?v=0.1"></script>
+  <script src="./chart-loader.js?v=0.2"></script>
 </body>
 </html>
