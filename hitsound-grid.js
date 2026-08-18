@@ -6,13 +6,14 @@
   const favorites = window.HitsoundFavorites;
   const $ = id => document.getElementById(id);
   const grid = $('hitsoundGrid');
+  const sources = $('hitsoundSources');
   const roleDonButton = $('roleDonButton');
   const roleKatButton = $('roleKatButton');
   const silentButton = $('silentButton');
   const previewButton = $('previewButton');
   const recommendationLine = $('recommendationLine');
 
-  if (!CANDIDATES.length || !controller || !favorites || !grid || !roleDonButton || !roleKatButton) return;
+  if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton) return;
 
   const SILENT_ID = controller.SILENT_ID;
   let activeSide = 'don';
@@ -71,7 +72,7 @@
 
   function buildGrid() {
     const groups = groupedCandidates();
-    grid.innerHTML = groups.map(([family, candidates]) => `
+    sources.innerHTML = groups.map(([family, candidates]) => `
       <section class="hs-family" data-family="${family}">
         <div class="hs-family-title">${family}</div>
         <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
@@ -101,7 +102,7 @@
     roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${byId(selection.kat)?.sourceNumber || '—'}`;
 
     grid.dataset.activeSide = activeSide;
-    grid.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
+    sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
       const id = button.dataset.hsId;
       button.classList.toggle('selected-don', id === selection.don);
       button.classList.toggle('selected-kat', id === selection.kat);
@@ -116,11 +117,11 @@
   }
 
   async function choose(id) {
-    grid.classList.add('busy');
+    sources.classList.add('busy');
     try {
       await controller.setSide(activeSide, id);
     } finally {
-      grid.classList.remove('busy');
+      sources.classList.remove('busy');
       paint();
     }
   }
@@ -137,9 +138,9 @@
   silentButton?.addEventListener('click', () => choose(SILENT_ID).catch(error => alert(error.message)));
   previewButton?.addEventListener('click', () => controller.togglePreview(activeSide).catch(error => alert(error.message)));
 
-  grid.addEventListener('click', event => {
+  sources.addEventListener('click', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
-    if (!button || grid.classList.contains('busy')) return;
+    if (!button || sources.classList.contains('busy')) return;
     choose(button.dataset.hsId).catch(error => alert(error.message));
   });
 
