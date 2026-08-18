@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d0e11">
+  <title>osu!taiko Hitsound Lab</title>
+  <link rel="stylesheet" href="./style.css?v=0.1">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="appbar">
+      <div class="brand-block">
+        <span class="brand-kicker">demon mami's</span>
+        <h1>Hitsound Lab</h1>
+      </div>
+      <span id="statusBadge" class="status-badge">待機中</span>
+    </header>
+
+    <section class="source-panel panel">
+      <div class="source-row native-file-row">
+        <div class="native-file-wrap">
+          <input id="oszInput" class="native-file-input" type="file" accept=".osz,.OSZ">
+        </div>
+        <p id="fileName" class="file-name"></p>
+      </div>
+
+      <label class="difficulty-field">
+        <span class="label">Difficulty</span>
+        <select id="difficultySelect" disabled>
+          <option>OSZを読み込んでください</option>
+        </select>
+      </label>
+
+      <div class="song-line">
+        <strong id="songTitle">—</strong>
+        <span id="songMeta">—</span>
+      </div>
+
+      <div class="pair-builder" aria-label="Hitsound Pair Builder">
+        <div class="pair-builder-head">
+          <div>
+            <span class="label">HITSOUND PAIR</span>
+            <strong>Low Don / High Kat</strong>
+          </div>
+          <label class="scope-field">
+            <span>Scope</span>
+            <select id="pairScope">
+              <option value="ALL">All</option>
+              <option value="SAME">Same family</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="pair-grid">
+          <div class="pair-side don-side">
+            <div class="pair-side-title"><span class="dot don-dot"></span>Don — LOW</div>
+            <select id="donSelect"></select>
+            <div id="donMeta" class="pair-meta"></div>
+            <div class="pair-actions">
+              <button id="donPrev" type="button">←</button>
+              <button id="donPreview" type="button">▶ Don</button>
+              <button id="donNext" type="button">→</button>
+            </div>
+          </div>
+
+          <div class="pair-side kat-side">
+            <div class="pair-side-title"><span class="dot kat-dot"></span>Kat — HIGH</div>
+            <select id="katSelect"></select>
+            <div id="katMeta" class="pair-meta"></div>
+            <div class="pair-actions">
+              <button id="katPrev" type="button">←</button>
+              <button id="katPreview" type="button">▶ Kat</button>
+              <button id="katNext" type="button">→</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pair-rule-row">
+          <span id="pairRule" class="pair-rule"></span>
+          <button id="savePairButton" class="save-pair-button" type="button">☆ Save Pair</button>
+        </div>
+
+        <div class="pair-eval" aria-label="Pair評価">
+          <button data-pair-eval="KEEP" type="button">KEEP</button>
+          <button data-pair-eval="MAYBE" type="button">MAYBE</button>
+          <button data-pair-eval="DROP" type="button">DROP</button>
+        </div>
+
+        <details class="saved-pairs">
+          <summary>Saved Pairs <span id="savedCount">0</span></summary>
+          <div id="savedPairsList" class="saved-list"></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="editor-panel panel" aria-label="譜面再生">
+      <div id="timelineViewport" class="timeline-viewport" aria-label="現在位置周辺のTaikoヒットポイント">
+        <canvas id="timelineStaticCanvas" class="timeline-static"></canvas>
+        <canvas id="timelineCursorCanvas" class="timeline-cursor"></canvas>
+      </div>
+
+      <div id="overviewViewport" class="overview-viewport" aria-label="曲全体">
+        <canvas id="overviewStaticCanvas" class="overview-static"></canvas>
+        <canvas id="overviewCursorCanvas" class="overview-cursor"></canvas>
+        <span id="timeDisplay" class="song-time">00:00:000</span>
+      </div>
+
+      <input id="seekBar" class="seek-bar" type="range" min="0" max="1" step="0.001" value="0" disabled>
+
+      <div class="editor-control-grid">
+        <div class="transport-row">
+          <button id="backButton" class="transport-button" type="button" disabled>−4s</button>
+          <button id="playButton" class="play-button" type="button" disabled>▶</button>
+          <button id="forwardButton" class="transport-button" type="button" disabled>+4s</button>
+        </div>
+        <div class="zoom-controls compact-zoom">
+          <button id="zoomOutButton" type="button" disabled>−</button>
+          <span id="zoomLabel" class="zoom-label">±0.5s</span>
+          <button id="zoomInButton" type="button" disabled>＋</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="errorCard" class="error-panel panel" hidden>
+      <strong>読み込みエラー</strong>
+      <p id="errorMessage"></p>
+    </section>
+  </main>
+
+  <audio id="samplePreviewAudio" preload="none"></audio>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./candidates.js?v=0.1"></script>
+  <script src="./app.js?v=0.1"></script>
+</body>
+</html>
