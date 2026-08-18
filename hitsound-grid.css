@@ -1,4 +1,4 @@
-/* Direct hitsound grid UI: compact tactile controls with momentary illumination. */
+/* Direct hitsound grid UI: compact tactile controls with latched selection states. */
 
 .pair-builder{
   margin-top:10px!important;
@@ -174,7 +174,7 @@
   font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 
-/* Momentary light: only while the physical key is held down. */
+/* Press feedback for a not-yet-selected key. */
 #hitsoundGrid[data-active-side="don"] .hs-key:active{
   --edge:rgba(245,170,178,.62);
   --back:rgba(96,43,50,.94);
@@ -182,7 +182,6 @@
 #hitsoundGrid[data-active-side="don"] .hs-key:active>span{
   background:linear-gradient(180deg,rgba(238,185,178,.96),rgba(205,134,143,.96));
   color:#8b3440;
-  box-shadow:inset 0 2px 4px rgba(103,33,43,.18),0 0 12px rgba(231,126,139,.10);
 }
 #hitsoundGrid[data-active-side="kat"] .hs-key:active{
   --edge:rgba(176,211,226,.64);
@@ -191,7 +190,55 @@
 #hitsoundGrid[data-active-side="kat"] .hs-key:active>span{
   background:linear-gradient(180deg,rgba(176,204,215,.97),rgba(128,174,194,.97));
   color:#326c85;
-  box-shadow:inset 0 2px 4px rgba(32,79,98,.18),0 0 12px rgba(110,179,207,.10);
+}
+
+/* Selected source stays physically down + lit. Old selection pops up when replaced. */
+.hs-key.selected-don{
+  --edge:rgba(245,170,178,.62);
+  --back:rgba(96,43,50,.94);
+}
+.hs-key.selected-don>span{
+  transform:translateY(4px);
+  background:linear-gradient(180deg,rgba(238,185,178,.96),rgba(205,134,143,.96));
+  color:#8b3440;
+  box-shadow:inset 0 2px 4px rgba(103,33,43,.20),0 0 12px rgba(231,126,139,.10);
+}
+.hs-key.selected-don::before{box-shadow:0 1px 3px rgba(5,10,12,.15)}
+
+.hs-key.selected-kat{
+  --edge:rgba(176,211,226,.64);
+  --back:rgba(42,82,99,.95);
+}
+.hs-key.selected-kat>span{
+  transform:translateY(4px);
+  background:linear-gradient(180deg,rgba(176,204,215,.97),rgba(128,174,194,.97));
+  color:#326c85;
+  box-shadow:inset 0 2px 4px rgba(32,79,98,.20),0 0 12px rgba(110,179,207,.10);
+}
+.hs-key.selected-kat::before{box-shadow:0 1px 3px rgba(5,10,12,.15)}
+
+.hs-key.selected-don.selected-kat>span{
+  background:linear-gradient(90deg,rgba(238,185,178,.96) 0 50%,rgba(176,204,215,.97) 50% 100%);
+  color:#594f58;
+}
+
+#silentButton.selected-don{
+  --edge:rgba(245,170,178,.62);
+  --back:rgba(96,43,50,.94);
+}
+#silentButton.selected-don>span{
+  transform:translateY(4px);
+  background:rgba(238,185,178,.94);
+  color:#8b3440;
+}
+#silentButton.selected-kat{
+  --edge:rgba(176,211,226,.64);
+  --back:rgba(42,82,99,.95);
+}
+#silentButton.selected-kat>span{
+  transform:translateY(4px);
+  background:rgba(176,204,215,.95);
+  color:#326c85;
 }
 
 .saved-sets-panel{
