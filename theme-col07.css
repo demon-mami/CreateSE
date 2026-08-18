@@ -1,0 +1,156 @@
+/* col_07 + White theme
+   Source palette: room_18_3_2 / bg_color / col_07
+   UI-only override. Audio/timeline/runtime code is untouched. */
+
+:root{
+  --col07:#a6b7bf;
+  --bg:#a6b7bf;
+  --text:#ffffff;
+  --muted:rgba(255,255,255,.66);
+  --line:rgba(255,255,255,.15);
+  --line-strong:rgba(255,255,255,.34);
+  --glass-edge:rgba(255,255,255,.17);
+  --panel:rgba(32,44,50,.60);
+  --panel-2:rgba(47,61,68,.58);
+  --glass:rgba(31,43,49,.56);
+  --glass-strong:rgba(28,40,46,.70);
+  --shadow:0 16px 38px rgba(7,13,16,.30),inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+html{
+  background:var(--col07);
+}
+
+body{
+  color:#fff;
+  background:
+    radial-gradient(900px 520px at 72% -8%,rgba(255,255,255,.11),transparent 63%),
+    radial-gradient(700px 470px at -12% 34%,rgba(209,228,236,.10),transparent 68%),
+    linear-gradient(180deg,rgba(27,39,45,.50) 0%,rgba(19,30,35,.59) 52%,rgba(10,18,22,.70) 100%),
+    var(--col07);
+  background-attachment:scroll;
+}
+
+/* White text system. Keep hierarchy through opacity rather than hue. */
+.brand-kicker,
+.label,
+.scope-field span,
+.pair-meta,
+.pair-rule,
+.zoom-label,
+.favorite-shortcut-title,
+.favorite-empty,
+.file-name,
+.song-line span{
+  color:rgba(255,255,255,.66)!important;
+}
+
+.brand-block h1,
+.status-badge,
+select,
+button,
+.song-time,
+.favorite-chip,
+.favorite-button{
+  color:#fff;
+}
+
+/* col_07-derived glass surfaces. */
+.panel{
+  border-color:rgba(255,255,255,.17);
+  background:linear-gradient(145deg,rgba(42,56,63,.59),rgba(19,30,35,.53));
+  box-shadow:0 16px 38px rgba(6,12,15,.29),inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+.source-panel{
+  border-color:rgba(255,255,255,.17);
+}
+
+.editor-panel{
+  border-color:rgba(255,255,255,.18);
+  background:linear-gradient(145deg,rgba(39,53,60,.60),rgba(18,29,34,.55));
+}
+
+.brand-block h1{
+  border-color:rgba(255,255,255,.18);
+  background:linear-gradient(145deg,rgba(72,88,96,.66),rgba(42,56,64,.62));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 20px rgba(8,14,17,.22);
+}
+
+.status-badge{
+  border-color:rgba(255,255,255,.16);
+  background:rgba(39,53,60,.48);
+  color:rgba(255,255,255,.70);
+}
+
+select{
+  border-color:rgba(255,255,255,.16);
+  background:linear-gradient(180deg,rgba(67,82,90,.58),rgba(42,56,64,.56));
+  color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+select:focus{
+  border-color:rgba(255,255,255,.38);
+  box-shadow:0 0 0 2px rgba(255,255,255,.055),inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.pair-builder{
+  border-top-color:rgba(255,255,255,.13);
+}
+
+.pair-side{
+  border-color:rgba(255,255,255,.15);
+  background:linear-gradient(145deg,rgba(50,64,71,.48),rgba(27,39,45,.45));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(6,12,15,.13);
+}
+
+.pair-actions button,
+.transport-button,
+.zoom-controls button,
+.favorite-button{
+  border-color:rgba(255,255,255,.15)!important;
+  background:linear-gradient(180deg,rgba(72,87,95,.55),rgba(45,59,66,.55))!important;
+  color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important;
+}
+
+/* Keep active/export distinction subtle and compatible with the existing accent. */
+.favorite-button.active{
+  border-color:rgba(255,255,255,.30)!important;
+  background:rgba(255,255,255,.10)!important;
+  color:#fff!important;
+}
+
+.favorite-button.export{
+  color:#fff!important;
+}
+
+.favorite-shortcut-panel{
+  border-color:rgba(255,255,255,.15)!important;
+  background:linear-gradient(145deg,rgba(48,62,69,.47),rgba(26,38,44,.44))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(6,12,15,.13)!important;
+}
+
+.favorite-chip{
+  border-color:rgba(255,255,255,.15)!important;
+  background:linear-gradient(180deg,rgba(72,87,95,.50),rgba(45,59,66,.50))!important;
+  color:#fff!important;
+}
+
+/* Timeline canvas mask depends on --surface; intentionally do not override it here. */
+.timeline-viewport,
+.overview-viewport{
+  border-color:rgba(255,255,255,.18);
+}
+
+.song-time{
+  border-color:rgba(255,255,255,.12);
+  color:#fff;
+}
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .panel{background:#2f4047}
+  .pair-side,.favorite-shortcut-panel{background:#26363c!important}
+  select,.pair-actions button,.transport-button,.zoom-controls button,.favorite-button,.favorite-chip{background:#394b53!important}
+}
