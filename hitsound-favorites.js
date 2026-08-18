@@ -12,6 +12,8 @@
   const exportButton = $('exportFavoritesButton');
   const panel = $('savedSetsPanel');
   const list = $('savedSetsList');
+  const pairBuilder = document.querySelector('.pair-builder');
+  const recommendationLine = $('recommendationLine');
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const valid = candidate => candidate && !candidate.excluded;
@@ -26,6 +28,62 @@
     ['A058', new Set(['A053'])],
     ['A060', new Set(['A055'])],
   ]);
+
+  let feedback = $('setFeedback');
+  if (!feedback && pairBuilder) {
+    feedback = document.createElement('div');
+    feedback.id = 'setFeedback';
+    feedback.className = 'set-feedback';
+    feedback.setAttribute('role', 'status');
+    feedback.setAttribute('aria-live', 'polite');
+    if (recommendationLine) recommendationLine.insertAdjacentElement('beforebegin', feedback);
+    else pairBuilder.appendChild(feedback);
+  }
+
+  const feedbackStyle = document.createElement('style');
+  feedbackStyle.textContent = `
+    .set-feedback{
+      min-height:30px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin:0 2px 2px;
+      color:rgba(255,255,255,.72);
+      font-size:11px;
+      font-weight:750;
+      letter-spacing:.01em;
+      opacity:0;
+      pointer-events:none;
+      text-align:center;
+      text-shadow:0 1px 10px rgba(255,255,255,.06);
+    }
+    .set-feedback.show{animation:setFavoriteFeedback 2.8s ease-out forwards}
+    @keyframes setFavoriteFeedback{
+      0%{opacity:0;transform:translateY(3px)}
+      12%{opacity:.72;transform:translateY(0)}
+      52%{opacity:.58;transform:translateY(0)}
+      100%{opacity:0;transform:translateY(-2px)}
+    }
+    @media(prefers-reduced-motion:reduce){
+      .set-feedback.show{animation:setFavoriteFeedbackReduced 2.8s linear forwards}
+      @keyframes setFavoriteFeedbackReduced{0%{opacity:.68}70%{opacity:.55}100%{opacity:0}}
+    }
+  `;
+  document.head.appendChild(feedbackStyle);
+
+  let feedbackClearTimer = 0;
+  function showSetFeedback() {
+    if (!feedback) return;
+    clearTimeout(feedbackClearTimer);
+    feedback.textContent = 'お気に入りに追加しました';
+    feedback.classList.remove('show');
+    void feedback.offsetWidth;
+    feedback.classList.add('show');
+    feedbackClearTimer = window.setTimeout(() => {
+      feedback.classList.remove('show');
+      feedback.textContent = '';
+    }, 3000);
+  }
 
   function readSets() {
     try {
@@ -58,8 +116,10 @@
     const key = currentSetKey();
     if (!key) return;
     const sets = readSets();
-    if (!sets.includes(key)) sets.push(key);
+    if (sets.includes(key)) return;
+    sets.push(key);
     writeSets(sets);
+    showSetFeedback();
   }
 
   function updateSetButton() {
