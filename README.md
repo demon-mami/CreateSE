@@ -4,74 +4,59 @@
 
 元リポジトリ `demon-mami/osutaiko-mami-viewer` は変更しません。
 
-## 構成
+## テスト譜面
+
+OSZを毎回選ぶ方式は使わず、以下5譜面だけを `TEST CHART` から選択します。
+
+- What Hurts The Most (Topmodelz ReMix) — `Gomen Yuuka [1.4x Rate]`
+- Over the Fullereneshift — `Eternity`
+- navi 98 — `genjuro's hell oni`
+- Tool-Assisted Speedcore (TQBF Frame Advance RMX) — `Frame Perfect`
+- Sunglow (Sped Up Ver.) — `Blazing Hope of the Dazzling Sun`
+
+repo rootの `maps.zip` には、この5つについて指定難易度の `.osu` とその難易度が使用するMusicだけを収録します。
+
+## Audio Engine
 
 譜面再生・Audio同期の核心部分は、既存Viewerの固定コミット
 `c22e29e4ce9cd8ae8c7a5ec3f2c4c9388c6b66c9`
 の `app-v4.js` を利用します。
 
-新repo側ではPair Builderと候補素材管理だけを追加しています。
+MusicとHitsoundは同じAudioContext、同じ`when`、同じ`offset`から開始します。
 
-## 残した機能
-
-- `.osz / .OSZ` の端末内解析
-- osu!taiko Mode:1のみ
-- 難易度選択
-- OBJECT TIMELINE
-- SONG TIMELINE
-- Kiai / BPM / ノーツ密度
-- Seek
-- Play / Pause
-- -4s / +4s
-- Timeline zoom: ±0.5 / ±0.4 / ±0.3
-- Music / Hitsoundを同一AudioContext・同一when・同一offsetで同期再生
-
-## 追加機能
+## Hitsound Pair Builder
 
 - D / K / Bに残った52素材を `hitsounds.zip` として候補ライブラリ化
-- Don候補だけ変更
-- Kat候補だけ変更
+- Donだけ変更 / Katだけ変更
 - Low Don / High Kat制約
 - All / Same family切替
 - Don / Kat単体Preview
 - Pair Save
 - KEEP / MAYBE / DROP
 - 保存Pairを再Load
-- Hitsound変更時、現在位置を保持してEffect Bufferを再構築
-- 再生中に変更した場合は、再構築後に同位置から再開
+- Hitsound変更時にEffect Bufferを再構築
 
 ## 削除した機能
 
+- OSZ手動選択
+- 複数Difficulty選択
 - START / END
 - V1 / V2
-- 区間長
-- 区間ジャンプ
-- 用途(Type)選択
-- Fade-in/out選択
+- 区間長 / 区間ジャンプ
+- 用途(Type)
+- Fade-in/out
 - テキスト出力
-- Copy / コピペ系
+- Copy系
 - 旧最下部Output一式
 
-## 候補素材
+## 必須バイナリ
 
-ユーザー手動選別の `D / K / B` のみを含みます。
+repo root:
 
-- `?` = 今回は使わないが保存価値あり → 非搭載
-- `X` = 除外 → 非搭載
-- D/K/Bは固定役割ではなく弱い参考ラベル
-- Pair内ではPitchProxy上の低い側をDon、高い側をKatへ割当
-
-## 必須ファイル
-
-repo rootに `hitsounds.zip` が必要です。
-ZIP内には `A003.wav` のような候補ID名で52ファイルを格納します。
+- `hitsounds.zip` — 52候補Hitsound
+- `maps.zip` — 固定5テスト譜面
 
 ## GitHub Pages
-
-1. Repository Settings
-2. Pages
-3. Build and deployment → Deploy from a branch
-4. Branch: `main` / `/ (root)`
 
 公開URL:
 
