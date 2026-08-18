@@ -33,19 +33,37 @@
   }
 
   function prefix(don, kat) {
-    const c = category(don, kat);
-    return c === 0 ? '♪ ' : c === 1 ? '♥ ' : '';
+    const group = category(don, kat);
+    return group === 0 ? '♪ ' : group === 1 ? '♥ ' : '';
   }
 
   let sorting = false;
+  let reorderQueued = false;
+
+  const observer = new MutationObserver(() => {
+    // lab.js が候補selectを再生成した時だけ後追いで整列する。
+    // 自分自身のDOM並び替えは observer.disconnect() 中に行うので再発火しない。
+    if (sorting || reorderQueued) return;
+    reorderQueued = true;
+    queueMicrotask(() => {
+      reorderQueued = false;
+      reorderKatOptions();
+    });
+  });
+
+  function startObserving() {
+    observer.observe(katSelect, { childList: true });
+  }
+
   function reorderKatOptions() {
     if (sorting) return;
     const don = byId(donSelect.value);
     if (!don) return;
 
     sorting = true;
+    observer.disconnect();
     try {
-      const current = katSelect.value;
+      const selected = katSelect.value;
       const rows = Array.from(katSelect.options).map((option, index) => {
         const kat = byId(option.value);
         return {
@@ -65,27 +83,32 @@
         a.index - b.index
       );
 
-      const fragment = document.createDocumentFragment();
+      // ラベルだけ更新。♪/♥を二重に付けない。
       for (const row of rows) {
-        const kat = row.kat;
-        if (kat) {
-          // lab.jsが作る元表示から既存の♪/♥だけ剥がして再付与。
-          const clean = row.option.textContent.replace(/^[♪♥]\s*/, '');
-          row.option.textContent = prefix(don, kat) + clean;
-        }
-        fragment.appendChild(row.option);
+        if (!row.kat) continue;
+        const clean = row.option.textContent.replace(/^[♪♥]\s*/, '');
+        row.option.textContent = prefix(don, row.kat) + clean;
       }
-      katSelect.appendChild(fragment);
-      if (Array.from(katSelect.options).some(o => o.value === current)) katSelect.value = current;
+
+      // 並びが既に正しければDOMを動かさない。
+      const currentOrder = Array.from(katSelect.options).map(o => o.value).join('|');
+      const desiredOrder = rows.map(row => row.option.value).join('|');
+      if (currentOrder !== desiredOrder) {
+        const fragment = document.createDocumentFragment();
+        for (const row of rows) fragment.appendChild(row.option);
+        katSelect.appendChild(fragment);
+      }
+
+      if (Array.from(katSelect.options).some(o => o.value === selected)) {
+        katSelect.value = selected;
+      }
     } finally {
       sorting = false;
+      startObserving();
     }
   }
 
-  const observer = new MutationObserver(() => {
-    if (!sorting) queueMicrotask(reorderKatOptions);
-  });
-  observer.observe(katSelect, { childList: true });
+  startObserving();
 
   // Katの←→も画面に見えている並び順で移動させる。
   function stepKat(direction, event) {
@@ -102,13 +125,13 @@
     katSelect.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  katPrev?.addEventListener('click', e => stepKat(-1, e), true);
-  katNext?.addEventListener('click', e => stepKat(1, e), true);
+  katPrev?.addEventListener('click', event => stepKat(-1, event), true);
+  katNext?.addEventListener('click', event => stepKat(1, event), true);
 
   donSelect.addEventListener('change', () => queueMicrotask(reorderKatOptions));
   $('pairScope')?.addEventListener('change', () => queueMicrotask(reorderKatOptions));
 
-  // 凡例を追加。
+  // 凡例。
   const katSide = katSelect.closest('.pair-side');
   if (katSide && !katSide.querySelector('.pair-order-legend')) {
     const legend = document.createElement('div');
@@ -125,8 +148,7 @@
       DROP: ['DROP', 'このPairを除外'],
     };
     pairEval.querySelectorAll('[data-pair-eval]').forEach(button => {
-      const key = button.dataset.pairEval;
-      const row = labels[key];
+      const row = labels[button.dataset.pairEval];
       if (!row) return;
       button.innerHTML = `<span>${row[0]}</span><small>${row[1]}</small>`;
     });
