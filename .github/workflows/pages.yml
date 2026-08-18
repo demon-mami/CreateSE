@@ -47,6 +47,7 @@ jobs:
           cp lab.js _site/
           cp pair-ranking.js _site/
           cp candidate-numbering.js _site/
+          cp favorite-shortcuts.js _site/
           cp object-timeline-v2.js _site/
           cp hitsounds.zip _site/
           cp maps.zip _site/
