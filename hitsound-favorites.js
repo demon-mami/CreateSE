@@ -5,15 +5,16 @@
   const controller = window.HitsoundController;
   if (!CANDIDATES.length || !controller) return;
 
-  const FAVORITES_KEY = 'osutaiko-hitsound-lab-favorites-v1';
+  const STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-v1';
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
-  const favDonButton = $('favDonButton');
-  const favKatButton = $('favKatButton');
-  const favSetButton = $('favSetButton');
+  const setButton = $('favSetButton');
   const exportButton = $('exportFavoritesButton');
+  const panel = $('savedSetsPanel');
+  const list = $('savedSetsList');
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
+  const valid = candidate => candidate && !candidate.excluded;
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || '';
 
   const GOOD_CROSS = new Map([
@@ -21,85 +22,80 @@
     ['A005', new Set(['A026'])],
     ['A010', new Set(['A026'])],
     ['A026', new Set(['A021'])],
-    ['A030', new Set(['A055'])],
     ['A058', new Set(['A053'])],
     ['A060', new Set(['A055'])],
   ]);
 
-  let stored = readFavorites();
-
-  function readFavorites() {
+  function readSets() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(FAVORITES_KEY) || 'null') || {};
-      return {
-        don: Array.isArray(parsed.don) ? parsed.don : [],
-        kat: Array.isArray(parsed.kat) ? parsed.kat : [],
-        set: Array.isArray(parsed.set) ? parsed.set : [],
-      };
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {};
+      const raw = Array.isArray(parsed.set) ? parsed.set : [];
+      return raw.filter(key => {
+        const [dId, kId] = String(key).split('|');
+        return valid(byId(dId)) && valid(byId(kId));
+      });
     } catch {
-      return { don: [], kat: [], set: [] };
+      return [];
     }
   }
 
-  function writeFavorites() {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(stored));
-    updateButtons();
-    window.dispatchEvent(new CustomEvent('hitsound-favorites-change', { detail: readFavorites() }));
+  function writeSets(sets) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ don: [], kat: [], set: sets }));
+    renderSavedSets();
+    updateSetButton();
+    window.dispatchEvent(new CustomEvent('hitsound-saved-sets-change', { detail: sets.slice() }));
   }
 
   function currentSetKey() {
     const { don, kat } = controller.getSelection();
     if (!don || !kat || don === SILENT_ID || kat === SILENT_ID) return '';
+    if (!valid(byId(don)) || !valid(byId(kat))) return '';
     return `${don}|${kat}`;
   }
 
-  function toggleList(key, value) {
-    if (!value || value === SILENT_ID) return;
-    const list = new Set(stored[key]);
-    if (list.has(value)) list.delete(value);
-    else list.add(value);
-    stored[key] = Array.from(list);
-    writeFavorites();
-  }
-
-  function toggleSet() {
+  function recordCurrentSet() {
     const key = currentSetKey();
     if (!key) return;
-    const list = new Set(stored.set);
-    if (list.has(key)) list.delete(key);
-    else list.add(key);
-    stored.set = Array.from(list);
-    writeFavorites();
+    const sets = readSets();
+    if (!sets.includes(key)) sets.push(key);
+    writeSets(sets);
   }
 
-  function updateButtons() {
-    stored = readFavorites();
-    const { don, kat } = controller.getSelection();
-    const setKey = currentSetKey();
-
-    if (favDonButton) {
-      favDonButton.disabled = !don || don === SILENT_ID;
-      favDonButton.classList.toggle('active', !!don && stored.don.includes(don));
-    }
-    if (favKatButton) {
-      favKatButton.disabled = !kat || kat === SILENT_ID;
-      favKatButton.classList.toggle('active', !!kat && stored.kat.includes(kat));
-    }
-    if (favSetButton) {
-      favSetButton.disabled = !setKey;
-      favSetButton.classList.toggle('active', !!setKey && stored.set.includes(setKey));
-    }
+  function updateSetButton() {
+    if (setButton) setButton.disabled = !currentSetKey();
   }
 
   function isRecommendedPair(donId, katId) {
     return !!donId && !!katId && GOOD_CROSS.get(donId)?.has(katId) === true;
   }
 
-  function pairCategory(d, k) {
-    if (!d || !k) return 'OTHER';
-    if (familyOf(d) === familyOf(k)) return 'SAME_FAMILY';
-    if (isRecommendedPair(d.id, k.id)) return 'RECOMMENDED_CROSS';
-    return 'OTHER';
+  function recommendedFor(side, selection = controller.getSelection()) {
+    if (side === 'kat') {
+      if (!selection.don || selection.don === SILENT_ID) return [];
+      return Array.from(GOOD_CROSS.get(selection.don) || []).filter(id => valid(byId(id)));
+    }
+
+    if (side === 'don') {
+      if (!selection.kat || selection.kat === SILENT_ID) return [];
+      const out = [];
+      for (const [dId, kats] of GOOD_CROSS.entries()) {
+        if (kats.has(selection.kat) && valid(byId(dId))) out.push(dId);
+      }
+      return out;
+    }
+    return [];
+  }
+
+  function renderSavedSets() {
+    if (!panel || !list) return;
+    const sets = readSets();
+    panel.hidden = sets.length === 0;
+    list.innerHTML = sets.map(key => {
+      const [dId, kId] = String(key).split('|');
+      const d = byId(dId), k = byId(kId);
+      if (!valid(d) || !valid(k)) return '';
+      return `<div class="saved-set-row" title="${d.originalName || d.name} + ${k.originalName || k.name}">${d.sourceNumber} + ${k.sourceNumber}</div>`;
+    }).join('');
   }
 
   function csvCell(value) {
@@ -111,44 +107,20 @@
       'FavoriteType',
       'DonNo','DonID','DonName','DonSourceName','DonFamily','DonPitchHz','DonUserLabel',
       'KatNo','KatID','KatName','KatSourceName','KatFamily','KatPitchHz','KatUserLabel',
-      'PairCategory','PairMark'
+      'PairCategory','Recommended'
     ]];
 
-    const sortCandidates = ids => ids
-      .map(byId).filter(Boolean)
-      .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber));
-
-    for (const d of sortCandidates(stored.don)) {
-      rows.push([
-        'DON', d.sourceNumber, d.id, d.name, d.originalName, familyOf(d), d.pitch, d.userLabel,
-        '', '', '', '', '', '', '', '', ''
-      ]);
-    }
-
-    for (const k of sortCandidates(stored.kat)) {
-      rows.push([
-        'KAT', '', '', '', '', '', '', '',
-        k.sourceNumber, k.id, k.name, k.originalName, familyOf(k), k.pitch, k.userLabel,
-        '', ''
-      ]);
-    }
-
-    const sets = stored.set.map(key => {
+    for (const key of readSets()) {
       const [dId, kId] = String(key).split('|');
       const d = byId(dId), k = byId(kId);
-      return d && k ? { d, k } : null;
-    }).filter(Boolean).sort((a, b) =>
-      Number(a.d.sourceNumber) - Number(b.d.sourceNumber) ||
-      Number(a.k.sourceNumber) - Number(b.k.sourceNumber)
-    );
-
-    for (const { d, k } of sets) {
-      const category = pairCategory(d, k);
+      if (!valid(d) || !valid(k)) continue;
+      const recommended = isRecommendedPair(d.id, k.id);
       rows.push([
         'SET',
         d.sourceNumber, d.id, d.name, d.originalName, familyOf(d), d.pitch, d.userLabel,
         k.sourceNumber, k.id, k.name, k.originalName, familyOf(k), k.pitch, k.userLabel,
-        category, category === 'RECOMMENDED_CROSS' ? '♥' : ''
+        familyOf(d) === familyOf(k) ? 'SAME_FAMILY' : (recommended ? 'RECOMMENDED_CROSS' : 'OTHER'),
+        recommended ? 'YES' : ''
       ]);
     }
 
@@ -156,12 +128,7 @@
   }
 
   async function exportCsv() {
-    stored = readFavorites();
-    const file = new File(
-      [makeCsv()],
-      'osu_taiko_hitsound_lab_favorites.csv',
-      { type: 'text/csv;charset=utf-8' }
-    );
+    const file = new File([makeCsv()], 'osu_taiko_hitsound_lab_favorites.csv', { type: 'text/csv;charset=utf-8' });
 
     try {
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
@@ -182,28 +149,20 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  favDonButton?.addEventListener('click', () => {
-    const { don } = controller.getSelection();
-    toggleList('don', don);
-  });
-  favKatButton?.addEventListener('click', () => {
-    const { kat } = controller.getSelection();
-    toggleList('kat', kat);
-  });
-  favSetButton?.addEventListener('click', toggleSet);
+  setButton?.addEventListener('click', recordCurrentSet);
   exportButton?.addEventListener('click', exportCsv);
-
-  window.addEventListener('hitsound-selection-change', updateButtons);
+  window.addEventListener('hitsound-selection-change', updateSetButton);
   window.addEventListener('storage', event => {
-    if (event.key === FAVORITES_KEY) updateButtons();
+    if (event.key === STORAGE_KEY) renderSavedSets();
   });
 
   window.HitsoundFavorites = {
-    KEY: FAVORITES_KEY,
-    read: readFavorites,
+    KEY: STORAGE_KEY,
+    readSets,
     isRecommendedPair,
-    pairCategory,
+    recommendedFor,
   };
 
-  updateButtons();
+  renderSavedSets();
+  updateSetButton();
 })();
