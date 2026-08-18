@@ -15,6 +15,7 @@
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const valid = candidate => candidate && !candidate.excluded;
+  const validSideId = id => id === SILENT_ID || valid(byId(id));
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || '';
 
   const GOOD_CROSS = new Map([
@@ -32,7 +33,7 @@
       const raw = Array.isArray(parsed.set) ? parsed.set : [];
       return raw.filter(key => {
         const [dId, kId] = String(key).split('|');
-        return valid(byId(dId)) && valid(byId(kId));
+        return validSideId(dId) && validSideId(kId) && !(dId === SILENT_ID && kId === SILENT_ID);
       });
     } catch {
       return [];
@@ -48,8 +49,8 @@
 
   function currentSetKey() {
     const { don, kat } = controller.getSelection();
-    if (!don || !kat || don === SILENT_ID || kat === SILENT_ID) return '';
-    if (!valid(byId(don)) || !valid(byId(kat))) return '';
+    if (!validSideId(don) || !validSideId(kat)) return '';
+    if (don === SILENT_ID && kat === SILENT_ID) return '';
     return `${don}|${kat}`;
   }
 
@@ -66,7 +67,7 @@
   }
 
   function isRecommendedPair(donId, katId) {
-    return !!donId && !!katId && GOOD_CROSS.get(donId)?.has(katId) === true;
+    return donId !== SILENT_ID && katId !== SILENT_ID && GOOD_CROSS.get(donId)?.has(katId) === true;
   }
 
   function recommendedFor(side, selection = controller.getSelection()) {
@@ -86,20 +87,44 @@
     return [];
   }
 
+  function sideLabel(id) {
+    if (id === SILENT_ID) return '—';
+    return byId(id)?.sourceNumber || '—';
+  }
+
+  function sideTitle(id) {
+    if (id === SILENT_ID) return '無音';
+    const candidate = byId(id);
+    return candidate ? (candidate.originalName || candidate.name) : '—';
+  }
+
   function renderSavedSets() {
     if (!panel || !list) return;
     const sets = readSets();
     panel.hidden = sets.length === 0;
     list.innerHTML = sets.map(key => {
       const [dId, kId] = String(key).split('|');
-      const d = byId(dId), k = byId(kId);
-      if (!valid(d) || !valid(k)) return '';
-      return `<div class="saved-set-row" title="${d.originalName || d.name} + ${k.originalName || k.name}">${d.sourceNumber} + ${k.sourceNumber}</div>`;
+      return `<div class="saved-set-row" title="${sideTitle(dId)} + ${sideTitle(kId)}">${sideLabel(dId)} + ${sideLabel(kId)}</div>`;
     }).join('');
   }
 
   function csvCell(value) {
     return `"${String(value ?? '').replaceAll('"', '""')}"`;
+  }
+
+  function sideCsv(id) {
+    if (id === SILENT_ID) return ['—', SILENT_ID, 'silent.wav', 'silent', 'Silent', '', ''];
+    const candidate = byId(id);
+    if (!valid(candidate)) return ['', '', '', '', '', '', ''];
+    return [
+      candidate.sourceNumber,
+      candidate.id,
+      candidate.name,
+      candidate.originalName,
+      familyOf(candidate),
+      candidate.pitch,
+      candidate.userLabel,
+    ];
   }
 
   function makeCsv() {
@@ -113,13 +138,17 @@
     for (const key of readSets()) {
       const [dId, kId] = String(key).split('|');
       const d = byId(dId), k = byId(kId);
-      if (!valid(d) || !valid(k)) continue;
-      const recommended = isRecommendedPair(d.id, k.id);
+      const recommended = isRecommendedPair(dId, kId);
+      let category = 'OTHER';
+      if (dId === SILENT_ID || kId === SILENT_ID) category = 'SILENT_SIDE';
+      else if (valid(d) && valid(k) && familyOf(d) === familyOf(k)) category = 'SAME_FAMILY';
+      else if (recommended) category = 'RECOMMENDED_CROSS';
+
       rows.push([
         'SET',
-        d.sourceNumber, d.id, d.name, d.originalName, familyOf(d), d.pitch, d.userLabel,
-        k.sourceNumber, k.id, k.name, k.originalName, familyOf(k), k.pitch, k.userLabel,
-        familyOf(d) === familyOf(k) ? 'SAME_FAMILY' : (recommended ? 'RECOMMENDED_CROSS' : 'OTHER'),
+        ...sideCsv(dId),
+        ...sideCsv(kId),
+        category,
         recommended ? 'YES' : ''
       ]);
     }
