@@ -10,7 +10,8 @@
     title: $('songTitle'),
     songMeta: $('songMeta'),
     status: $('statusBadge'),
-    play: $('playButton')
+    play: $('playButton'),
+    chartInfo: document.querySelector('.chart-info')
   };
 
   let packPromise = null;
@@ -20,6 +21,10 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+
+  function setChartInfoVisible(visible) {
+    if (el.chartInfo) el.chartInfo.hidden = !visible;
+  }
 
   function setInputFile(input, file) {
     const dt = new DataTransfer();
@@ -55,11 +60,13 @@
     if (!chart || chart !== currentChart) return;
     if (el.title) el.title.textContent = chart.title;
     if (el.difficulty) el.difficulty.textContent = chart.difficulty;
+    setChartInfoVisible(true);
   }
 
   async function loadChart(chart) {
     const mySerial = ++serial;
     currentChart = chart;
+    setChartInfoVisible(true);
     if (el.status) el.status.textContent = '譜面読込中';
     if (el.title) el.title.textContent = chart.title;
     if (el.difficulty) el.difficulty.textContent = chart.difficulty;
@@ -84,15 +91,18 @@
   }
 
   el.select.innerHTML =
-    '<option value="">譜面を選択してください</option>' +
+    '<option value="">譜面を選択</option>' +
     CHARTS.map(chart =>
       `<option value="${esc(chart.id)}">${esc(chart.title)}</option>`
     ).join('');
+
+  setChartInfoVisible(false);
 
   el.select.addEventListener('change', async () => {
     const chart = CHARTS.find(x => x.id === el.select.value);
     if (!chart) {
       currentChart = null;
+      setChartInfoVisible(false);
       if (el.title) el.title.textContent = '—';
       if (el.difficulty) el.difficulty.textContent = '—';
       return;
