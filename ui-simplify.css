@@ -5,7 +5,10 @@
 
 .pair-builder{padding-top:7px!important}
 .pair-builder-head{justify-content:flex-end!important;align-items:center!important;margin-bottom:7px!important}
-.scope-field{width:112px!important}
+.pair-filter-fields{display:flex;align-items:center;gap:5px;min-width:0;flex:1}
+.category-field{display:block;min-width:0;flex:1}
+.category-field select{min-height:29px!important;font-size:9px!important;padding-left:8px!important}
+.scope-field{width:112px!important;flex:0 0 112px}
 .scope-field select{min-height:29px!important}
 
 .pair-meta,
@@ -91,7 +94,10 @@
 .favorite-shortcut-label.set{color:#fff!important}
 
 @media(max-width:430px){
-  .scope-field{width:88px!important}
+  .pair-builder-head{gap:5px!important}
+  .pair-filter-fields{gap:4px}
+  .scope-field{width:82px!important;flex-basis:82px!important}
+  .category-field select{font-size:8px!important;padding-left:6px!important}
   .pair-side{padding:8px!important}
   .favorite-shortcut-row{grid-template-columns:36px minmax(0,1fr)!important}
 }
