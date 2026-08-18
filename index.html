@@ -37,6 +37,9 @@
         <span id="songMeta">—</span>
       </div>
 
+      <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
+      <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
+
       <div class="pair-builder" aria-label="Hitsound Pair Builder">
         <div class="pair-builder-head">
           <div>
@@ -130,7 +133,9 @@
 
   <audio id="samplePreviewAudio" preload="none"></audio>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./fetch-bridge.js?v=0.1"></script>
   <script src="./candidates.js?v=0.1"></script>
-  <script src="./app.js?v=0.1"></script>
+  <script src="https://cdn.jsdelivr.net/gh/demon-mami/osutaiko-mami-viewer@c22e29e4ce9cd8ae8c7a5ec3f2c4c9388c6b66c9/app-v4.js"></script>
+  <script src="./lab.js?v=0.1"></script>
 </body>
 </html>
