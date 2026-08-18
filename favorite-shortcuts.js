@@ -8,6 +8,7 @@
   const donSelect = $('donSelect');
   const katSelect = $('katSelect');
   const scopeSelect = $('pairScope');
+  const categorySelect = $('pairCategory');
   const donInput = $('donHitsoundInput');
   const katInput = $('kaHitsoundInput');
   const status = $('statusBadge');
@@ -20,6 +21,7 @@
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id);
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const activeCategory = () => categorySelect?.value || '';
 
   const sourceNumber = candidate => {
     if (candidate?.sourceNumber) return candidate.sourceNumber;
@@ -47,7 +49,7 @@
     }
   }
 
-  // Move SET★ / CSV to the top of the HITSOUND PAIR block.
+  // Move SET★ / CSV to the top of the pair block.
   if (pairHead && topActions && topActions.parentElement !== pairHead) {
     topActions.classList.add('pair-head-actions');
     pairHead.appendChild(topActions);
@@ -117,7 +119,6 @@
       const isReady = (status?.textContent || '') === '準備完了' && !play?.disabled;
       if (isReady) {
         if (!readySince) readySince = performance.now();
-        // Require a quiet period so sequential Don->Kat rebuilds are not split midway.
         if (performance.now() - readySince >= 280) return true;
       } else {
         readySince = 0;
@@ -162,15 +163,25 @@
   }
 
   async function applyFavoriteDon(id) {
+    const candidate = byId(id);
+    const category = activeCategory();
+    if (!candidate || (category && candidate.family !== category)) return;
     await selectOne(donSelect, donInput, id);
   }
 
   async function applyFavoriteKat(id) {
     const d = byId(donSelect.value);
     const k = byId(id);
-    if (!d || !k || k.pitch <= d.pitch) return;
+    const category = activeCategory();
+    if (!k) return;
 
-    if (!optionExists(katSelect, id)) {
+    if (category) {
+      if (k.family !== category) return;
+    } else {
+      if (!d || k.pitch <= d.pitch) return;
+    }
+
+    if (!optionExists(katSelect, id) && !category) {
       ensureAllScope();
       await delay(0);
     }
@@ -181,18 +192,23 @@
     const [dId, kId] = String(key || '').split('|');
     const d = byId(dId);
     const k = byId(kId);
-    if (!d || !k || k.pitch <= d.pitch) return;
+    const category = activeCategory();
+    if (!d || !k) return;
 
-    // A saved SET is a direct recall command, so allow cross-family SETs regardless
-    // of the current browsing scope.
-    if (scopeSelect?.value === 'SAME' && d.family !== k.family) {
+    if (category) {
+      if (d.family !== category || k.family !== category) return;
+    } else if (k.pitch <= d.pitch) {
+      return;
+    }
+
+    if (!category && scopeSelect?.value === 'SAME' && d.family !== k.family) {
       ensureAllScope();
       await delay(0);
     }
 
     await selectOne(donSelect, donInput, dId);
 
-    if (!optionExists(katSelect, kId)) {
+    if (!optionExists(katSelect, kId) && !category) {
       ensureAllScope();
       await delay(0);
     }
@@ -206,19 +222,27 @@
   function renderFavorites() {
     const fav = readFavorites();
     const currentDon = byId(donSelect.value);
+    const category = activeCategory();
 
     const dons = fav.don.map(byId).filter(Boolean);
-    donList.innerHTML = dons.length ? dons.map(candidate =>
-      `<button type="button" class="favorite-chip don" data-quick-don="${candidate.id}" title="${candidate.name}" ${applying ? 'disabled' : ''}>${shortName(candidate)}</button>`
-    ).join('') : emptyMarkup();
+    donList.innerHTML = dons.length ? dons.map(candidate => {
+      const compatible = !category || candidate.family === category;
+      const disabled = applying || !compatible;
+      const title = compatible ? candidate.name : `${candidate.name} — 選択カテゴリー外`;
+      return `<button type="button" class="favorite-chip don" data-quick-don="${candidate.id}" title="${title}" ${disabled ? 'disabled' : ''}>${shortName(candidate)}</button>`;
+    }).join('') : emptyMarkup();
 
     const kats = fav.kat.map(byId).filter(Boolean);
     katList.innerHTML = kats.length ? kats.map(candidate => {
-      const compatible = !!currentDon && candidate.pitch > currentDon.pitch;
+      const compatible = category
+        ? candidate.family === category
+        : !!currentDon && candidate.pitch > currentDon.pitch;
       const disabled = applying || !compatible;
       const title = compatible
         ? candidate.name
-        : `${candidate.name} — 現在のDONより高くないため選択不可`;
+        : category
+          ? `${candidate.name} — 選択カテゴリー外`
+          : `${candidate.name} — 現在のDONより高くないため選択不可`;
       return `<button type="button" class="favorite-chip kat" data-quick-kat="${candidate.id}" title="${title}" ${disabled ? 'disabled' : ''}>${shortName(candidate)}</button>`;
     }).join('') : emptyMarkup();
 
@@ -227,9 +251,12 @@
       const d = byId(dId), k = byId(kId);
       return d && k ? { key, d, k } : null;
     }).filter(Boolean);
-    setList.innerHTML = sets.length ? sets.map(({ key, d, k }) =>
-      `<button type="button" class="favorite-chip set" data-quick-set="${key}" title="${d.name} + ${k.name}" ${applying ? 'disabled' : ''}>${sourceNumber(d)} + ${sourceNumber(k)}</button>`
-    ).join('') : emptyMarkup();
+    setList.innerHTML = sets.length ? sets.map(({ key, d, k }) => {
+      const compatible = !category || (d.family === category && k.family === category);
+      const disabled = applying || !compatible;
+      const title = compatible ? `${d.name} + ${k.name}` : `${d.name} + ${k.name} — 選択カテゴリー外`;
+      return `<button type="button" class="favorite-chip set" data-quick-set="${key}" title="${title}" ${disabled ? 'disabled' : ''}>${sourceNumber(d)} + ${sourceNumber(k)}</button>`;
+    }).join('') : emptyMarkup();
 
     donList.querySelectorAll('[data-quick-don]').forEach(button => {
       button.addEventListener('click', () => runExclusive(() => applyFavoriteDon(button.dataset.quickDon)));
@@ -242,13 +269,13 @@
     });
   }
 
-  // Pair-ranking writes localStorage in its click handlers first; refresh just after it.
   ['favDonButton', 'favKatButton', 'favSetButton'].forEach(id => {
     $(id)?.addEventListener('click', () => setTimeout(renderFavorites, 0));
   });
   donSelect.addEventListener('change', () => setTimeout(renderFavorites, 0));
   katSelect.addEventListener('change', () => setTimeout(renderFavorites, 0));
   scopeSelect?.addEventListener('change', () => setTimeout(renderFavorites, 0));
+  categorySelect?.addEventListener('change', () => setTimeout(renderFavorites, 0));
 
   const style = document.createElement('style');
   style.textContent = `
@@ -334,7 +361,6 @@
     .favorite-shortcut-panel.busy{opacity:.82}
     @media(max-width:430px){
       .pair-builder-head{gap:5px}
-      .scope-field{width:94px}
       .pair-head-actions .favorite-button{min-width:45px;padding:0 5px}
       .pair-head-actions .favorite-button.export{min-width:53px}
     }
