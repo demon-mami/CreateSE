@@ -23,26 +23,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Hitsound Lab
         uses: actions/checkout@v6
+
+      - name: Checkout frozen reference runtime
+        uses: actions/checkout@v6
+        with:
+          repository: demon-mami/osutaiko-mami-viewer
+          ref: c22e29e4ce9cd8ae8c7a5ec3f2c4c9388c6b66c9
+          path: _reference
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
       - name: Prepare site
         run: |
-          mkdir -p _site
+          mkdir -p _site/vendor
           cp index.html _site/
           cp style.css _site/
           cp candidates.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
-          cp fetch-bridge.js _site/
           cp lab.js _site/
           cp pair-ranking.js _site/
           cp object-timeline-v2.js _site/
           cp hitsounds.zip _site/
           cp maps.zip _site/
+
+          # Freeze the audio/runtime dependencies to the verified Viewer commit.
+          cp _reference/app-v4.js _site/app-v4.js
+          cp _reference/vendor/jszip.min.js _site/vendor/jszip.min.js
+          cp -R _reference/hitsounds _site/hitsounds
+
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
