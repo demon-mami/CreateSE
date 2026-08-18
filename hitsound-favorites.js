@@ -43,26 +43,14 @@
   const feedbackStyle = document.createElement('style');
   feedbackStyle.textContent = `
     .set-feedback{
-      min-height:30px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      margin:0 2px 2px;
-      color:rgba(255,255,255,.72);
-      font-size:11px;
-      font-weight:750;
-      letter-spacing:.01em;
-      opacity:0;
-      pointer-events:none;
-      text-align:center;
-      text-shadow:0 1px 10px rgba(255,255,255,.06);
+      min-height:30px;display:flex;align-items:center;justify-content:center;margin:0 2px 2px;
+      color:rgba(255,255,255,.72);font-size:11px;font-weight:750;letter-spacing:.01em;
+      opacity:0;pointer-events:none;text-align:center;text-shadow:0 1px 10px rgba(255,255,255,.06)
     }
     .set-feedback.show{animation:setFavoriteFeedback 2.8s ease-out forwards}
     @keyframes setFavoriteFeedback{
-      0%{opacity:0;transform:translateY(3px)}
-      12%{opacity:.72;transform:translateY(0)}
-      52%{opacity:.58;transform:translateY(0)}
-      100%{opacity:0;transform:translateY(-2px)}
+      0%{opacity:0;transform:translateY(3px)}12%{opacity:.72;transform:translateY(0)}
+      52%{opacity:.58;transform:translateY(0)}100%{opacity:0;transform:translateY(-2px)}
     }
     @media(prefers-reduced-motion:reduce){
       .set-feedback.show{animation:setFavoriteFeedbackReduced 2.8s linear forwards}
@@ -122,6 +110,17 @@
     showSetFeedback();
   }
 
+  function removeSet(key) {
+    const sets = readSets().filter(item => item !== key);
+    writeSets(sets);
+  }
+
+  async function applySet(key) {
+    const [donId, katId] = String(key).split('|');
+    if (!validSideId(donId) || !validSideId(katId)) return;
+    await controller.setPair(donId, katId);
+  }
+
   function updateSetButton() {
     if (setButton) setButton.disabled = !currentSetKey();
   }
@@ -161,10 +160,15 @@
   function renderSavedSets() {
     if (!panel || !list) return;
     const sets = readSets();
-    panel.hidden = sets.length === 0;
     list.innerHTML = sets.map(key => {
       const [dId, kId] = String(key).split('|');
-      return `<div class="saved-set-row" title="${sideTitle(dId)} + ${sideTitle(kId)}">${sideLabel(dId)} + ${sideLabel(kId)}</div>`;
+      const label = `${sideLabel(dId)} + ${sideLabel(kId)}`;
+      const title = `${sideTitle(dId)} + ${sideTitle(kId)}`;
+      return `
+        <div class="favorite-set-item">
+          <button class="hs-key favorite-set-apply" type="button" data-apply-set="${key}" title="${title}" aria-label="${label} を適用"><span>${label}</span></button>
+          <button class="hs-key favorite-set-delete" type="button" data-delete-set="${key}" aria-label="${label} を削除"><span>×</span></button>
+        </div>`;
     }).join('');
   }
 
@@ -240,6 +244,16 @@
 
   setButton?.addEventListener('click', recordCurrentSet);
   exportButton?.addEventListener('click', exportCsv);
+  list?.addEventListener('click', event => {
+    const applyButton = event.target.closest('[data-apply-set]');
+    if (applyButton) {
+      applySet(applyButton.dataset.applySet).catch(error => alert(error.message));
+      return;
+    }
+    const deleteButton = event.target.closest('[data-delete-set]');
+    if (deleteButton) removeSet(deleteButton.dataset.deleteSet);
+  });
+
   window.addEventListener('hitsound-selection-change', updateSetButton);
   window.addEventListener('storage', event => {
     if (event.key === STORAGE_KEY) renderSavedSets();
