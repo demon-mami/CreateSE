@@ -130,49 +130,65 @@
     }
   }
 
+  // Role policy is one-way and anchored on the DON side.
+  // DON: only sounds previously classified D or B.
+  // KAT: only sounds previously classified K or B, and strictly higher than the selected DON.
+  // Changing KAT never changes or filters the DON candidate pool.
   function donPool() {
-    const k = byId(katId);
-    let list = k ? CANDIDATES.filter(x => x.pitch < k.pitch) : [...CANDIDATES];
-    if (el.scope.value === 'SAME' && k) list = list.filter(x => x.family === k.family);
-    return list.sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
+    return CANDIDATES
+      .filter(x => x.userLabel === 'D' || x.userLabel === 'B')
+      .sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
   }
 
   function katPool() {
     const d = byId(donId);
-    let list = d ? CANDIDATES.filter(x => x.pitch > d.pitch) : [...CANDIDATES];
-    if (el.scope.value === 'SAME' && d) list = list.filter(x => x.family === d.family);
+    if (!d) return [];
+    let list = CANDIDATES.filter(x =>
+      (x.userLabel === 'K' || x.userLabel === 'B') && x.pitch > d.pitch
+    );
+    if (el.scope.value === 'SAME') list = list.filter(x => x.family === d.family);
     return list.sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
   }
 
-  function normalizePair(changedSide = '') {
-    const d = byId(donId), k = byId(katId);
-    if (!d || !k || d.pitch < k.pitch) return;
-    if (changedSide === 'don') {
-      const next = CANDIDATES.filter(x => x.pitch > d.pitch).sort((a,b) => a.pitch - b.pitch)[0];
-      if (next) katId = next.id;
-    } else {
-      const prev = CANDIDATES.filter(x => x.pitch < k.pitch).sort((a,b) => b.pitch - a.pitch)[0];
-      if (prev) donId = prev.id;
-    }
+  function normalizePair() {
+    const dons = donPool();
+    if (!dons.some(x => x.id === donId)) donId = dons[0]?.id || '';
+
+    const kats = katPool();
+    if (!kats.some(x => x.id === katId)) katId = kats[0]?.id || '';
   }
 
   function optionText(c) {
     return `${c.name} [${c.userLabel}] · ${Math.round(c.pitch)}Hz`;
   }
 
-  function fillSelect(select, list, current) {
-    const actual = list.length ? list : CANDIDATES;
-    select.innerHTML = actual.map(c => `<option value="${c.id}">${esc(optionText(c))}</option>`).join('');
-    if (actual.some(c => c.id === current)) select.value = current;
+  function fillSelect(select, list, current, emptyText = '該当候補なし') {
+    if (!list.length) {
+      select.innerHTML = `<option value="">${esc(emptyText)}</option>`;
+      select.value = '';
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    select.innerHTML = list.map(c => `<option value="${c.id}">${esc(optionText(c))}</option>`).join('');
+    select.value = list.some(c => c.id === current) ? current : list[0].id;
   }
 
-  function renderPair(changedSide = '') {
-    normalizePair(changedSide);
-    fillSelect(el.donSelect, donPool(), donId);
-    fillSelect(el.katSelect, katPool(), katId);
+  function renderPair() {
+    normalizePair();
+    fillSelect(el.donSelect, donPool(), donId, 'D/BのDON候補なし');
+    fillSelect(el.katSelect, katPool(), katId, 'このDONより高いK/B候補なし');
 
     const d = byId(donId), k = byId(katId);
-    if (!d || !k) return;
+    if (!d) return;
+    if (!k) {
+      el.donSelect.value = donId;
+      el.donMeta.textContent = `${d.family} · user ${d.userLabel} · ${d.pitch.toFixed(1)} Hz`;
+      el.katMeta.textContent = '該当KAT候補なし';
+      el.pairRule.textContent = 'このDONより高いK/B候補がありません';
+      el.pairRule.className = 'pair-rule bad';
+      return;
+    }
     el.donSelect.value = donId;
     el.katSelect.value = katId;
     el.donMeta.textContent = `${d.family} · user ${d.userLabel} · ${d.pitch.toFixed(1)} Hz`;
@@ -215,17 +231,27 @@
     });
   }
 
-  function cycle(side, dir) {
+  async function cycle(side, dir) {
     const list = side === 'don' ? donPool() : katPool();
     if (!list.length) return;
     const current = side === 'don' ? donId : katId;
     let index = list.findIndex(x => x.id === current);
     if (index < 0) index = 0;
     index = Math.max(0, Math.min(list.length - 1, index + dir));
-    if (side === 'don') donId = list[index].id;
-    else katId = list[index].id;
-    renderPair(side);
-    applyCandidate(side, side === 'don' ? donId : katId);
+    if (list[index].id === current) return;
+
+    if (side === 'don') {
+      const previousKat = katId;
+      donId = list[index].id;
+      renderPair();
+      if (!katId) return;
+      if (katId !== previousKat) await applyPair();
+      else await applyCandidate('don', donId);
+    } else {
+      katId = list[index].id;
+      renderPair();
+      await applyCandidate('kat', katId);
+    }
   }
 
   async function preview(id) {
@@ -243,16 +269,23 @@
   }
 
   el.donSelect.addEventListener('change', async () => {
+    const previousKat = katId;
     donId = el.donSelect.value;
-    renderPair('don');
-    await applyCandidate('don', donId);
+    renderPair();
+    if (!katId) return;
+    if (katId !== previousKat) await applyPair();
+    else await applyCandidate('don', donId);
   });
   el.katSelect.addEventListener('change', async () => {
     katId = el.katSelect.value;
-    renderPair('kat');
-    await applyCandidate('kat', katId);
+    renderPair();
+    if (katId) await applyCandidate('kat', katId);
   });
-  el.scope.addEventListener('change', () => renderPair());
+  el.scope.addEventListener('change', async () => {
+    const previousKat = katId;
+    renderPair();
+    if (katId && katId !== previousKat) await applyCandidate('kat', katId);
+  });
   el.donPrev.addEventListener('click', () => cycle('don', -1));
   el.donNext.addEventListener('click', () => cycle('don', 1));
   el.katPrev.addEventListener('click', () => cycle('kat', -1));
@@ -283,6 +316,7 @@
 
   renderPair();
 
+  // After the original viewer finishes loading an OSZ, apply the current Pair sequentially.
   $('oszInput')?.addEventListener('change', async () => {
     if (!(await waitForViewerReady())) return;
     try {
