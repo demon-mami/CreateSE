@@ -44,6 +44,7 @@ jobs:
           cp theme-col07.css _site/
           cp ui-simplify.css _site/
           cp candidates.js _site/
+          cp category-policy.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
           cp lab.js _site/
