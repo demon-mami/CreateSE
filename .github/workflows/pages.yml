@@ -42,16 +42,14 @@ jobs:
           cp index.html _site/
           cp style.css _site/
           cp theme-col07.css _site/
-          cp ui-simplify.css _site/
+          cp hitsound-grid.css _site/
           cp candidates.js _site/
-          cp category-policy.js _site/
+          cp candidate-numbering.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
-          cp lab.js _site/
-          cp pair-ranking.js _site/
-          cp candidate-numbering.js _site/
-          cp favorite-shortcuts.js _site/
-          cp ui-simplify.js _site/
+          cp hitsound-controller.js _site/
+          cp hitsound-favorites.js _site/
+          cp hitsound-grid.js _site/
           cp object-timeline-v2.js _site/
           cp hitsounds.zip _site/
           cp maps.zip _site/
