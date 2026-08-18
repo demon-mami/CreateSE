@@ -7,7 +7,6 @@
   const katSelect = $('katSelect');
   const katPrev = $('katPrev');
   const katNext = $('katNext');
-  const pairEval = document.querySelector('.pair-eval');
 
   if (!donSelect || !katSelect) return;
 
@@ -37,12 +36,18 @@
     return group === 0 ? '♪ ' : group === 1 ? '♥ ' : '';
   }
 
+  function categoryName(don, kat) {
+    const group = category(don, kat);
+    return group === 0 ? 'SAME_FAMILY' : group === 1 ? 'RECOMMENDED_CROSS' : 'OTHER';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Kat候補の表示順: ♪同family -> ♥推奨Cross-family -> その他
+  // ---------------------------------------------------------------------------
   let sorting = false;
   let reorderQueued = false;
 
   const observer = new MutationObserver(() => {
-    // lab.js が候補selectを再生成した時だけ後追いで整列する。
-    // 自分自身のDOM並び替えは observer.disconnect() 中に行うので再発火しない。
     if (sorting || reorderQueued) return;
     reorderQueued = true;
     queueMicrotask(() => {
@@ -83,14 +88,12 @@
         a.index - b.index
       );
 
-      // ラベルだけ更新。♪/♥を二重に付けない。
       for (const row of rows) {
         if (!row.kat) continue;
         const clean = row.option.textContent.replace(/^[♪♥]\s*/, '');
         row.option.textContent = prefix(don, row.kat) + clean;
       }
 
-      // 並びが既に正しければDOMを動かさない。
       const currentOrder = Array.from(katSelect.options).map(o => o.value).join('|');
       const desiredOrder = rows.map(row => row.option.value).join('|');
       if (currentOrder !== desiredOrder) {
@@ -128,9 +131,6 @@
   katPrev?.addEventListener('click', event => stepKat(-1, event), true);
   katNext?.addEventListener('click', event => stepKat(1, event), true);
 
-  donSelect.addEventListener('change', () => queueMicrotask(reorderKatOptions));
-  $('pairScope')?.addEventListener('change', () => queueMicrotask(reorderKatOptions));
-
   // 凡例。
   const katSide = katSelect.closest('.pair-side');
   if (katSide && !katSide.querySelector('.pair-order-legend')) {
@@ -140,36 +140,190 @@
     katSelect.insertAdjacentElement('afterend', legend);
   }
 
-  // KEEP / MAYBE / DROP の意味をUI上でも固定。
-  if (pairEval) {
-    const labels = {
-      KEEP: ['KEEP', '次工程へ残す'],
-      MAYBE: ['MAYBE', '比較保留'],
-      DROP: ['DROP', 'このPairを除外'],
+  // ---------------------------------------------------------------------------
+  // お気に入り: DON★ / KAT★ / SET★
+  // ---------------------------------------------------------------------------
+  const FAVORITES_KEY = 'osutaiko-hitsound-lab-favorites-v1';
+  let stored = { don: [], kat: [], set: [] };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FAVORITES_KEY) || 'null');
+    if (parsed) stored = {
+      don: Array.isArray(parsed.don) ? parsed.don : [],
+      kat: Array.isArray(parsed.kat) ? parsed.kat : [],
+      set: Array.isArray(parsed.set) ? parsed.set : [],
     };
-    pairEval.querySelectorAll('[data-pair-eval]').forEach(button => {
-      const row = labels[button.dataset.pairEval];
-      if (!row) return;
-      button.innerHTML = `<span>${row[0]}</span><small>${row[1]}</small>`;
+  } catch {}
+
+  const favDon = new Set(stored.don);
+  const favKat = new Set(stored.kat);
+  const favSet = new Set(stored.set);
+
+  function currentSetKey() {
+    return `${donSelect.value}|${katSelect.value}`;
+  }
+
+  function saveFavorites() {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify({
+      don: Array.from(favDon),
+      kat: Array.from(favKat),
+      set: Array.from(favSet),
+    }));
+  }
+
+  // 旧評価UIは残存コード互換のためDOMには残すが、ユーザーには表示しない。
+  const oldSavePair = $('savePairButton');
+  const oldPairEval = document.querySelector('.pair-eval');
+  const oldSavedPairs = document.querySelector('.saved-pairs');
+  if (oldSavePair) oldSavePair.hidden = true;
+  if (oldPairEval) oldPairEval.hidden = true;
+  if (oldSavedPairs) oldSavedPairs.hidden = true;
+
+  const pairRuleRow = document.querySelector('.pair-rule-row');
+  const favoriteBar = document.createElement('div');
+  favoriteBar.className = 'favorite-actions';
+  favoriteBar.innerHTML = `
+    <button id="favDonButton" class="favorite-button" type="button">DON ★</button>
+    <button id="favKatButton" class="favorite-button" type="button">KAT ★</button>
+    <button id="favSetButton" class="favorite-button" type="button">SET ★</button>
+    <button id="exportFavoritesButton" class="favorite-button export" type="button">CSV出力</button>
+  `;
+  (pairRuleRow || document.querySelector('.pair-grid'))?.insertAdjacentElement('afterend', favoriteBar);
+
+  const favDonButton = $('favDonButton');
+  const favKatButton = $('favKatButton');
+  const favSetButton = $('favSetButton');
+  const exportButton = $('exportFavoritesButton');
+
+  function updateFavoriteButtons() {
+    favDonButton?.classList.toggle('active', favDon.has(donSelect.value));
+    favKatButton?.classList.toggle('active', favKat.has(katSelect.value));
+    favSetButton?.classList.toggle('active', favSet.has(currentSetKey()));
+  }
+
+  function toggleFavorite(set, key) {
+    if (!key) return;
+    if (set.has(key)) set.delete(key);
+    else set.add(key);
+    saveFavorites();
+    updateFavoriteButtons();
+  }
+
+  favDonButton?.addEventListener('click', () => toggleFavorite(favDon, donSelect.value));
+  favKatButton?.addEventListener('click', () => toggleFavorite(favKat, katSelect.value));
+  favSetButton?.addEventListener('click', () => toggleFavorite(favSet, currentSetKey()));
+
+  // ---------------------------------------------------------------------------
+  // CSV出力
+  // ---------------------------------------------------------------------------
+  function csvCell(value) {
+    return `"${String(value ?? '').replaceAll('"', '""')}"`;
+  }
+
+  function makeCsv() {
+    const header = [
+      'FavoriteType',
+      'DonID','DonName','DonFamily','DonPitchHz','DonUserLabel',
+      'KatID','KatName','KatFamily','KatPitchHz','KatUserLabel',
+      'PairCategory','PairMark'
+    ];
+    const rows = [header];
+
+    const donItems = Array.from(favDon)
+      .map(byId).filter(Boolean)
+      .sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
+    for (const d of donItems) {
+      rows.push([
+        'DON', d.id, d.name, d.family, d.pitch, d.userLabel,
+        '', '', '', '', '', '', ''
+      ]);
+    }
+
+    const katItems = Array.from(favKat)
+      .map(byId).filter(Boolean)
+      .sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
+    for (const k of katItems) {
+      rows.push([
+        'KAT', '', '', '', '', '',
+        k.id, k.name, k.family, k.pitch, k.userLabel, '', ''
+      ]);
+    }
+
+    const setItems = Array.from(favSet)
+      .map(key => {
+        const [dId, kId] = key.split('|');
+        const d = byId(dId), k = byId(kId);
+        return d && k ? { d, k } : null;
+      })
+      .filter(Boolean)
+      .sort((a,b) => a.d.pitch - b.d.pitch || a.k.pitch - b.k.pitch || a.d.globalRank - b.d.globalRank || a.k.globalRank - b.k.globalRank);
+
+    for (const { d, k } of setItems) {
+      rows.push([
+        'SET',
+        d.id, d.name, d.family, d.pitch, d.userLabel,
+        k.id, k.name, k.family, k.pitch, k.userLabel,
+        categoryName(d, k), prefix(d, k).trim()
+      ]);
+    }
+
+    return '\ufeff' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+  }
+
+  async function exportCsv() {
+    const csv = makeCsv();
+    const file = new File([csv], 'osu_taiko_hitsound_lab_favorites.csv', {
+      type: 'text/csv;charset=utf-8'
     });
 
-    if (!pairEval.nextElementSibling?.classList.contains('pair-eval-help')) {
-      const help = document.createElement('div');
-      help.className = 'pair-eval-help';
-      help.innerHTML = '<b>KEEP</b>＝有望なので残す　<b>MAYBE</b>＝まだ決めず後で比較　<b>DROP</b>＝この組合せだけ外す（素材自体は除外しない）';
-      pairEval.insertAdjacentElement('afterend', help);
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ files: [file], title: 'osu!taiko Hitsound Lab Favorites' });
+        return;
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
     }
+
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+
+  exportButton?.addEventListener('click', exportCsv);
+
+  function afterSelectionChange() {
+    queueMicrotask(() => {
+      reorderKatOptions();
+      updateFavoriteButtons();
+    });
+  }
+
+  donSelect.addEventListener('change', afterSelectionChange);
+  katSelect.addEventListener('change', updateFavoriteButtons);
+  $('pairScope')?.addEventListener('change', afterSelectionChange);
+
+  // Don側の←→はlab.jsが直接selectを書き換えるので、クリック後にも状態を同期する。
+  $('donPrev')?.addEventListener('click', () => queueMicrotask(updateFavoriteButtons));
+  $('donNext')?.addEventListener('click', () => queueMicrotask(updateFavoriteButtons));
+  katPrev?.addEventListener('click', () => queueMicrotask(updateFavoriteButtons));
+  katNext?.addEventListener('click', () => queueMicrotask(updateFavoriteButtons));
 
   const style = document.createElement('style');
   style.textContent = `
     .pair-order-legend{margin-top:4px;color:var(--muted);font-size:8px;line-height:1.45}
-    .pair-eval button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-    .pair-eval button small{font-size:7px;font-weight:700;opacity:.82;line-height:1.1}
-    .pair-eval-help{margin-top:5px;color:var(--muted);font-size:8px;line-height:1.5}
-    .pair-eval-help b{color:var(--text);font-weight:800}
+    .favorite-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+    .favorite-button{min-height:34px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);font-size:9px;font-weight:850}
+    .favorite-button.active{border-color:#d8ad78;background:rgba(216,173,120,.22);color:#f0d3a5}
+    .favorite-button.export{border-color:var(--accent-border);background:var(--accent-soft);color:var(--accent-text)}
+    @media(max-width:430px){.favorite-actions{grid-template-columns:1fr 1fr}}
   `;
   document.head.appendChild(style);
 
   reorderKatOptions();
+  updateFavoriteButtons();
 })();
