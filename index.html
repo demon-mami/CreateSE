@@ -7,7 +7,7 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./ui-simplify.css?v=0.1">
+  <link rel="stylesheet" href="./ui-simplify.css?v=0.2">
   <style>
 .chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}.chart-info{position:relative;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.chart-info>div{min-width:0}.chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35}.chart-hits{position:absolute;right:8px;bottom:6px;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}@media(max-width:430px){.chart-info{grid-template-columns:1fr}.chart-info strong{padding-right:54px}}
   </style>
@@ -47,12 +47,19 @@
 
       <div class="pair-builder" aria-label="Hitsound Pair Builder">
         <div class="pair-builder-head">
-          <label class="scope-field">
-            <select id="pairScope" aria-label="候補範囲">
-              <option value="ALL">All</option>
-              <option value="SAME">Same family</option>
-            </select>
-          </label>
+          <div class="pair-filter-fields">
+            <label class="category-field">
+              <select id="pairCategory" aria-label="音源カテゴリー">
+                <option value="">全カテゴリー</option>
+              </select>
+            </label>
+            <label class="scope-field">
+              <select id="pairScope" aria-label="候補範囲">
+                <option value="ALL">All</option>
+                <option value="SAME">Same family</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div class="pair-grid">
@@ -137,9 +144,9 @@
   <script src="./charts.js?v=0.2"></script>
   <script src="./app-v4.js?v=c22e29e4"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./lab.js?v=0.2"></script>
+  <script src="./lab.js?v=0.3"></script>
   <script src="./pair-ranking.js?v=0.5"></script>
-  <script src="./favorite-shortcuts.js?v=0.2"></script>
+  <script src="./favorite-shortcuts.js?v=0.3"></script>
   <script src="./ui-simplify.js?v=0.1"></script>
   <script src="./chart-loader.js?v=0.3"></script>
 </body>
