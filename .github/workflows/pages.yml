@@ -40,6 +40,7 @@ jobs:
           cp fetch-bridge.js _site/
           cp lab.js _site/
           cp pair-ranking.js _site/
+          cp object-timeline-v2.js _site/
           cp hitsounds.zip _site/
           cp maps.zip _site/
           touch _site/.nojekyll
