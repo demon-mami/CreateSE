@@ -1,0 +1,186 @@
+/* Direct hitsound grid UI.
+   Motion/depth is adapted from the referenced CodePen's separated front/back button
+   structure, but dimensions, timing, palette and states are tuned for this tool. */
+
+.pair-builder{margin-top:10px!important;padding-top:8px!important;border-top:1px solid rgba(255,255,255,.12)!important}
+
+.hs-toolbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;
+  gap:7px;
+  align-items:center;
+  margin-bottom:9px;
+}
+.hs-role-pack{display:grid;grid-template-columns:minmax(0,1fr) 34px 34px;gap:5px;align-items:center;min-width:0}
+.hs-toolbar-actions{display:flex;gap:5px;align-items:center;justify-content:flex-end}
+
+.hs-role-button,
+.hs-key{
+  --hs-front:linear-gradient(180deg,rgba(75,89,96,.72),rgba(46,59,66,.72));
+  --hs-back:rgba(27,37,42,.92);
+  --hs-border:rgba(255,255,255,.16);
+  position:relative;
+  isolation:isolate;
+  padding:0 0 4px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:#fff;
+  cursor:pointer;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.hs-role-button::before,
+.hs-key::before{
+  content:"";
+  position:absolute;
+  inset:4px 0 0;
+  z-index:0;
+  border:1px solid color-mix(in srgb,var(--hs-border),transparent 15%);
+  border-radius:inherit;
+  background:var(--hs-back);
+  box-shadow:0 4px 8px rgba(5,10,12,.24);
+  transition:transform 100ms ease,box-shadow 100ms ease,background 120ms ease;
+}
+.hs-role-button>span,
+.hs-key>span{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--hs-border);
+  border-radius:inherit;
+  background:var(--hs-front);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.075),inset 0 -1px 0 rgba(0,0,0,.12);
+  transform:translateY(0);
+  transition:transform 100ms ease,background 120ms ease,border-color 120ms ease,box-shadow 120ms ease,filter 120ms ease;
+}
+.hs-role-button:active>span,
+.hs-key:active>span{transform:translateY(4px)}
+.hs-role-button:active::before,
+.hs-key:active::before{box-shadow:0 1px 3px rgba(5,10,12,.16)}
+@media(hover:hover){
+  .hs-role-button:hover>span,.hs-key:hover>span{filter:brightness(1.06)}
+}
+
+.hs-role-button{min-width:0}
+.hs-role-button>span{height:36px;font:850 14px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.02em}
+.hs-role-button.don{--hs-border:rgba(234,160,167,.28);--hs-back:rgba(66,35,40,.74)}
+.hs-role-button.kat{--hs-border:rgba(145,190,209,.29);--hs-back:rgba(31,57,68,.76)}
+.hs-role-button.don>span::before,
+.hs-role-button.kat>span::before{
+  content:"";
+  width:8px;height:8px;margin-right:7px;border-radius:999px;
+  box-shadow:0 0 10px currentColor;
+}
+.hs-role-button.don>span::before{background:rgba(230,121,133,.78);color:rgba(230,121,133,.64)}
+.hs-role-button.kat>span::before{background:rgba(103,168,196,.82);color:rgba(103,168,196,.68)}
+.hs-role-button.target.don{--hs-front:linear-gradient(180deg,rgba(125,65,73,.62),rgba(78,43,49,.66));--hs-border:rgba(238,164,171,.48)}
+.hs-role-button.target.kat{--hs-front:linear-gradient(180deg,rgba(63,104,122,.64),rgba(39,72,86,.67));--hs-border:rgba(161,207,226,.50)}
+.hs-role-button.target>span{box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 0 1px rgba(255,255,255,.025),0 0 14px rgba(255,255,255,.035)}
+
+.hs-mini-action{
+  min-width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.15);border-radius:9px;
+  background:linear-gradient(180deg,rgba(69,83,90,.56),rgba(43,55,62,.57));color:#fff;
+  font-size:12px;font-weight:850;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)
+}
+.hs-mini-action.active{border-color:rgba(255,255,255,.34);background:rgba(255,255,255,.12)}
+.hs-mini-action:disabled{opacity:.26}
+#donPreview,#katPreview{font-size:13px}
+#favSetButton{min-width:48px}
+#exportFavoritesButton{min-width:42px;font-size:9px}
+
+#hitsoundGrid{
+  display:grid;
+  gap:7px;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(44,58,65,.42),rgba(24,35,40,.43));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(6,12,15,.12);
+  -webkit-backdrop-filter:blur(12px) saturate(118%);backdrop-filter:blur(12px) saturate(118%);
+}
+#hitsoundGrid.busy{pointer-events:none}
+
+.hs-silent-row{display:flex;justify-content:flex-start;padding-bottom:1px}
+.hs-family{min-width:0}
+.hs-family-title{
+  margin:0 0 4px 2px;
+  color:rgba(255,255,255,.52);
+  font-size:9px;
+  font-weight:760;
+  letter-spacing:.025em;
+  line-height:1.15;
+}
+.hs-family-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(39px,1fr));
+  gap:6px;
+}
+.hs-key{width:100%;min-width:39px}
+.hs-key>span{
+  height:30px;
+  font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.hs-silent{width:45px;min-width:45px;--hs-front:linear-gradient(180deg,rgba(70,79,84,.55),rgba(45,54,59,.57));--hs-back:rgba(29,35,38,.86)}
+.hs-silent>span{font-size:14px}
+
+/* Saved colors are deliberately dim: registered but not currently active. */
+.hs-key.fav-don:not(.selected-don):not(.selected-kat){
+  --hs-front:linear-gradient(180deg,rgba(132,66,73,.30),rgba(73,44,48,.36));
+  --hs-back:rgba(61,33,37,.68);
+  --hs-border:rgba(218,128,138,.22);
+}
+.hs-key.fav-kat:not(.selected-don):not(.selected-kat){
+  --hs-front:linear-gradient(180deg,rgba(64,105,122,.31),rgba(41,68,79,.37));
+  --hs-back:rgba(31,54,64,.69);
+  --hs-border:rgba(126,181,204,.23);
+}
+.hs-key.fav-don.fav-kat:not(.selected-don):not(.selected-kat)>span{
+  background:linear-gradient(90deg,rgba(127,62,70,.32) 0 50%,rgba(57,99,117,.33) 50% 100%);
+  border-color:rgba(186,164,180,.27);
+}
+
+/* Dynamic ♥ recommendation: pink standby illumination, not a text marker. */
+.hs-key.recommended:not(.selected-don):not(.selected-kat){
+  --hs-front:linear-gradient(180deg,rgba(143,79,111,.40),rgba(79,48,67,.42));
+  --hs-back:rgba(61,35,48,.78);
+  --hs-border:rgba(225,145,185,.38);
+}
+.hs-key.recommended:not(.selected-don):not(.selected-kat)>span{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 10px rgba(219,111,165,.07);
+}
+
+/* Current assignments override all standby colors. */
+.hs-key.selected-don{
+  --hs-front:linear-gradient(180deg,rgba(191,88,99,.78),rgba(126,52,61,.79));
+  --hs-back:rgba(86,38,45,.92);
+  --hs-border:rgba(244,164,172,.64);
+}
+.hs-key.selected-kat{
+  --hs-front:linear-gradient(180deg,rgba(79,145,174,.80),rgba(45,98,122,.81));
+  --hs-back:rgba(32,71,87,.93);
+  --hs-border:rgba(170,216,235,.65);
+}
+.hs-key.selected-don.selected-kat>span{
+  background:linear-gradient(90deg,rgba(184,82,94,.80) 0 50%,rgba(70,137,167,.81) 50% 100%);
+  border-color:rgba(209,188,200,.68);
+}
+.hs-key.selected-don>span,.hs-key.selected-kat>span{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 0 12px rgba(255,255,255,.045);
+}
+
+@media(max-width:430px){
+  .hs-toolbar{grid-template-columns:1fr 1fr;gap:7px}
+  .hs-role-pack{grid-template-columns:minmax(0,1fr) 32px 32px}
+  .hs-toolbar-actions{grid-column:1/-1;justify-content:flex-end;margin-top:-1px}
+  .hs-mini-action{width:32px;min-width:32px;height:32px}
+  .hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:5px}
+  .hs-key>span{height:29px}
+  #hitsoundGrid{padding:7px;gap:6px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .hs-role-button::before,.hs-key::before,.hs-role-button>span,.hs-key>span{transition:none!important}
+}
