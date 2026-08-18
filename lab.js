@@ -4,7 +4,7 @@
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   const $ = id => document.getElementById(id);
   const el = {
-    donSelect: $('donSelect'), katSelect: $('katSelect'), scope: $('pairScope'),
+    donSelect: $('donSelect'), katSelect: $('katSelect'), scope: $('pairScope'), category: $('pairCategory'),
     donPrev: $('donPrev'), donNext: $('donNext'), katPrev: $('katPrev'), katNext: $('katNext'),
     donPreview: $('donPreview'), katPreview: $('katPreview'),
     donMeta: $('donMeta'), katMeta: $('katMeta'), pairRule: $('pairRule'),
@@ -12,7 +12,7 @@
     previewAudio: $('samplePreviewAudio'), status: $('statusBadge'), play: $('playButton')
   };
 
-  if (!el.donSelect || !el.katSelect || !el.scope) return;
+  if (!el.donSelect || !el.katSelect || !el.scope || !el.category) return;
 
   let donId = CANDIDATES.find(x => x.name === 'RnT_Timbale-02.wav')?.id
     || CANDIDATES.find(x => x.userLabel === 'D' || x.userLabel === 'B')?.id
@@ -28,6 +28,48 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+
+  const CATEGORY_LABELS = new Map([
+    ['808 / Sub', '808 / Sub（808・サブベース）'],
+    ['Bass Drum / Kick', 'Bass Drum / Kick（バスドラム／キック）'],
+    ['Tom', 'Tom（タム）'],
+    ['Timbale', 'Timbale（ティンバレス）'],
+    ['Rimshot', 'Rimshot（リムショット）'],
+    ['Snare', 'Snare（スネア）'],
+    ['Cowbell', 'Cowbell（カウベル）'],
+    ['Agogo', 'Agogo（アゴゴ）'],
+    ['Woodblock', 'Woodblock（ウッドブロック）'],
+    ['Clave / Claves', 'Clave / Claves（クラベス）'],
+  ]);
+
+  function initCategorySelect() {
+    const familyStats = new Map();
+    for (const candidate of CANDIDATES) {
+      const key = candidate.family || 'Other';
+      let stat = familyStats.get(key);
+      if (!stat) {
+        stat = { family: key, firstRank: candidate.globalRank ?? Number.POSITIVE_INFINITY, hasDon: false, hasKat: false };
+        familyStats.set(key, stat);
+      }
+      stat.firstRank = Math.min(stat.firstRank, candidate.globalRank ?? Number.POSITIVE_INFINITY);
+      if (candidate.userLabel === 'D' || candidate.userLabel === 'B') stat.hasDon = true;
+      if (candidate.userLabel === 'K' || candidate.userLabel === 'B') stat.hasKat = true;
+    }
+
+    const families = Array.from(familyStats.values())
+      .filter(stat => stat.hasDon && stat.hasKat)
+      .sort((a, b) => a.firstRank - b.firstRank || a.family.localeCompare(b.family));
+
+    el.category.innerHTML = '<option value="">全カテゴリー</option>' + families.map(stat => {
+      const label = CATEGORY_LABELS.get(stat.family) || stat.family;
+      return `<option value="${esc(stat.family)}">${esc(label)}</option>`;
+    }).join('');
+  }
+
+  initCategorySelect();
+
+  const selectedCategory = () => el.category.value || '';
+  const categoryMode = () => !!selectedCategory();
 
   async function hitsoundPack() {
     if (!packPromise) {
@@ -128,20 +170,30 @@
   }
 
   function donPool() {
+    const category = selectedCategory();
     return CANDIDATES
-      .filter(x => x.userLabel === 'D' || x.userLabel === 'B')
+      .filter(x =>
+        (x.userLabel === 'D' || x.userLabel === 'B') &&
+        (!category || x.family === category)
+      )
       .sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
   }
 
   function katPool() {
+    const category = selectedCategory();
     const d = byId(donId);
-    if (!d) return [];
 
-    let list = CANDIDATES.filter(x =>
-      (x.userLabel === 'K' || x.userLabel === 'B') && x.pitch > d.pitch
-    );
+    let list = CANDIDATES.filter(x => x.userLabel === 'K' || x.userLabel === 'B');
 
-    if (el.scope.value === 'SAME') list = list.filter(x => x.family === d.family);
+    if (category) {
+      // Category exploration intentionally bypasses the normal Kat > Don pitch gate.
+      list = list.filter(x => x.family === category);
+    } else {
+      if (!d) return [];
+      list = list.filter(x => x.pitch > d.pitch);
+      if (el.scope.value === 'SAME') list = list.filter(x => x.family === d.family);
+    }
+
     return list.sort((a,b) => a.pitch - b.pitch || a.globalRank - b.globalRank);
   }
 
@@ -173,28 +225,54 @@
   function renderPair() {
     normalizePair();
 
-    fillSelect(el.donSelect, donPool(), donId, 'D/BのDON候補なし');
-    fillSelect(el.katSelect, katPool(), katId, 'このDONより高いK/B候補なし');
+    const category = selectedCategory();
+    fillSelect(el.donSelect, donPool(), donId, category ? 'このカテゴリーにDON候補なし' : 'D/BのDON候補なし');
+    fillSelect(el.katSelect, katPool(), katId, category ? 'このカテゴリーにKAT候補なし' : 'このDONより高いK/B候補なし');
 
     const d = byId(donId), k = byId(katId);
-    if (!d) return;
 
-    el.donSelect.value = donId;
-    el.donMeta.textContent = `${d.family} · user ${d.userLabel} · ${d.pitch.toFixed(1)} Hz`;
+    if (d) {
+      el.donSelect.value = donId;
+      el.donMeta.textContent = `${d.family} · user ${d.userLabel} · ${d.pitch.toFixed(1)} Hz`;
+    } else {
+      el.donMeta.textContent = '該当DON候補なし';
+    }
 
-    if (!k) {
+    if (k) {
+      el.katSelect.value = katId;
+      el.katMeta.textContent = `${k.family} · user ${k.userLabel} · ${k.pitch.toFixed(1)} Hz`;
+    } else {
       el.katMeta.textContent = '該当KAT候補なし';
-      el.pairRule.textContent = 'このDONより高いK/B候補がありません';
+    }
+
+    if (!d || !k) {
+      el.pairRule.textContent = category ? '選択カテゴリーにペア候補がありません' : 'このDONより高いK/B候補がありません';
       el.pairRule.className = 'pair-rule bad';
       return;
     }
 
-    el.katSelect.value = katId;
-    el.katMeta.textContent = `${k.family} · user ${k.userLabel} · ${k.pitch.toFixed(1)} Hz`;
+    if (categoryMode()) {
+      el.pairRule.textContent = 'カテゴリー探索モード';
+      el.pairRule.className = 'pair-rule ok';
+      return;
+    }
 
     const ok = d.pitch < k.pitch;
     el.pairRule.textContent = ok ? `✓ ${(k.pitch / d.pitch).toFixed(2)}× high` : 'Low Don / High Kat NG';
     el.pairRule.className = `pair-rule ${ok ? 'ok' : 'bad'}`;
+  }
+
+  async function applySelectionDelta(previousDon, previousKat) {
+    const donChanged = donId !== previousDon;
+    const katChanged = katId !== previousKat;
+    if (!donChanged && !katChanged) return;
+
+    if (donChanged && katChanged && donId && katId) {
+      await applyPair();
+      return;
+    }
+    if (donChanged && donId) await applyCandidate('don', donId);
+    if (katChanged && katId) await applyCandidate('kat', katId);
   }
 
   async function cycle(side, dir) {
@@ -253,9 +331,17 @@
   });
 
   el.scope.addEventListener('change', async () => {
+    const previousDon = donId;
     const previousKat = katId;
     renderPair();
-    if (katId && katId !== previousKat) await applyCandidate('kat', katId);
+    await applySelectionDelta(previousDon, previousKat);
+  });
+
+  el.category.addEventListener('change', async () => {
+    const previousDon = donId;
+    const previousKat = katId;
+    renderPair();
+    await applySelectionDelta(previousDon, previousKat);
   });
 
   el.donPrev.addEventListener('click', () => cycle('don', -1));
