@@ -7,9 +7,9 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./ui-simplify.css?v=0.2">
+  <link rel="stylesheet" href="./hitsound-grid.css?v=1.0">
   <style>
-.chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}.chart-info{position:relative;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.chart-info>div{min-width:0}.chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35}.chart-hits{position:absolute;right:8px;bottom:6px;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}@media(max-width:430px){.chart-info{grid-template-columns:1fr}.chart-info strong{padding-right:54px}}
+.chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}.chart-info{position:relative;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.chart-info[hidden]{display:none!important}.chart-info>div{min-width:0}.chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35}.chart-hits{display:none!important}.chart-hits{position:absolute;right:8px;bottom:6px;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}@media(max-width:430px){.chart-info{grid-template-columns:1fr}.chart-info strong{padding-right:54px}}
   </style>
 </head>
 <body>
@@ -30,12 +30,8 @@
       </label>
 
       <div class="chart-info" hidden>
-        <div>
-          <strong id="songTitle">—</strong>
-        </div>
-        <div>
-          <strong id="fixedDifficulty">—</strong>
-        </div>
+        <div><strong id="songTitle">—</strong></div>
+        <div><strong id="fixedDifficulty">—</strong></div>
         <span id="songMeta" class="chart-hits">—</span>
       </div>
 
@@ -45,61 +41,27 @@
       <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
       <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
 
-      <div class="pair-builder" aria-label="Hitsound Pair Builder">
-        <div class="pair-builder-head">
-          <div class="pair-filter-fields">
-            <label class="category-field">
-              <select id="pairCategory" aria-label="音源カテゴリー">
-                <option value="">全カテゴリー</option>
-              </select>
-            </label>
-            <label class="scope-field">
-              <select id="pairScope" aria-label="候補範囲">
-                <option value="ALL">All</option>
-                <option value="SAME">Same family</option>
-              </select>
-            </label>
+      <div class="pair-builder" aria-label="Hitsound selector">
+        <div class="hs-toolbar">
+          <div class="hs-role-pack">
+            <button id="roleDonButton" class="hs-role-button don" type="button" aria-label="DON割当先"><span id="roleDonValue">—</span></button>
+            <button id="favDonButton" class="hs-mini-action" type="button" aria-label="DONをお気に入り">★</button>
+            <button id="donPreview" class="hs-mini-action" type="button" aria-label="DON単音を再生または一時停止">▶</button>
+          </div>
+
+          <div class="hs-role-pack">
+            <button id="roleKatButton" class="hs-role-button kat" type="button" aria-label="KAT割当先"><span id="roleKatValue">—</span></button>
+            <button id="favKatButton" class="hs-mini-action" type="button" aria-label="KATをお気に入り">★</button>
+            <button id="katPreview" class="hs-mini-action" type="button" aria-label="KAT単音を再生または一時停止">▶</button>
+          </div>
+
+          <div class="hs-toolbar-actions">
+            <button id="favSetButton" class="hs-mini-action" type="button" aria-label="SETをお気に入り">★SET</button>
+            <button id="exportFavoritesButton" class="hs-mini-action" type="button" aria-label="CSV出力">CSV</button>
           </div>
         </div>
 
-        <div class="pair-grid">
-          <div class="pair-side don-side" aria-label="Don">
-            <div class="pair-side-head">
-              <div class="pair-side-title" aria-hidden="true"><span class="dot don-dot"></span></div>
-              <button id="favDonButton" class="favorite-button side-favorite" type="button" aria-label="DONをお気に入り">★</button>
-            </div>
-            <select id="donSelect" aria-label="Don音源"></select>
-            <div id="donMeta" class="pair-meta"></div>
-            <div class="pair-actions">
-              <button id="donPrev" type="button" aria-label="前のDon">←</button>
-              <button id="donPreview" type="button" aria-label="Donを再生または一時停止">▶</button>
-              <button id="donNext" type="button" aria-label="次のDon">→</button>
-            </div>
-          </div>
-
-          <div class="pair-side kat-side" aria-label="Kat">
-            <div class="pair-side-head">
-              <div class="pair-side-title" aria-hidden="true"><span class="dot kat-dot"></span></div>
-              <button id="favKatButton" class="favorite-button side-favorite" type="button" aria-label="KATをお気に入り">★</button>
-            </div>
-            <select id="katSelect" aria-label="Kat音源"></select>
-            <div id="katMeta" class="pair-meta"></div>
-            <div class="pair-actions">
-              <button id="katPrev" type="button" aria-label="前のKat">←</button>
-              <button id="katPreview" type="button" aria-label="Katを再生または一時停止">▶</button>
-              <button id="katNext" type="button" aria-label="次のKat">→</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="pair-rule-row pair-rule-only" aria-hidden="true">
-          <span id="pairRule" class="pair-rule"></span>
-        </div>
-
-        <div class="pair-footer-actions">
-          <button id="favSetButton" class="favorite-button set-favorite" type="button">SET ★</button>
-          <button id="exportFavoritesButton" class="favorite-button export" type="button">CSV出力</button>
-        </div>
+        <div id="hitsoundGrid" aria-label="音源一覧"></div>
       </div>
     </section>
 
@@ -140,15 +102,13 @@
   <audio id="samplePreviewAudio" preload="none"></audio>
   <script src="./vendor/jszip.min.js?v=3.10.1"></script>
   <script src="./candidates.js?v=0.1"></script>
-  <script src="./category-policy.js?v=0.1"></script>
-  <script src="./candidate-numbering.js?v=0.2"></script>
+  <script src="./candidate-numbering.js?v=1.0"></script>
   <script src="./charts.js?v=0.2"></script>
   <script src="./app-v4.js?v=c22e29e4"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./lab.js?v=0.3"></script>
-  <script src="./pair-ranking.js?v=0.5"></script>
-  <script src="./favorite-shortcuts.js?v=0.3"></script>
-  <script src="./ui-simplify.js?v=0.1"></script>
+  <script src="./hitsound-controller.js?v=1.0"></script>
+  <script src="./hitsound-favorites.js?v=1.0"></script>
+  <script src="./hitsound-grid.js?v=1.0"></script>
   <script src="./chart-loader.js?v=0.3"></script>
 </body>
 </html>
