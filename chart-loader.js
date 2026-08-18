@@ -22,8 +22,8 @@
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 
-  function setChartInfoVisible(visible) {
-    if (el.chartInfo) el.chartInfo.hidden = !visible;
+  function keepChartInfoVisible() {
+    if (el.chartInfo) el.chartInfo.hidden = false;
   }
 
   function setInputFile(input, file) {
@@ -37,9 +37,7 @@
       packPromise = (async () => {
         if (!window.JSZip) throw new Error('JSZipを読み込めません。');
         const response = await fetch('./maps.zip', { cache: 'force-cache' });
-        if (!response.ok) {
-          throw new Error('maps.zip がありません。GitHub repo rootへアップロードしてください。');
-        }
+        if (!response.ok) throw new Error('maps.zip がありません。GitHub repo rootへアップロードしてください。');
         return JSZip.loadAsync(await response.arrayBuffer());
       })();
     }
@@ -60,13 +58,13 @@
     if (!chart || chart !== currentChart) return;
     if (el.title) el.title.textContent = chart.title;
     if (el.difficulty) el.difficulty.textContent = chart.difficulty;
-    setChartInfoVisible(true);
+    keepChartInfoVisible();
   }
 
   async function loadChart(chart) {
     const mySerial = ++serial;
     currentChart = chart;
-    setChartInfoVisible(true);
+    keepChartInfoVisible();
     if (el.status) el.status.textContent = '譜面読込中';
     if (el.title) el.title.textContent = chart.title;
     if (el.difficulty) el.difficulty.textContent = chart.difficulty;
@@ -92,17 +90,16 @@
 
   el.select.innerHTML =
     '<option value="">譜面を選択</option>' +
-    CHARTS.map(chart =>
-      `<option value="${esc(chart.id)}">${esc(chart.title)}</option>`
-    ).join('');
+    CHARTS.map(chart => `<option value="${esc(chart.id)}">${esc(chart.title)}</option>`).join('');
 
-  setChartInfoVisible(false);
+  keepChartInfoVisible();
+  if (el.difficulty) el.difficulty.textContent = '—';
 
   el.select.addEventListener('change', async () => {
     const chart = CHARTS.find(x => x.id === el.select.value);
     if (!chart) {
       currentChart = null;
-      setChartInfoVisible(false);
+      keepChartInfoVisible();
       if (el.title) el.title.textContent = '—';
       if (el.difficulty) el.difficulty.textContent = '—';
       return;
@@ -118,9 +115,7 @@
 
   if (el.title) {
     new MutationObserver(() => {
-      if (currentChart && el.title.textContent !== currentChart.title) {
-        el.title.textContent = currentChart.title;
-      }
+      if (currentChart && el.title.textContent !== currentChart.title) el.title.textContent = currentChart.title;
     }).observe(el.title, { childList: true, characterData: true, subtree: true });
   }
 })();
