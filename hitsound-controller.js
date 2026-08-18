@@ -9,21 +9,21 @@
     donInput: $('donHitsoundInput'),
     katInput: $('kaHitsoundInput'),
     previewAudio: $('samplePreviewAudio'),
+    previewButton: $('previewButton'),
     status: $('statusBadge'),
     play: $('playButton'),
     oszInput: $('oszInput'),
-    donPreview: $('donPreview'),
-    katPreview: $('katPreview'),
   };
 
   if (!CANDIDATES.length || !el.donInput || !el.katInput) return;
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
-  const initialDon = CANDIDATES.find(candidate => candidate.originalName === 'RnT_Timbale-02.wav')?.id
-    || CANDIDATES[0]?.id
+  const available = candidate => candidate && !candidate.excluded;
+  const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-02.wav')?.id
+    || CANDIDATES.find(available)?.id
     || SILENT_ID;
-  const initialKat = CANDIDATES.find(candidate => candidate.originalName === 'RnT_Timbale-06.wav')?.id
-    || CANDIDATES[1]?.id
+  const initialKat = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-06.wav')?.id
+    || CANDIDATES.find(available)?.id
     || SILENT_ID;
 
   const selection = { don: initialDon, kat: initialKat };
@@ -47,7 +47,7 @@
 
   function makeSilentWav() {
     const sampleRate = 48000;
-    const frames = 480; // 10 ms of explicit zero signal.
+    const frames = 480;
     const channels = 1;
     const bits = 16;
     const blockAlign = channels * bits / 8;
@@ -80,7 +80,7 @@
     if (bytesCache.has(id)) return bytesCache.get(id).slice(0);
 
     const candidate = byId(id);
-    if (!candidate) throw new Error('候補音源が見つかりません。');
+    if (!available(candidate)) throw new Error('候補音源が見つかりません。');
     const pack = await hitsoundPack();
     const entry = pack.file(candidate.entry);
     if (!entry) throw new Error(`hitsounds.zip 内にありません: ${candidate.entry}`);
@@ -171,9 +171,17 @@
   }
 
   function emitSelection() {
-    window.dispatchEvent(new CustomEvent('hitsound-selection-change', {
-      detail: { ...selection }
-    }));
+    window.dispatchEvent(new CustomEvent('hitsound-selection-change', { detail: { ...selection } }));
+  }
+
+  function previewFace() {
+    return el.previewButton?.querySelector('span') || el.previewButton;
+  }
+
+  function paintPreview() {
+    const playing = !!el.previewAudio && !el.previewAudio.paused && !el.previewAudio.ended;
+    const face = previewFace();
+    if (face) face.textContent = playing ? 'Ⅱ' : '▶';
   }
 
   function stopPreview({ reset = true } = {}) {
@@ -189,14 +197,8 @@
     paintPreview();
   }
 
-  function paintPreview() {
-    const playing = !!el.previewAudio && !el.previewAudio.paused && !el.previewAudio.ended;
-    if (el.donPreview) el.donPreview.textContent = playing && previewSide === 'don' ? 'Ⅱ' : '▶';
-    if (el.katPreview) el.katPreview.textContent = playing && previewSide === 'kat' ? 'Ⅱ' : '▶';
-  }
-
   async function togglePreview(side) {
-    if (!el.previewAudio) return;
+    if (!el.previewAudio || (side !== 'don' && side !== 'kat')) return;
 
     if (previewSide === side && el.previewAudio.src) {
       if (!el.previewAudio.paused && !el.previewAudio.ended) {
@@ -224,7 +226,8 @@
 
   async function setSide(side, id) {
     if (side !== 'don' && side !== 'kat') return false;
-    if (id !== SILENT_ID && !byId(id)) return false;
+    const candidate = id === SILENT_ID ? null : byId(id);
+    if (id !== SILENT_ID && !available(candidate)) return false;
     if (selection[side] === id) return true;
 
     selection[side] = id;
@@ -235,8 +238,6 @@
     return true;
   }
 
-  el.donPreview?.addEventListener('click', () => togglePreview('don').catch(error => alert(error.message)));
-  el.katPreview?.addEventListener('click', () => togglePreview('kat').catch(error => alert(error.message)));
   el.previewAudio?.addEventListener('play', paintPreview);
   el.previewAudio?.addEventListener('pause', paintPreview);
   el.previewAudio?.addEventListener('ended', () => {
@@ -267,6 +268,7 @@
     setSide,
     applyPair,
     togglePreview,
+    stopPreview,
   };
 
   emitSelection();
