@@ -7,6 +7,7 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
+  <link rel="stylesheet" href="./ui-simplify.css?v=0.1">
   <style>
 .chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}.chart-info{position:relative;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:8px;margin-top:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}.chart-info>div{min-width:0}.chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35}.chart-hits{position:absolute;right:8px;bottom:6px;color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}@media(max-width:430px){.chart-info{grid-template-columns:1fr}.chart-info strong{padding-right:54px}}
   </style>
@@ -23,19 +24,16 @@
 
     <section class="source-panel panel">
       <label class="chart-field">
-        <span class="label">TEST CHART</span>
-        <select id="chartSelect">
-          <option value="">譜面を選択してください</option>
+        <select id="chartSelect" aria-label="譜面を選択">
+          <option value="">譜面を選択</option>
         </select>
       </label>
 
-      <div class="chart-info">
+      <div class="chart-info" hidden>
         <div>
-          <span class="label">TITLE</span>
           <strong id="songTitle">—</strong>
         </div>
         <div>
-          <span class="label">DIFFICULTY</span>
           <strong id="fixedDifficulty">—</strong>
         </div>
         <span id="songMeta" class="chart-hits">—</span>
@@ -49,13 +47,8 @@
 
       <div class="pair-builder" aria-label="Hitsound Pair Builder">
         <div class="pair-builder-head">
-          <div>
-            <span class="label">HITSOUND PAIR</span>
-            <strong>Low Don / High Kat</strong>
-          </div>
           <label class="scope-field">
-            <span>Scope</span>
-            <select id="pairScope">
+            <select id="pairScope" aria-label="候補範囲">
               <option value="ALL">All</option>
               <option value="SAME">Same family</option>
             </select>
@@ -63,36 +56,36 @@
         </div>
 
         <div class="pair-grid">
-          <div class="pair-side don-side">
+          <div class="pair-side don-side" aria-label="Don">
             <div class="pair-side-head">
-              <div class="pair-side-title"><span class="dot don-dot"></span>Don — LOW</div>
-              <button id="favDonButton" class="favorite-button side-favorite" type="button">DON ★</button>
+              <div class="pair-side-title" aria-hidden="true"><span class="dot don-dot"></span></div>
+              <button id="favDonButton" class="favorite-button side-favorite" type="button" aria-label="DONをお気に入り">★</button>
             </div>
-            <select id="donSelect"></select>
+            <select id="donSelect" aria-label="Don音源"></select>
             <div id="donMeta" class="pair-meta"></div>
             <div class="pair-actions">
-              <button id="donPrev" type="button">←</button>
-              <button id="donPreview" type="button">▶ Don</button>
-              <button id="donNext" type="button">→</button>
+              <button id="donPrev" type="button" aria-label="前のDon">←</button>
+              <button id="donPreview" type="button" aria-label="Donを再生または一時停止">▶</button>
+              <button id="donNext" type="button" aria-label="次のDon">→</button>
             </div>
           </div>
 
-          <div class="pair-side kat-side">
+          <div class="pair-side kat-side" aria-label="Kat">
             <div class="pair-side-head">
-              <div class="pair-side-title"><span class="dot kat-dot"></span>Kat — HIGH</div>
-              <button id="favKatButton" class="favorite-button side-favorite" type="button">KAT ★</button>
+              <div class="pair-side-title" aria-hidden="true"><span class="dot kat-dot"></span></div>
+              <button id="favKatButton" class="favorite-button side-favorite" type="button" aria-label="KATをお気に入り">★</button>
             </div>
-            <select id="katSelect"></select>
+            <select id="katSelect" aria-label="Kat音源"></select>
             <div id="katMeta" class="pair-meta"></div>
             <div class="pair-actions">
-              <button id="katPrev" type="button">←</button>
-              <button id="katPreview" type="button">▶ Kat</button>
-              <button id="katNext" type="button">→</button>
+              <button id="katPrev" type="button" aria-label="前のKat">←</button>
+              <button id="katPreview" type="button" aria-label="Katを再生または一時停止">▶</button>
+              <button id="katNext" type="button" aria-label="次のKat">→</button>
             </div>
           </div>
         </div>
 
-        <div class="pair-rule-row pair-rule-only">
+        <div class="pair-rule-row pair-rule-only" aria-hidden="true">
           <span id="pairRule" class="pair-rule"></span>
         </div>
 
@@ -146,7 +139,7 @@
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
   <script src="./lab.js?v=0.2"></script>
   <script src="./pair-ranking.js?v=0.5"></script>
-  <script src="./favorite-shortcuts.js?v=0.1"></script>
-  <script src="./chart-loader.js?v=0.2"></script>
+  <script src="./favorite-shortcuts.js?v=0.2"></script>
+  <script src="./chart-loader.js?v=0.3"></script>
 </body>
 </html>
