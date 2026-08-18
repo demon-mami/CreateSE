@@ -16,8 +16,8 @@
   if (katLabel) katLabel.textContent = '★🔵';
   if (setLabel) setLabel.textContent = '★SET';
 
-  // The userLabel remains available internally for filtering/CSV, but is omitted from
-  // the browsing text to reduce visual information density.
+  // userLabel remains available internally for filtering/CSV, but is omitted from
+  // browsing text to reduce visual information density.
   function simplifyOptionText(option) {
     if (!option?.value) return;
     option.textContent = String(option.textContent || '')
@@ -53,11 +53,12 @@
   $('pairScope')?.addEventListener('change', queueSimplify);
   queueSimplify();
 
-  // Don/Kat preview buttons share one neutral play/pause UI. The underlying preview
-  // loading remains handled by lab.js; this only adds pause/resume-state presentation.
+  // Don/Kat preview buttons share one neutral play/pause UI. lab.js still owns
+  // candidate loading; this layer only pauses/resumes the already-loaded preview.
   if (audio && donPreview && katPreview) {
     const buttons = [donPreview, katPreview];
     let activeButton = null;
+    let pausedButton = null;
     let requestedButton = null;
 
     function paint() {
@@ -72,9 +73,20 @@
       if (button === activeButton && !audio.paused && !audio.ended) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        pausedButton = button;
         audio.pause();
         return;
       }
+
+      if (button === pausedButton && audio.paused && !audio.ended && audio.currentTime > 0) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        requestedButton = button;
+        audio.play().catch(() => {});
+        return;
+      }
+
+      pausedButton = null;
       requestedButton = button;
     }
 
@@ -82,21 +94,30 @@
     katPreview.addEventListener('click', event => capture(katPreview, event), true);
 
     audio.addEventListener('play', () => {
-      activeButton = requestedButton || activeButton;
+      activeButton = requestedButton || pausedButton || activeButton;
+      pausedButton = null;
+      requestedButton = null;
       paint();
     });
+
     audio.addEventListener('pause', () => {
+      if (requestedButton && requestedButton !== activeButton) pausedButton = null;
+      else if (activeButton && audio.currentTime > 0 && !audio.ended) pausedButton = activeButton;
       activeButton = null;
       paint();
     });
-    audio.addEventListener('ended', () => {
+
+    function clearPreviewState() {
       activeButton = null;
+      pausedButton = null;
+      requestedButton = null;
       paint();
-    });
-    audio.addEventListener('emptied', () => {
-      activeButton = null;
-      paint();
-    });
+    }
+
+    audio.addEventListener('ended', clearPreviewState);
+    audio.addEventListener('emptied', clearPreviewState);
+    donSelect?.addEventListener('change', () => { if (pausedButton === donPreview) pausedButton = null; paint(); });
+    katSelect?.addEventListener('change', () => { if (pausedButton === katPreview) pausedButton = null; paint(); });
 
     paint();
   }
