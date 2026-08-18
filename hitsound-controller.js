@@ -19,6 +19,7 @@
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const available = candidate => candidate && !candidate.excluded;
+  const validSideId = id => id === SILENT_ID || available(byId(id));
   const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-02.wav')?.id
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
@@ -226,8 +227,7 @@
 
   async function setSide(side, id) {
     if (side !== 'don' && side !== 'kat') return false;
-    const candidate = id === SILENT_ID ? null : byId(id);
-    if (id !== SILENT_ID && !available(candidate)) return false;
+    if (!validSideId(id)) return false;
     if (selection[side] === id) return true;
 
     selection[side] = id;
@@ -235,6 +235,19 @@
     emitSelection();
 
     if (viewerReady()) await applyOne(side, id, { resume: true });
+    return true;
+  }
+
+  async function setPair(donId, katId) {
+    if (!validSideId(donId) || !validSideId(katId)) return false;
+    if (selection.don === donId && selection.kat === katId) return true;
+
+    selection.don = donId;
+    selection.kat = katId;
+    stopPreview();
+    emitSelection();
+
+    if (viewerReady()) await applyPair({ resume: true });
     return true;
   }
 
@@ -266,6 +279,7 @@
     byId,
     getSelection: () => ({ ...selection }),
     setSide,
+    setPair,
     applyPair,
     togglePreview,
     stopPreview,
