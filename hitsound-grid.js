@@ -92,13 +92,26 @@
 
   function paint() {
     const selection = controller.getSelection();
+
     roleDonButton.classList.toggle('target', activeSide === 'don');
     roleKatButton.classList.toggle('target', activeSide === 'kat');
     roleDonButton.setAttribute('aria-pressed', activeSide === 'don' ? 'true' : 'false');
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
     roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${byId(selection.don)?.sourceNumber || '—'}`;
     roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${byId(selection.kat)?.sourceNumber || '—'}`;
+
     grid.dataset.activeSide = activeSide;
+    grid.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
+      const id = button.dataset.hsId;
+      button.classList.toggle('selected-don', id === selection.don);
+      button.classList.toggle('selected-kat', id === selection.kat);
+    });
+
+    if (silentButton) {
+      silentButton.classList.toggle('selected-don', activeSide === 'don' && selection.don === SILENT_ID);
+      silentButton.classList.toggle('selected-kat', activeSide === 'kat' && selection.kat === SILENT_ID);
+    }
+
     paintRecommendation();
   }
 
