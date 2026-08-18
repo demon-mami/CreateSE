@@ -41,6 +41,7 @@ jobs:
           mkdir -p _site/vendor
           cp index.html _site/
           cp style.css _site/
+          cp theme-col07.css _site/
           cp candidates.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
