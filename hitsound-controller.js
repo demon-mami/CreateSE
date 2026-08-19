@@ -259,7 +259,7 @@
     if (!validSideId(id)) return false;
 
     if (selection[side] === id) {
-      if (preview && id !== SILENT_ID) await previewCandidate(id);
+      if (preview && id !== null && id !== SILENT_ID) await previewCandidate(id);
       return true;
     }
 
@@ -269,7 +269,7 @@
     selection[side] = id;
     emitSelection();
 
-    if (preview && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
+    if (preview && id !== null && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
     if (serial === selectionSerial) await applyPendingSelection(serial);
     return true;
   }
