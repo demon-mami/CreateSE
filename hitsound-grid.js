@@ -190,21 +190,17 @@
     const current = controller.getSelection()[activeSide];
     const deselecting = current === id;
     const nextId = deselecting ? SILENT_ID : id;
-    sources.classList.add('busy');
     try {
       await controller.setSide(activeSide, nextId, { preview: !deselecting });
     } finally {
-      sources.classList.remove('busy');
       paint();
     }
   }
 
   async function chooseSilent() {
-    sources.classList.add('busy');
     try {
       await controller.setSide(activeSide, SILENT_ID);
     } finally {
-      sources.classList.remove('busy');
       paint();
     }
   }

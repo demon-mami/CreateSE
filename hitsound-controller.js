@@ -30,8 +30,10 @@
   let packPromise = null;
   const bytesCache = new Map();
   let applySerial = 0;
+  let selectionSerial = 0;
   let previewSerial = 0;
   let previewUrl = '';
+  const pendingSides = new Set();
 
   async function hitsoundPack() {
     if (!packPromise) {
@@ -103,6 +105,10 @@
 
   function viewerReady() {
     return (el.status?.textContent || '') === '準備完了' && !!el.play && !el.play.disabled;
+  }
+
+  function viewerRebuilding() {
+    return /Hitsound(?:生成|反映)中/.test(el.status?.textContent || '');
   }
 
   function wasPlaying() {
@@ -229,6 +235,25 @@
     return previewCandidate(selection[side]);
   }
 
+  async function applyPendingSelection(serial) {
+    if (serial !== selectionSerial || !pendingSides.size) return false;
+
+    if (!viewerReady()) {
+      if (!viewerRebuilding()) return false;
+      if (!(await waitForViewerReady()) || serial !== selectionSerial) return false;
+    }
+
+    const sides = Array.from(pendingSides);
+    sides.forEach(side => pendingSides.delete(side));
+    if (sides.length === 1) {
+      const side = sides[0];
+      await applyOne(side, selection[side], { resume: true });
+    } else {
+      await applyPair({ resume: true });
+    }
+    return serial === selectionSerial;
+  }
+
   async function setSide(side, id, { preview = false } = {}) {
     if (side !== 'don' && side !== 'kat') return false;
     if (!validSideId(id)) return false;
@@ -238,12 +263,14 @@
       return true;
     }
 
+    const serial = ++selectionSerial;
+    pendingSides.add(side);
     stopPreview();
     selection[side] = id;
     emitSelection();
 
     if (preview && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
-    if (viewerReady()) await applyOne(side, id, { resume: true });
+    if (serial === selectionSerial) await applyPendingSelection(serial);
     return true;
   }
 
@@ -251,12 +278,15 @@
     if (!validSideId(donId) || !validSideId(katId)) return false;
     if (selection.don === donId && selection.kat === katId) return true;
 
+    const serial = ++selectionSerial;
+    pendingSides.add('don');
+    pendingSides.add('kat');
     selection.don = donId;
     selection.kat = katId;
     stopPreview();
     emitSelection();
 
-    if (viewerReady()) await applyPair({ resume: true });
+    await applyPendingSelection(serial);
     return true;
   }
 
@@ -273,6 +303,7 @@
     if (!(await waitForViewerReady())) return;
     try {
       await applyPair({ resume: false });
+      pendingSides.clear();
     } catch (error) {
       console.warn(error);
       if (el.status) el.status.textContent = 'hitsounds.zip待ち';

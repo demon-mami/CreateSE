@@ -4,6 +4,7 @@
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   if (!CANDIDATES.length) return;
 
+  const EXCLUDED_SOURCE_NUMBERS = new Set(['23', '31']);
   const ordered = [...CANDIDATES].sort((a, b) =>
     (a.pitch ?? Number.POSITIVE_INFINITY) - (b.pitch ?? Number.POSITIVE_INFINITY) ||
     (a.globalRank ?? Number.POSITIVE_INFINITY) - (b.globalRank ?? Number.POSITIVE_INFINITY) ||
@@ -16,7 +17,7 @@
 
     candidate.sourceNumber = String(10 + index); // stable pitch-order numbering: 10..61
     candidate.name = `${candidate.sourceNumber}.wav`;
-    candidate.excluded = candidate.sourceNumber === '23'; // Snare 23 is intentionally removed from selection.
+    candidate.excluded = EXCLUDED_SOURCE_NUMBERS.has(candidate.sourceNumber);
   });
 
   window.HITSOUND_NUMBERED_CANDIDATES = ordered.filter(candidate => !candidate.excluded);
