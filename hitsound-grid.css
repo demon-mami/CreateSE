@@ -193,32 +193,58 @@
 }
 .custom-sound-grid.busy{pointer-events:none;opacity:.72}
 .custom-sound-slot{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 28px;
-  gap:4px;
+  position:relative;
   min-width:0;
 }
-.custom-sound-slot.empty{grid-template-columns:minmax(0,1fr)}
 .custom-sound-grid .custom-sound-key,
 .custom-sound-grid .custom-sound-add{min-width:0}
+.custom-sound-key>span{padding:0 27px 0 5px}
 .custom-sound-add>span{
   border-style:dashed;
   color:rgba(255,255,255,.55);
   font-size:15px;
 }
-.custom-sound-grid .custom-sound-delete{min-width:28px}
+.custom-sound-grid .custom-sound-delete{
+  position:absolute;
+  top:0;
+  right:0;
+  z-index:4;
+  width:28px;
+  min-width:28px;
+  padding:0 0 4px;
+}
+.custom-sound-delete::before{display:none}
 .custom-sound-delete>span{
+  height:30px;
+  border:0;
+  border-radius:0 10px 10px 0;
+  background:transparent;
+  box-shadow:inset 1px 0 rgba(255,255,255,.08);
   color:rgba(255,255,255,.49);
   font-size:12px;
 }
-.custom-sound-delete:active{
-  --edge:rgba(230,135,145,.34);
-  --back:rgba(79,43,47,.80);
-}
 .custom-sound-delete:active>span{
-  background:rgba(117,63,69,.66);
+  transform:none;
+  background:rgba(117,63,69,.48);
   color:rgba(255,218,222,.84);
 }
+.custom-sound-key:active + .custom-sound-delete>span,
+.custom-sound-key.selected-don + .custom-sound-delete>span,
+.custom-sound-key.selected-kat + .custom-sound-delete>span{transform:translateY(4px)}
+.custom-sound-key.selected-don + .custom-sound-delete>span{
+  box-shadow:inset 1px 0 rgba(139,52,64,.18);
+  color:#8b3440;
+}
+.custom-sound-key.selected-kat + .custom-sound-delete>span{
+  box-shadow:inset 1px 0 rgba(50,108,133,.18);
+  color:#326c85;
+}
+.custom-sound-key.selected-don.selected-kat + .custom-sound-delete>span{
+  box-shadow:inset 1px 0 rgba(89,79,88,.18);
+  color:#594f58;
+}
+.custom-sound-key.selected-don + .custom-sound-delete:active>span,
+.custom-sound-key.selected-kat + .custom-sound-delete:active>span{transform:translateY(4px)}
 .custom-sound-grid .hs-key:disabled{cursor:default;opacity:.46}
 .custom-sound-grid .hs-key:disabled>span{transform:none!important}
 
@@ -336,32 +362,50 @@
   gap:6px;
 }
 .favorite-set-item{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 34px;
-  gap:5px;
+  position:relative;
   min-width:0;
 }
-.favorite-set-apply{min-width:0}
+.favorite-set-apply{width:100%;min-width:0}
 .favorite-set-apply>span{
   height:30px;
-  padding:0 6px;
+  padding:0 32px 0 7px;
   color:rgba(255,255,255,.82);
   font-size:10px;
   white-space:nowrap;
 }
-.favorite-set-delete{min-width:34px}
+.favorite-set-delete{
+  position:absolute;
+  top:0;
+  right:0;
+  z-index:4;
+  width:32px;
+  min-width:32px;
+  padding:0 0 4px;
+}
+.favorite-set-delete::before{display:none}
 .favorite-set-delete>span{
   height:30px;
+  border:0;
+  border-radius:0 10px 10px 0;
+  background:transparent;
+  box-shadow:inset 1px 0 rgba(255,255,255,.08);
   color:rgba(255,255,255,.55);
   font-size:13px;
 }
-.favorite-set-delete:active{
-  --edge:rgba(230,135,145,.34);
-  --back:rgba(79,43,47,.80);
-}
 .favorite-set-delete:active>span{
-  background:rgba(117,63,69,.66);
+  transform:none;
+  background:rgba(117,63,69,.48);
   color:rgba(255,218,222,.84);
+}
+.favorite-set-apply:active + .favorite-set-delete>span{transform:translateY(4px)}
+
+@media(hover:hover){
+  .custom-sound-delete:hover>span,
+  .favorite-set-delete:hover>span{
+    background:rgba(255,255,255,.055);
+    color:rgba(255,255,255,.78);
+    filter:none;
+  }
 }
 
 @media(max-width:430px){
@@ -371,9 +415,8 @@
   .hs-action-button>span{height:31px}
   .hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:5px}
   .custom-sound-grid{gap:5px}
-  .custom-sound-slot{grid-template-columns:minmax(0,1fr) 25px;gap:3px}
-  .custom-sound-slot.empty{grid-template-columns:minmax(0,1fr)}
-  .custom-sound-grid .custom-sound-delete{min-width:25px}
+  .custom-sound-grid .custom-sound-delete{width:27px;min-width:27px}
+  .custom-sound-key>span{padding-right:26px}
   .hs-key>span{height:29px}
   .favorite-set-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
   #hitsoundGrid{padding:7px;gap:6px}
