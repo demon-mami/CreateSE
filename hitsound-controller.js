@@ -195,7 +195,7 @@
     clearPreview({ reset });
   }
 
-  async function previewCandidate(id) {
+  async function previewCandidate(id, { waitUntilEnded = false } = {}) {
     if (!el.previewAudio || id === SILENT_ID || !validSideId(id)) return false;
 
     const serial = ++previewSerial;
@@ -207,6 +207,20 @@
     el.previewAudio.src = previewUrl;
     el.previewAudio.currentTime = 0;
     await el.previewAudio.play();
+    if (waitUntilEnded && serial === previewSerial && !el.previewAudio.ended) {
+      await new Promise(resolve => {
+        const finish = () => {
+          el.previewAudio.removeEventListener('ended', finish);
+          el.previewAudio.removeEventListener('pause', finish);
+          el.previewAudio.removeEventListener('error', finish);
+          resolve();
+        };
+        el.previewAudio.addEventListener('ended', finish, { once: true });
+        el.previewAudio.addEventListener('pause', finish, { once: true });
+        el.previewAudio.addEventListener('error', finish, { once: true });
+        if (el.previewAudio.ended || el.previewAudio.paused || serial !== previewSerial) finish();
+      });
+    }
     return true;
   }
 
@@ -228,10 +242,8 @@
     selection[side] = id;
     emitSelection();
 
-    // Rebuild first so an already-playing chart has resumed before auditioning.
-    // The one-shot preview can then duck the live chart instead of racing it.
+    if (preview && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
     if (viewerReady()) await applyOne(side, id, { resume: true });
-    if (preview && id !== SILENT_ID) await previewCandidate(id);
     return true;
   }
 
