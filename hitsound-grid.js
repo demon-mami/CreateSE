@@ -7,6 +7,9 @@
   const $ = id => document.getElementById(id);
   const grid = $('hitsoundGrid');
   const sources = $('hitsoundSources');
+  const categorySelect = $('hitsoundCategorySelect');
+  const pinnedPanel = $('pinnedSourcesPanel');
+  const pinnedList = $('pinnedSourcesList');
   const roleDonButton = $('roleDonButton');
   const roleKatButton = $('roleKatButton');
   const silentButton = $('silentButton');
@@ -14,20 +17,34 @@
   const songPlayButton = $('playButton');
   const recommendationLine = $('recommendationLine');
 
-  if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton) return;
+  if (
+    !CANDIDATES.length || !controller || !favorites || !grid || !sources || !categorySelect ||
+    !pinnedPanel || !pinnedList || !roleDonButton || !roleKatButton
+  ) return;
 
   const SILENT_ID = controller.SILENT_ID;
   const PIN_STORAGE_KEY = 'osutaiko-hitsound-lab:pinned-sources:v1';
+  const CATEGORY_STORAGE_KEY = 'osutaiko-hitsound-lab:source-category:v1';
+  const RECOMMENDED_CATEGORY = '__RECOMMENDED__';
+  const ALL_CATEGORY = '__ALL__';
   const LONG_PRESS_MS = 520;
   const MOVE_TOLERANCE_PX = 11;
   const validCandidateIds = new Set(CANDIDATES.filter(candidate => !candidate.excluded).map(candidate => candidate.id));
   let activeSide = 'don';
+  let activeCategory = '';
   let pressState = null;
   let suppressClickFor = null;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
   const displayFamily = candidate => familyOf(candidate) === '808 / Sub' ? 'Bass Drum / Kick' : familyOf(candidate);
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
 
   function readPinnedIds() {
     try {
@@ -46,11 +63,18 @@
     } catch {}
   }
 
+  function saveActiveCategory() {
+    try {
+      localStorage.setItem(CATEGORY_STORAGE_KEY, activeCategory);
+    } catch {}
+  }
+
   const preferredOrder = [
     'Bass Drum / Kick',
     'Tom',
     'Timbale',
     'Rimshot',
+    'Snare',
     'Cowbell',
     'Agogo',
     'Woodblock',
@@ -88,42 +112,122 @@
     });
   }
 
+  function recommendedIds(selection = controller.getSelection()) {
+    return new Set(
+      favorites.recommendedFor(activeSide, selection)
+        .filter(id => validCandidateIds.has(id))
+    );
+  }
+
   function candidateLabel(candidate) {
     return `${candidate.sourceNumber} ${candidate.originalName || candidate.name || ''}`.trim();
   }
 
-  function pinHint(candidate) {
-    return `${candidateLabel(candidate)} · 長押しでピン留め${pinnedIds.has(candidate.id) ? '解除' : ''}`;
+  function pinHint(candidate, recommended = false) {
+    const state = pinnedIds.has(candidate.id) ? '解除' : '';
+    return `${candidateLabel(candidate)}${recommended ? ' · 推奨' : ''} · 長押しでピン留め${state}`;
   }
 
-  function keyMarkup(candidate) {
+  function keyMarkup(candidate, recommended = recommendedIds().has(candidate.id)) {
     const source = String(candidate.originalName || candidate.name || '');
     const pitch = Number.isFinite(candidate.pitch) ? `${candidate.pitch.toFixed(1)} Hz` : '';
     const pinned = pinnedIds.has(candidate.id);
-    return `<button class="hs-key${pinned ? ' pinned' : ''}" type="button" data-hs-id="${candidate.id}" title="${source}${pitch ? ` · ${pitch}` : ''} · 長押しでピン留め${pinned ? '解除' : ''}" aria-label="${pinHint(candidate)}" data-base-label="${candidateLabel(candidate)}"><span>${candidate.sourceNumber}</span></button>`;
+    const title = `${source}${pitch ? ` · ${pitch}` : ''} · 長押しでピン留め${pinned ? '解除' : ''}`;
+    return `<button class="hs-key${pinned ? ' pinned' : ''}${recommended ? ' recommended' : ''}" type="button" data-hs-id="${escapeHtml(candidate.id)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(pinHint(candidate, recommended))}" data-base-label="${escapeHtml(candidateLabel(candidate))}"><span><span class="hs-key-number">${escapeHtml(candidate.sourceNumber)}</span><span class="hs-recommended-mark" aria-hidden="true"${recommended ? '' : ' hidden'}>♥</span></span></button>`;
   }
 
-  function buildGrid() {
+  function initialCategory(groups) {
+    const allowed = new Set([RECOMMENDED_CATEGORY, ALL_CATEGORY, ...groups.map(([family]) => family)]);
+    try {
+      const saved = localStorage.getItem(CATEGORY_STORAGE_KEY) || '';
+      if (allowed.has(saved)) return saved;
+    } catch {}
+
+    const current = controller.getSelection()[activeSide];
+    const currentFamily = displayFamily(byId(current));
+    if (allowed.has(currentFamily)) return currentFamily;
+    return groups[0]?.[0] || ALL_CATEGORY;
+  }
+
+  function buildCategorySelect() {
     const groups = groupedCandidates();
-    sources.innerHTML = groups.map(([family, candidates]) => `
-      <section class="hs-family" data-family="${family}">
-        <div class="hs-family-title">${family}</div>
-        <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
-      </section>
-    `).join('');
+    activeCategory = initialCategory(groups);
+    const total = groups.reduce((sum, [, candidates]) => sum + candidates.length, 0);
+    categorySelect.innerHTML = [
+      `<option value="${RECOMMENDED_CATEGORY}">♥ 推奨</option>`,
+      ...groups.map(([family, candidates]) => `<option value="${escapeHtml(family)}">${escapeHtml(family)} (${candidates.length})</option>`),
+      `<option value="${ALL_CATEGORY}">すべて (${total})</option>`,
+    ].join('');
+    categorySelect.value = activeCategory;
   }
 
-  function paintPinnedButton(button) {
+  function updateRecommendedOption(recommended) {
+    const option = Array.from(categorySelect.options).find(item => item.value === RECOMMENDED_CATEGORY);
+    if (option) option.textContent = `♥ 推奨 (${recommended.size})`;
+  }
+
+  function renderCategorySources(recommended = recommendedIds()) {
+    const groups = groupedCandidates();
+
+    if (activeCategory === RECOMMENDED_CATEGORY) {
+      const candidates = CANDIDATES
+        .filter(candidate => !candidate.excluded && recommended.has(candidate.id))
+        .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber));
+      sources.innerHTML = candidates.length
+        ? `<section class="hs-family"><div class="hs-family-grid">${candidates.map(candidate => keyMarkup(candidate, true)).join('')}</div></section>`
+        : '<div class="hs-category-empty">現在の組み合わせに推奨候補はありません</div>';
+      return;
+    }
+
+    if (activeCategory === ALL_CATEGORY) {
+      sources.innerHTML = groups.map(([family, candidates]) => `
+        <section class="hs-family" data-family="${escapeHtml(family)}">
+          <div class="hs-family-title">${escapeHtml(family)}</div>
+          <div class="hs-family-grid">${candidates.map(candidate => keyMarkup(candidate, recommended.has(candidate.id))).join('')}</div>
+        </section>
+      `).join('');
+      return;
+    }
+
+    const candidates = groups.find(([family]) => family === activeCategory)?.[1] || [];
+    sources.innerHTML = candidates.length
+      ? `<section class="hs-family" data-family="${escapeHtml(activeCategory)}"><div class="hs-family-grid">${candidates.map(candidate => keyMarkup(candidate, recommended.has(candidate.id))).join('')}</div></section>`
+      : '<div class="hs-category-empty">このカテゴリーに音源はありません</div>';
+  }
+
+  function renderPinnedSources(recommended = recommendedIds()) {
+    const candidates = Array.from(pinnedIds)
+      .map(byId)
+      .filter(candidate => candidate && !candidate.excluded);
+    pinnedPanel.hidden = candidates.length === 0;
+    pinnedList.innerHTML = candidates.map(candidate => keyMarkup(candidate, recommended.has(candidate.id))).join('');
+  }
+
+  function paintSourceButton(button, selection, recommended) {
     const id = button?.dataset.hsId;
     const candidate = byId(id);
     if (!button || !candidate) return;
     const pinned = pinnedIds.has(id);
+    const isRecommended = recommended.has(id);
     const source = String(candidate.originalName || candidate.name || '');
     const pitch = Number.isFinite(candidate.pitch) ? `${candidate.pitch.toFixed(1)} Hz` : '';
+
     button.classList.toggle('pinned', pinned);
-    button.setAttribute('aria-label', pinHint(candidate));
+    button.classList.toggle('recommended', isRecommended);
+    button.classList.toggle('selected-don', id === selection.don);
+    button.classList.toggle('selected-kat', id === selection.kat);
+    button.querySelector('.hs-recommended-mark')?.toggleAttribute('hidden', !isRecommended);
+    button.setAttribute('aria-label', pinHint(candidate, isRecommended));
     button.setAttribute('aria-description', pinned ? 'ピン留め中。長押しで解除できます。' : '長押しでピン留めできます。');
     button.title = `${source}${pitch ? ` · ${pitch}` : ''} · 長押しでピン留め${pinned ? '解除' : ''}`;
+  }
+
+  function pulsePin(button) {
+    if (!button?.isConnected) return;
+    button.classList.remove('pin-pulse');
+    void button.offsetWidth;
+    button.classList.add('pin-pulse');
+    setTimeout(() => button.classList.remove('pin-pulse'), 360);
   }
 
   function togglePin(button) {
@@ -132,40 +236,44 @@
     if (pinnedIds.has(id)) pinnedIds.delete(id);
     else pinnedIds.add(id);
     savePinnedIds();
-    paintPinnedButton(button);
-    button.classList.remove('pin-pulse');
-    void button.offsetWidth;
-    button.classList.add('pin-pulse');
-    setTimeout(() => button.classList.remove('pin-pulse'), 360);
+    pulsePin(button);
+    renderPinnedSources();
+    paint();
   }
 
-  function paintRecommendation() {
+  function paintRecommendation(recommended) {
     if (!recommendationLine) return;
-    const ids = favorites.recommendedFor(activeSide, controller.getSelection());
-    const numbers = ids
+    const numbers = Array.from(recommended)
       .map(byId)
       .filter(candidate => candidate && !candidate.excluded)
       .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber))
       .map(candidate => candidate.sourceNumber);
-    recommendationLine.textContent = `推奨：${numbers.length ? numbers.join(' ') : '—'}`;
+    recommendationLine.textContent = `♥ 推奨：${numbers.length ? numbers.join(' ') : '—'}`;
+  }
+
+  function sideTitle(label, id) {
+    if (id === null) return `${label}: 未選択`;
+    if (id === SILENT_ID) return `${label}: 無音`;
+    return `${label}: ${byId(id)?.sourceNumber || '—'}`;
   }
 
   function paint() {
     const selection = controller.getSelection();
+    const recommended = recommendedIds(selection);
 
     roleDonButton.classList.toggle('target', activeSide === 'don');
     roleKatButton.classList.toggle('target', activeSide === 'kat');
     roleDonButton.setAttribute('aria-pressed', activeSide === 'don' ? 'true' : 'false');
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
-    roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${byId(selection.don)?.sourceNumber || '—'}`;
-    roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${byId(selection.kat)?.sourceNumber || '—'}`;
+    roleDonButton.title = sideTitle('Don', selection.don);
+    roleKatButton.title = sideTitle('Kat', selection.kat);
 
     grid.dataset.activeSide = activeSide;
-    sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
-      const id = button.dataset.hsId;
-      button.classList.toggle('selected-don', id === selection.don);
-      button.classList.toggle('selected-kat', id === selection.kat);
-      paintPinnedButton(button);
+    updateRecommendedOption(recommended);
+    if (activeCategory === RECOMMENDED_CATEGORY) renderCategorySources(recommended);
+
+    grid.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
+      paintSourceButton(button, selection, recommended);
     });
 
     if (silentButton) {
@@ -173,7 +281,7 @@
       silentButton.classList.toggle('selected-kat', activeSide === 'kat' && selection.kat === SILENT_ID);
     }
 
-    paintRecommendation();
+    paintRecommendation(recommended);
   }
 
   function syncSongTransportButton() {
@@ -189,7 +297,7 @@
   async function chooseSound(id) {
     const current = controller.getSelection()[activeSide];
     const deselecting = current === id;
-    const nextId = deselecting ? SILENT_ID : id;
+    const nextId = deselecting ? null : id;
     try {
       await controller.setSide(activeSide, nextId, { preview: !deselecting });
     } finally {
@@ -239,6 +347,12 @@
   previewButton?.addEventListener('click', () => {
     if (!songPlayButton?.disabled) songPlayButton.click();
   });
+  categorySelect.addEventListener('change', () => {
+    activeCategory = categorySelect.value;
+    saveActiveCategory();
+    renderCategorySources();
+    paint();
+  });
 
   if (songPlayButton && previewButton) {
     new MutationObserver(syncSongTransportButton).observe(songPlayButton, {
@@ -250,7 +364,7 @@
     });
   }
 
-  sources.addEventListener('pointerdown', event => {
+  grid.addEventListener('pointerdown', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
     if (!button || sources.classList.contains('busy')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -275,7 +389,7 @@
     }, LONG_PRESS_MS);
   });
 
-  sources.addEventListener('pointermove', event => {
+  grid.addEventListener('pointermove', event => {
     if (!pressState || event.pointerId !== pressState.pointerId || pressState.longPressed) return;
     const dx = event.clientX - pressState.startX;
     const dy = event.clientY - pressState.startY;
@@ -285,14 +399,14 @@
     }
   });
 
-  sources.addEventListener('pointerup', event => finishPress(event));
-  sources.addEventListener('pointercancel', event => finishPress(event, true));
-  sources.addEventListener('lostpointercapture', event => finishPress(event, true));
-  sources.addEventListener('contextmenu', event => {
+  grid.addEventListener('pointerup', event => finishPress(event));
+  grid.addEventListener('pointercancel', event => finishPress(event, true));
+  grid.addEventListener('lostpointercapture', event => finishPress(event, true));
+  grid.addEventListener('contextmenu', event => {
     if (event.target.closest('.hs-key[data-hs-id]')) event.preventDefault();
   });
 
-  sources.addEventListener('click', event => {
+  grid.addEventListener('click', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
     if (!button || sources.classList.contains('busy')) return;
     if (suppressClickFor === button) {
@@ -305,8 +419,19 @@
   });
 
   window.addEventListener('hitsound-selection-change', paint);
+  window.addEventListener('storage', event => {
+    if (event.key === PIN_STORAGE_KEY) {
+      const latest = readPinnedIds();
+      pinnedIds.clear();
+      latest.forEach(id => pinnedIds.add(id));
+      renderPinnedSources();
+      paint();
+    }
+  });
 
-  buildGrid();
+  buildCategorySelect();
+  renderCategorySources();
+  renderPinnedSources();
   paint();
   syncSongTransportButton();
 })();

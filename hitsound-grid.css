@@ -109,7 +109,7 @@
 }
 .hs-role-button.target::before{box-shadow:0 1px 3px rgba(5,10,12,.14)}
 
-/* Shared neutral actions: silent / song transport / Set / CSV. */
+/* Shared neutral actions: silent / song transport / favorite / CSV. */
 .hs-action-button{min-width:0;color:rgba(255,255,255,.88)}
 .hs-action-button>span{
   height:32px;
@@ -118,10 +118,32 @@
   font-weight:850;
 }
 .hs-action-button.compact>span{font-size:14px}
+.hs-action-button>span.hs-set-icon{color:#fff}
+.hs-set-icon svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
 .hs-action-button:disabled{opacity:.28;cursor:default}
 .hs-action-button:disabled>span{transform:none!important}
 
+.hs-source-filter{
+  display:block;
+  margin:0 2px 3px;
+}
+.hs-category-select{
+  min-height:34px;
+  padding:0 9px;
+  border-radius:10px;
+  font-size:10px;
+  font-weight:800;
+}
 .hs-recommendation{
+  min-width:0;
   min-height:18px;
   margin:0 2px 6px;
   color:rgba(255,255,255,.63);
@@ -162,9 +184,30 @@
 
 .hs-key{width:100%;min-width:39px;color:rgba(255,255,255,.72)}
 .hs-key>span{
+  position:relative;
   height:30px;
   color:rgba(255,255,255,.72);
   font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.hs-key-number{pointer-events:none}
+.hs-recommended-mark{
+  position:absolute;
+  top:4px;
+  right:5px;
+  color:rgba(255,224,230,.94);
+  font:900 9px/1 Arial,sans-serif;
+  text-shadow:0 0 7px rgba(255,190,204,.22);
+  pointer-events:none;
+}
+.hs-category-empty{
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:rgba(255,255,255,.48);
+  font-size:10px;
+  font-weight:700;
+  text-align:center;
 }
 
 /* A long press pins a source without changing its Don/Kat selection state. */
@@ -187,19 +230,19 @@
 }
 
 /* Press feedback for a not-yet-selected key. */
-#hitsoundGrid[data-active-side="don"] #hitsoundSources .hs-key:active{
+#hitsoundGrid[data-active-side="don"] .hs-key[data-hs-id]:active{
   --edge:rgba(245,170,178,.62);
   --back:rgba(96,43,50,.94);
 }
-#hitsoundGrid[data-active-side="don"] #hitsoundSources .hs-key:active>span{
+#hitsoundGrid[data-active-side="don"] .hs-key[data-hs-id]:active>span{
   background:linear-gradient(180deg,rgba(238,185,178,.96),rgba(205,134,143,.96));
   color:#8b3440;
 }
-#hitsoundGrid[data-active-side="kat"] #hitsoundSources .hs-key:active{
+#hitsoundGrid[data-active-side="kat"] .hs-key[data-hs-id]:active{
   --edge:rgba(176,211,226,.64);
   --back:rgba(42,82,99,.95);
 }
-#hitsoundGrid[data-active-side="kat"] #hitsoundSources .hs-key:active>span{
+#hitsoundGrid[data-active-side="kat"] .hs-key[data-hs-id]:active>span{
   background:linear-gradient(180deg,rgba(176,204,215,.97),rgba(128,174,194,.97));
   color:#326c85;
 }
@@ -253,7 +296,14 @@
   color:#326c85;
 }
 
-/* Favorite SETs live inside the same source frame, directly below Hi-Hat. */
+/* Pinned sources stay visible below the filtered category. */
+.hs-pinned-family{
+  padding-top:7px;
+  border-top:1px solid rgba(218,207,170,.18);
+}
+.hs-pinned-family .hs-family-title{color:rgba(218,207,170,.68)}
+
+/* Favorite SETs live inside the same source frame. */
 .hs-favorite-family{
   padding-top:7px;
   border-top:1px solid rgba(255,255,255,.10);
@@ -297,6 +347,7 @@
   .hs-role-button>span{height:36px}
   .hs-toolbar-actions{grid-template-columns:42px 42px 1fr 1fr;gap:5px}
   .hs-action-button>span{height:31px}
+  .hs-recommendation{padding-left:2px}
   .hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:5px}
   .hs-key>span{height:29px}
   .favorite-set-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}

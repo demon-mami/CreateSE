@@ -18,7 +18,7 @@
 
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const available = candidate => candidate && !candidate.excluded;
-  const validSideId = id => id === SILENT_ID || available(byId(id));
+  const validSideId = id => id === null || id === SILENT_ID || available(byId(id));
   const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-02.wav')?.id
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
@@ -78,7 +78,7 @@
   }
 
   async function candidateBytes(id) {
-    if (id === SILENT_ID) return makeSilentWav();
+    if (id === null || id === SILENT_ID) return makeSilentWav();
     if (bytesCache.has(id)) return bytesCache.get(id).slice(0);
 
     const candidate = byId(id);
@@ -93,7 +93,7 @@
 
   function fileFor(id, bytes) {
     const candidate = byId(id);
-    const name = id === SILENT_ID ? 'silent.wav' : (candidate?.name || 'hitsound.wav');
+    const name = id === null || id === SILENT_ID ? 'silent.wav' : (candidate?.name || 'hitsound.wav');
     return new File([bytes], name, { type: 'audio/wav', lastModified: Date.now() });
   }
 
@@ -202,7 +202,7 @@
   }
 
   async function previewCandidate(id, { waitUntilEnded = false } = {}) {
-    if (!el.previewAudio || id === SILENT_ID || !validSideId(id)) return false;
+    if (!el.previewAudio || id === null || id === SILENT_ID || !validSideId(id)) return false;
 
     const serial = ++previewSerial;
     clearPreview();
