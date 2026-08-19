@@ -3,6 +3,7 @@
 
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   const SILENT_ID = '__SILENT__';
+  const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-4]__$/;
   const $ = id => document.getElementById(id);
 
   const el = {
@@ -16,9 +17,11 @@
 
   if (!CANDIDATES.length || !el.donInput || !el.katInput) return;
 
-  const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
+  const builtInById = id => CANDIDATES.find(candidate => candidate.id === id) || null;
+  const customSources = new Map();
+  const byId = id => customSources.get(id) || builtInById(id);
   const available = candidate => candidate && !candidate.excluded;
-  const validSideId = id => id === null || id === SILENT_ID || available(byId(id));
+  const validSideId = id => id === null || id === SILENT_ID || customSources.has(id) || available(builtInById(id));
   const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-02.wav')?.id
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
@@ -79,9 +82,11 @@
 
   async function candidateBytes(id) {
     if (id === null || id === SILENT_ID) return makeSilentWav();
+    const custom = customSources.get(id);
+    if (custom) return custom.bytes.slice(0);
     if (bytesCache.has(id)) return bytesCache.get(id).slice(0);
 
-    const candidate = byId(id);
+    const candidate = builtInById(id);
     if (!available(candidate)) throw new Error('候補音源が見つかりません。');
     const pack = await hitsoundPack();
     const entry = pack.file(candidate.entry);
@@ -92,9 +97,63 @@
   }
 
   function fileFor(id, bytes) {
-    const candidate = byId(id);
-    const name = id === null || id === SILENT_ID ? 'silent.wav' : (candidate?.name || 'hitsound.wav');
-    return new File([bytes], name, { type: 'audio/wav', lastModified: Date.now() });
+    const source = byId(id);
+    const silent = id === null || id === SILENT_ID;
+    const custom = customSources.has(id);
+    const name = silent ? 'silent.wav' : (source?.name || 'hitsound.wav');
+    const type = silent || !custom ? 'audio/wav' : (source?.type || '');
+    return new File([bytes], name, {
+      type,
+      lastModified: custom ? (source?.lastModified || Date.now()) : Date.now(),
+    });
+  }
+
+  function registerCustomSource(id, source) {
+    if (!CUSTOM_ID_PATTERN.test(String(id))) throw new Error('ユーザー音源スロットが不正です。');
+    const rawBytes = source?.bytes;
+    let bytes = null;
+    if (rawBytes instanceof ArrayBuffer) bytes = rawBytes.slice(0);
+    else if (ArrayBuffer.isView(rawBytes)) {
+      bytes = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
+    }
+    if (!bytes?.byteLength) throw new Error('空の音源ファイルは追加できません。');
+
+    const slot = Number(source?.slot);
+    const safeName = String(source?.name || 'custom-sound.wav').split(/[\\/]/).pop().slice(0, 240);
+    const entry = {
+      id,
+      name: safeName || 'custom-sound.wav',
+      originalName: safeName || 'custom-sound.wav',
+      sourceNumber: String(source?.sourceNumber || (Number.isInteger(slot) ? `M${slot}` : 'My')),
+      family: 'My Sound',
+      originalFamily: 'My Sound',
+      type: String(source?.type || ''),
+      lastModified: Number(source?.lastModified) || Date.now(),
+      slot: Number.isInteger(slot) ? slot : null,
+      custom: true,
+      bytes,
+    };
+    customSources.set(id, entry);
+    return { ...entry, bytes: entry.bytes.slice(0) };
+  }
+
+  async function unregisterCustomSource(id) {
+    if (!customSources.has(id)) return false;
+
+    const affectedSides = ['don', 'kat'].filter(side => selection[side] === id);
+    stopPreview();
+    customSources.delete(id);
+
+    if (affectedSides.length) {
+      const serial = ++selectionSerial;
+      affectedSides.forEach(side => {
+        selection[side] = null;
+        pendingSides.add(side);
+      });
+      emitSelection();
+      await applyPendingSelection(serial);
+    }
+    return true;
   }
 
   function setInputFile(input, file) {
@@ -209,7 +268,9 @@
     const bytes = await candidateBytes(id);
     if (serial !== previewSerial) return false;
 
-    previewUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+    const source = byId(id);
+    const type = customSources.has(id) ? (source?.type || '') : 'audio/wav';
+    previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
     el.previewAudio.src = previewUrl;
     el.previewAudio.currentTime = 0;
     await el.previewAudio.play();
@@ -263,15 +324,26 @@
       return true;
     }
 
+    const previousId = selection[side];
     const serial = ++selectionSerial;
     pendingSides.add(side);
     stopPreview();
     selection[side] = id;
     emitSelection();
 
-    if (preview && id !== null && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
-    if (serial === selectionSerial) await applyPendingSelection(serial);
-    return true;
+    try {
+      if (preview && id !== null && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
+      if (serial === selectionSerial) await applyPendingSelection(serial);
+      return true;
+    } catch (error) {
+      if (serial === selectionSerial) {
+        pendingSides.delete(side);
+        stopPreview();
+        selection[side] = previousId;
+        emitSelection();
+      }
+      throw error;
+    }
   }
 
   async function setPair(donId, katId) {
@@ -318,7 +390,10 @@
   window.HitsoundController = {
     SILENT_ID,
     byId,
+    isValidSideId: validSideId,
     getSelection: () => ({ ...selection }),
+    registerCustomSource,
+    unregisterCustomSource,
     setSide,
     setPair,
     applyPair,

@@ -7,7 +7,7 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./hitsound-grid.css?v=1.6">
+  <link rel="stylesheet" href="./hitsound-grid.css?v=1.7">
   <style>
     .chart-field{display:block}.chart-field select{height:46px;min-height:46px;font-size:12px;font-weight:750}
     .chart-info{display:flex;align-items:center;min-height:34px;margin-top:8px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden}
@@ -42,6 +42,7 @@
       <p id="fileName" hidden></p>
       <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
       <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
+      <input id="customHitsoundInput" type="file" accept="audio/*,.wav" hidden>
 
       <div class="pair-builder" aria-label="Hitsound selector">
         <div class="hs-toolbar">
@@ -58,6 +59,13 @@
 
         <div id="recommendationLine" class="hs-recommendation">推奨：—</div>
         <div id="hitsoundGrid" data-active-side="don" aria-label="音源一覧">
+          <section id="customSoundSection" class="hs-family hs-custom-family" aria-label="ユーザー音源">
+            <div class="hs-family-title hs-custom-title">
+              <span>My Sound</span>
+              <span id="customSoundCount" aria-live="polite">0 / 4</span>
+            </div>
+            <div id="customSoundSlots" class="custom-sound-grid" aria-busy="true"></div>
+          </section>
           <div id="hitsoundSources"></div>
           <section id="savedSetsPanel" class="hs-family hs-favorite-family" aria-label="Favorite SET">
             <div class="hs-family-title">Favorite</div>
@@ -109,9 +117,9 @@
   <script src="./audio-ducking-bridge.js?v=1.0"></script>
   <script src="./app-v4.js?v=c22e29e4"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./hitsound-controller.js?v=1.7"></script>
+  <script src="./hitsound-controller.js?v=1.8"></script>
   <script src="./hitsound-favorites.js?v=1.4"></script>
-  <script src="./hitsound-grid.js?v=1.7"></script>
+  <script src="./hitsound-grid.js?v=1.8"></script>
   <script src="./chart-loader.js?v=0.4"></script>
 </body>
 </html>

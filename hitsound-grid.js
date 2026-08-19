@@ -13,21 +13,33 @@
   const previewButton = $('previewButton');
   const songPlayButton = $('playButton');
   const recommendationLine = $('recommendationLine');
+  const customInput = $('customHitsoundInput');
+  const customSlots = $('customSoundSlots');
+  const customCount = $('customSoundCount');
 
-  if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton) return;
+  if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton || !customInput || !customSlots || !customCount) return;
 
   const SILENT_ID = controller.SILENT_ID;
   const PIN_STORAGE_KEY = 'osutaiko-hitsound-lab:pinned-sources:v1';
+  const CUSTOM_SLOT_COUNT = 4;
+  const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
+  const CUSTOM_STORE_NAME = 'sounds';
   const LONG_PRESS_MS = 520;
   const MOVE_TOLERANCE_PX = 11;
   const validCandidateIds = new Set(CANDIDATES.filter(candidate => !candidate.excluded).map(candidate => candidate.id));
+  const customRecords = new Map();
   let activeSide = 'don';
   let pressState = null;
   let suppressClickFor = null;
+  let customDbPromise = null;
+  let customReady = false;
+  let customBusy = false;
+  let uploadTargetSlot = null;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
   const displayFamily = candidate => familyOf(candidate) === '808 / Sub' ? 'Bass Drum / Kick' : familyOf(candidate);
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
+  const customIdForSlot = slot => `__CUSTOM_${slot}__`;
 
   function readPinnedIds() {
     try {
@@ -113,6 +125,142 @@
     `).join('');
   }
 
+  function openCustomDb() {
+    if (!('indexedDB' in window)) return Promise.reject(new Error('このブラウザでは音源を保存できません。'));
+    if (customDbPromise) return customDbPromise;
+
+    customDbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(CUSTOM_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(CUSTOM_STORE_NAME)) {
+          db.createObjectStore(CUSTOM_STORE_NAME, { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('ユーザー音源の保存領域を開けません。'));
+      request.onblocked = () => reject(new Error('ユーザー音源の保存領域がほかのタブで使用中です。'));
+    });
+    return customDbPromise;
+  }
+
+  async function readCustomRecords() {
+    const db = await openCustomDb();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(CUSTOM_STORE_NAME, 'readonly').objectStore(CUSTOM_STORE_NAME).getAll();
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      request.onerror = () => reject(request.error || new Error('保存済み音源を読み込めません。'));
+    });
+  }
+
+  async function writeCustomRecord(record) {
+    const db = await openCustomDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(CUSTOM_STORE_NAME, 'readwrite');
+      transaction.objectStore(CUSTOM_STORE_NAME).put({
+        id: record.id,
+        slot: record.slot,
+        sourceNumber: record.sourceNumber,
+        name: record.name,
+        type: record.type,
+        lastModified: record.lastModified,
+        bytes: record.bytes.slice(0),
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('ユーザー音源を保存できません。'));
+      transaction.onabort = () => reject(transaction.error || new Error('ユーザー音源の保存が中断されました。'));
+    });
+  }
+
+  async function deleteCustomRecord(id) {
+    const db = await openCustomDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(CUSTOM_STORE_NAME, 'readwrite');
+      transaction.objectStore(CUSTOM_STORE_NAME).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('ユーザー音源を削除できません。'));
+      transaction.onabort = () => reject(transaction.error || new Error('ユーザー音源の削除が中断されました。'));
+    });
+  }
+
+  function renderCustomSlots() {
+    const fragment = document.createDocumentFragment();
+
+    for (let slot = 1; slot <= CUSTOM_SLOT_COUNT; slot++) {
+      const id = customIdForSlot(slot);
+      const record = customRecords.get(id);
+      const item = document.createElement('div');
+      item.className = `custom-sound-slot${record ? '' : ' empty'}`;
+
+      if (!record) {
+        const addButton = document.createElement('button');
+        addButton.type = 'button';
+        addButton.className = 'hs-key custom-sound-add';
+        addButton.dataset.uploadSlot = String(slot);
+        addButton.disabled = !customReady || customBusy;
+        addButton.title = `My Sound ${slot} に音源を追加`;
+        addButton.setAttribute('aria-label', `ユーザー音源 ${slot} を追加`);
+        const face = document.createElement('span');
+        face.textContent = customReady ? '＋' : '…';
+        addButton.append(face);
+        item.append(addButton);
+      } else {
+        const soundButton = document.createElement('button');
+        soundButton.type = 'button';
+        soundButton.className = 'hs-key custom-sound-key';
+        soundButton.dataset.customId = id;
+        soundButton.disabled = customBusy;
+        soundButton.title = record.name;
+        soundButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を選択・試聴`);
+        const soundFace = document.createElement('span');
+        soundFace.textContent = record.sourceNumber;
+        soundButton.append(soundFace);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'hs-key custom-sound-delete';
+        deleteButton.dataset.deleteCustom = id;
+        deleteButton.disabled = customBusy;
+        deleteButton.title = `${record.name} を削除`;
+        deleteButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を削除`);
+        const deleteFace = document.createElement('span');
+        deleteFace.textContent = '×';
+        deleteButton.append(deleteFace);
+
+        item.append(soundButton, deleteButton);
+      }
+      fragment.append(item);
+    }
+
+    customSlots.replaceChildren(fragment);
+    customSlots.classList.toggle('busy', !customReady || customBusy);
+    customSlots.setAttribute('aria-busy', (!customReady || customBusy) ? 'true' : 'false');
+    customCount.textContent = `${customRecords.size} / ${CUSTOM_SLOT_COUNT}`;
+  }
+
+  async function restoreCustomSounds() {
+    try {
+      const records = await readCustomRecords();
+      for (const stored of records) {
+        const slot = Number(stored?.slot);
+        const id = customIdForSlot(slot);
+        if (slot < 1 || slot > CUSTOM_SLOT_COUNT || stored?.id !== id || customRecords.has(id)) continue;
+        try {
+          const record = controller.registerCustomSource(id, stored);
+          customRecords.set(id, record);
+        } catch (error) {
+          console.warn('保存済みユーザー音源を復元できませんでした。', error);
+        }
+      }
+    } catch (error) {
+      console.warn('ユーザー音源の保存領域を利用できません。', error);
+    } finally {
+      customReady = true;
+      renderCustomSlots();
+      paint();
+    }
+  }
+
   function paintPinnedButton(button) {
     const id = button?.dataset.hsId;
     const candidate = byId(id);
@@ -152,13 +300,15 @@
 
   function paint() {
     const selection = controller.getSelection();
+    const donSource = controller.byId(selection.don);
+    const katSource = controller.byId(selection.kat);
 
     roleDonButton.classList.toggle('target', activeSide === 'don');
     roleKatButton.classList.toggle('target', activeSide === 'kat');
     roleDonButton.setAttribute('aria-pressed', activeSide === 'don' ? 'true' : 'false');
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
-    roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${byId(selection.don)?.sourceNumber || '—'}`;
-    roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${byId(selection.kat)?.sourceNumber || '—'}`;
+    roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${donSource?.sourceNumber || '—'}`;
+    roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${katSource?.sourceNumber || '—'}`;
 
     grid.dataset.activeSide = activeSide;
     sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
@@ -166,6 +316,12 @@
       button.classList.toggle('selected-don', id === selection.don);
       button.classList.toggle('selected-kat', id === selection.kat);
       paintPinnedButton(button);
+    });
+
+    customSlots.querySelectorAll('.custom-sound-key[data-custom-id]').forEach(button => {
+      const id = button.dataset.customId;
+      button.classList.toggle('selected-don', id === selection.don);
+      button.classList.toggle('selected-kat', id === selection.kat);
     });
 
     if (silentButton) {
@@ -194,6 +350,87 @@
       await controller.setSide(activeSide, nextId, { preview: !deselecting });
     } finally {
       paint();
+    }
+  }
+
+  function requestCustomUpload(slot) {
+    if (!customReady || customBusy || slot < 1 || slot > CUSTOM_SLOT_COUNT) return;
+    if (customRecords.has(customIdForSlot(slot))) return;
+    uploadTargetSlot = slot;
+    customInput.value = '';
+    customInput.click();
+  }
+
+  async function addCustomSound(file, slot) {
+    const id = customIdForSlot(slot);
+    if (!file || customBusy || customRecords.has(id)) return;
+
+    customBusy = true;
+    renderCustomSlots();
+    let record = null;
+    let persistenceError = null;
+
+    try {
+      const bytes = await file.arrayBuffer();
+      record = controller.registerCustomSource(id, {
+        id,
+        slot,
+        sourceNumber: `M${slot}`,
+        name: file.name,
+        type: file.type,
+        lastModified: file.lastModified,
+        bytes,
+      });
+      customRecords.set(id, record);
+
+      try {
+        await writeCustomRecord(record);
+      } catch (error) {
+        persistenceError = error;
+        console.warn('ユーザー音源をブラウザに保存できませんでした。', error);
+      }
+    } catch (error) {
+      if (record) {
+        customRecords.delete(id);
+        await controller.unregisterCustomSource(id).catch(() => {});
+      }
+      throw error;
+    } finally {
+      customBusy = false;
+      renderCustomSlots();
+      paint();
+    }
+
+    if (persistenceError) {
+      alert('音源は使用できますが、ブラウザへの保存に失敗しました。次回は再追加してください。');
+    }
+
+    chooseSound(id).catch(error => alert(`音源を再生できませんでした。\n${error.message}`));
+  }
+
+  async function removeCustomSound(id) {
+    const record = customRecords.get(id);
+    if (!record || customBusy) return;
+
+    customBusy = true;
+    customRecords.delete(id);
+    renderCustomSlots();
+
+    let deleteError = null;
+    try {
+      await Promise.all([
+        controller.unregisterCustomSource(id),
+        deleteCustomRecord(id).catch(error => { deleteError = error; }),
+      ]);
+    } finally {
+      customBusy = false;
+      renderCustomSlots();
+      paint();
+    }
+
+    if (deleteError) {
+      console.warn('保存済みユーザー音源を削除できませんでした。', deleteError);
+      alert('この画面からは削除しましたが、ブラウザの保存データを削除できませんでした。');
     }
   }
 
@@ -304,9 +541,41 @@
     chooseSound(button.dataset.hsId).catch(error => alert(error.message));
   });
 
+  customSlots.addEventListener('click', event => {
+    if (customBusy || !customReady) return;
+
+    const deleteButton = event.target.closest('[data-delete-custom]');
+    if (deleteButton && customSlots.contains(deleteButton)) {
+      removeCustomSound(deleteButton.dataset.deleteCustom).catch(error => alert(error.message));
+      return;
+    }
+
+    const addButton = event.target.closest('[data-upload-slot]');
+    if (addButton && customSlots.contains(addButton)) {
+      requestCustomUpload(Number(addButton.dataset.uploadSlot));
+      return;
+    }
+
+    const soundButton = event.target.closest('.custom-sound-key[data-custom-id]');
+    if (soundButton && customSlots.contains(soundButton)) {
+      chooseSound(soundButton.dataset.customId).catch(error => alert(error.message));
+    }
+  });
+
+  customInput.addEventListener('change', () => {
+    const file = customInput.files?.[0] || null;
+    const slot = uploadTargetSlot;
+    uploadTargetSlot = null;
+    customInput.value = '';
+    if (!file || !slot) return;
+    addCustomSound(file, slot).catch(error => alert(`音源を追加できませんでした。\n${error.message}`));
+  });
+
   window.addEventListener('hitsound-selection-change', paint);
 
   buildGrid();
+  renderCustomSlots();
   paint();
   syncSongTransportButton();
+  restoreCustomSounds();
 })();
