@@ -36,6 +36,8 @@
   cursor:pointer;
   user-select:none;
   touch-action:manipulation;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
   -webkit-tap-highlight-color:transparent;
 }
 
@@ -107,7 +109,7 @@
 }
 .hs-role-button.target::before{box-shadow:0 1px 3px rgba(5,10,12,.14)}
 
-/* Shared neutral actions: silent / preview / Set / CSV. */
+/* Shared neutral actions: silent / song transport / Set / CSV. */
 .hs-action-button{min-width:0;color:rgba(255,255,255,.88)}
 .hs-action-button>span{
   height:32px;
@@ -163,6 +165,25 @@
   height:30px;
   color:rgba(255,255,255,.72);
   font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+/* A long press pins a source without changing its Don/Kat selection state. */
+.hs-key.pinned::after,
+.hs-key.pin-pulse::after{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  z-index:3;
+  border:1.5px solid rgba(218,207,170,.82);
+  border-radius:12px;
+  box-shadow:0 0 0 1px rgba(218,207,170,.10),0 0 9px rgba(218,207,170,.14);
+  pointer-events:none;
+}
+.hs-key.pin-pulse::after{animation:hs-pin-pulse 340ms ease-out}
+@keyframes hs-pin-pulse{
+  0%{opacity:.25;transform:scale(.96)}
+  55%{opacity:1;transform:scale(1.035)}
+  100%{opacity:1;transform:scale(1)}
 }
 
 /* Press feedback for a not-yet-selected key. */
@@ -286,4 +307,5 @@
 @media(prefers-reduced-motion:reduce){
   .hs-role-button::before,.hs-action-button::before,.hs-key::before,
   .hs-role-button>span,.hs-action-button>span,.hs-key>span{transition:none!important}
+  .hs-key.pin-pulse::after{animation:none!important}
 }

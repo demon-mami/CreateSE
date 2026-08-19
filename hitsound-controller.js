@@ -9,7 +9,6 @@
     donInput: $('donHitsoundInput'),
     katInput: $('kaHitsoundInput'),
     previewAudio: $('samplePreviewAudio'),
-    previewButton: $('previewButton'),
     status: $('statusBadge'),
     play: $('playButton'),
     oszInput: $('oszInput'),
@@ -31,8 +30,8 @@
   let packPromise = null;
   const bytesCache = new Map();
   let applySerial = 0;
+  let previewSerial = 0;
   let previewUrl = '';
-  let previewSide = null;
 
   async function hitsoundPack() {
     if (!packPromise) {
@@ -175,66 +174,64 @@
     window.dispatchEvent(new CustomEvent('hitsound-selection-change', { detail: { ...selection } }));
   }
 
-  function previewFace() {
-    return el.previewButton?.querySelector('span') || el.previewButton;
+  function setPreviewDucking(active) {
+    window.HitsoundDuckingBridge?.setPreviewActive?.(!!active);
   }
 
-  function paintPreview() {
-    const playing = !!el.previewAudio && !el.previewAudio.paused && !el.previewAudio.ended;
-    const face = previewFace();
-    if (face) face.textContent = playing ? 'Ⅱ' : '▶';
-  }
-
-  function stopPreview({ reset = true } = {}) {
+  function clearPreview({ reset = true } = {}) {
     if (!el.previewAudio) return;
+    setPreviewDucking(false);
     el.previewAudio.pause();
     if (reset) {
       try { el.previewAudio.currentTime = 0; } catch {}
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = '';
-      previewSide = null;
       el.previewAudio.removeAttribute('src');
     }
-    paintPreview();
   }
 
-  async function togglePreview(side) {
-    if (!el.previewAudio || (side !== 'don' && side !== 'kat')) return;
+  function stopPreview({ reset = true } = {}) {
+    previewSerial++;
+    clearPreview({ reset });
+  }
 
-    if (previewSide === side && el.previewAudio.src) {
-      if (!el.previewAudio.paused && !el.previewAudio.ended) {
-        el.previewAudio.pause();
-        paintPreview();
-        return;
-      }
-      if (!el.previewAudio.ended) {
-        await el.previewAudio.play();
-        paintPreview();
-        return;
-      }
-    }
+  async function previewCandidate(id) {
+    if (!el.previewAudio || id === SILENT_ID || !validSideId(id)) return false;
 
-    stopPreview();
-    const id = selection[side];
+    const serial = ++previewSerial;
+    clearPreview();
     const bytes = await candidateBytes(id);
+    if (serial !== previewSerial) return false;
+
     previewUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
-    previewSide = side;
     el.previewAudio.src = previewUrl;
     el.previewAudio.currentTime = 0;
     await el.previewAudio.play();
-    paintPreview();
+    return true;
   }
 
-  async function setSide(side, id) {
+  async function togglePreview(side) {
+    if (side !== 'don' && side !== 'kat') return false;
+    return previewCandidate(selection[side]);
+  }
+
+  async function setSide(side, id, { preview = false } = {}) {
     if (side !== 'don' && side !== 'kat') return false;
     if (!validSideId(id)) return false;
-    if (selection[side] === id) return true;
 
+    if (selection[side] === id) {
+      if (preview && id !== SILENT_ID) await previewCandidate(id);
+      return true;
+    }
+
+    stopPreview();
     selection[side] = id;
-    if (previewSide === side) stopPreview();
     emitSelection();
 
+    // Rebuild first so an already-playing chart has resumed before auditioning.
+    // The one-shot preview can then duck the live chart instead of racing it.
     if (viewerReady()) await applyOne(side, id, { resume: true });
+    if (preview && id !== SILENT_ID) await previewCandidate(id);
     return true;
   }
 
@@ -251,13 +248,13 @@
     return true;
   }
 
-  el.previewAudio?.addEventListener('play', paintPreview);
-  el.previewAudio?.addEventListener('pause', paintPreview);
+  el.previewAudio?.addEventListener('play', () => setPreviewDucking(true));
+  el.previewAudio?.addEventListener('pause', () => setPreviewDucking(false));
   el.previewAudio?.addEventListener('ended', () => {
+    setPreviewDucking(false);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
-    previewSide = null;
-    paintPreview();
+    el.previewAudio.removeAttribute('src');
   });
 
   el.oszInput?.addEventListener('change', async () => {
@@ -271,6 +268,7 @@
   });
 
   window.addEventListener('beforeunload', () => {
+    setPreviewDucking(false);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   });
 
@@ -281,10 +279,10 @@
     setSide,
     setPair,
     applyPair,
+    previewCandidate,
     togglePreview,
     stopPreview,
   };
 
   emitSelection();
-  paintPreview();
 })();

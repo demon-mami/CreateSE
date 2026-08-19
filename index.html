@@ -7,7 +7,7 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./hitsound-grid.css?v=1.3">
+  <link rel="stylesheet" href="./hitsound-grid.css?v=1.4">
   <style>
     .chart-field{display:block}.chart-field select{min-height:42px;font-size:12px;font-weight:750}
     .chart-info{display:flex;align-items:center;min-height:34px;margin-top:8px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden}
@@ -50,7 +50,7 @@
 
           <div class="hs-toolbar-actions">
             <button id="silentButton" class="hs-action-button compact" type="button" aria-label="選択中を無音にする"><span>—</span></button>
-            <button id="previewButton" class="hs-action-button compact" type="button" aria-label="選択中の単音を再生または一時停止"><span>▶</span></button>
+            <button id="previewButton" class="hs-action-button compact" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>▶</span></button>
             <button id="favSetButton" class="hs-action-button" type="button" aria-label="現在のSETを記録"><span>Set</span></button>
             <button id="exportFavoritesButton" class="hs-action-button" type="button" aria-label="CSV出力"><span>CSV</span></button>
           </div>
@@ -106,11 +106,12 @@
   <script src="./candidates.js?v=0.1"></script>
   <script src="./candidate-numbering.js?v=1.1"></script>
   <script src="./charts.js?v=0.2"></script>
+  <script src="./audio-ducking-bridge.js?v=1.0"></script>
   <script src="./app-v4.js?v=c22e29e4"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./hitsound-controller.js?v=1.3"></script>
+  <script src="./hitsound-controller.js?v=1.4"></script>
   <script src="./hitsound-favorites.js?v=1.4"></script>
-  <script src="./hitsound-grid.js?v=1.3"></script>
+  <script src="./hitsound-grid.js?v=1.4"></script>
   <script src="./chart-loader.js?v=0.4"></script>
 </body>
 </html>
