@@ -53,7 +53,7 @@ jobs:
           cp hitsound-favorites.js _site/
           cp hitsound-grid.js _site/
           cp object-timeline-v2.js _site/
-          cp hitsounds.zip _site/
+          cp hitsounds-v12.zip _site/
           cp maps.zip _site/
 
           # Keep the verified Viewer assets while using CreateSE's patched audio runtime.
