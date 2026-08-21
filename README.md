@@ -2,19 +2,14 @@
 
 osu!taiko向けHitsoundの組み合わせ検証ツールです。既存の `osutaiko-mami-viewer` を基盤に、固定譜面上でDon / Kat候補を素早く比較できます。
 
-## Hitsound dataset v1.2
+## 正式内蔵Hitsound：単音ベース 116
 
-- 基礎調整済み **116音源**
-- 表示番号：音高順 **10〜125**
-- カテゴリー：
-  - Bass Drum / Kick
-  - Tom
-  - RimStick
-  - SnareClap
-  - Percussion
-  - Hi-Hat
-- `hitsounds.zip` はv1.2の116音源のみを収録
-- 旧50音源セットは使用しません
+- 正式素材 **116音源**のみを収録
+- 全ファイル：48 kHz / 24-bit PCM / Stereo WAV
+- 表示番号：素材管理番号 **001〜116**
+- 元ファイル名とソース系統を保持してカテゴリー表示
+- 配布パック：`hitsounds-single-base-116.zip`
+- 旧v1.2パック、旧50音源セット、Viewer由来の既定Hitsoundは使用しません
 
 ## My Sound
 
@@ -22,7 +17,7 @@ osu!taiko向けHitsoundの組み合わせ検証ツールです。既存の `osut
 
 ## Favorite / Pin
 
-データセット更新時に旧候補IDのFavorite / Pinはリセットされます。v1.2で選び直した結果のみを新しい比較結果として扱います。
+正式版への切替時に旧候補IDのFavorite / Pinはリセットされます。単音ベース116で選び直した結果のみを新しい比較結果として扱います。
 
 ## テスト譜面
 
