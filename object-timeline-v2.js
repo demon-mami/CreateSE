@@ -25,14 +25,22 @@
     'background:transparent'
   ].join(';');
   viewport.appendChild(canvas);
+  window.CreateSEViewer?.setExternalTimelineRenderer?.(true);
 
   const POST_HIT_FADE_MS = 110;
+  const MAX_CANVAS_DPR = 2;
   const DON = 'rgb(235,69,44)';
   const KA = 'rgb(68,141,171)';
   const LANE = '#121214';
   const LANE_HEIGHT = 80;
   let maps = [];
   let generation = 0;
+  let renderInvalidated = true;
+  let lastRenderedPositionMs = NaN;
+  let lastRenderedSpanMs = NaN;
+  let lastRenderedMap = null;
+  const viewportSize = { width: 0, height: 0 };
+  const surfaceColor = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#0f1014';
 
   function parseMap(text) {
     const map = { mode: -1, hits: [], timing: [], redTiming: [] };
@@ -91,9 +99,11 @@
       for (const entry of entries) parsed.push(parseMap(await entry.async('string')));
       if (localGeneration !== generation) return;
       maps = parsed.filter(map => map.mode === 1);
+      renderInvalidated = true;
     } catch {
       if (localGeneration !== generation) return;
       maps = [];
+      renderInvalidated = true;
     }
   }
 
@@ -113,19 +123,46 @@
     return 1000;
   }
 
+  function measureViewport() {
+    const rect = viewport.getBoundingClientRect();
+    viewportSize.width = Math.max(0, rect.width);
+    viewportSize.height = Math.max(0, rect.height);
+    renderInvalidated = true;
+  }
+
   function sizeCanvas(rect) {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const dpr = Math.max(1, Math.min(MAX_CANVAS_DPR, window.devicePixelRatio || 1));
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
     }
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    const styleWidth = `${rect.width}px`;
+    const styleHeight = `${rect.height}px`;
+    if (canvas.style.width !== styleWidth) canvas.style.width = styleWidth;
+    if (canvas.style.height !== styleHeight) canvas.style.height = styleHeight;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return ctx;
+  }
+
+  function currentPositionSec() {
+    const viewerPosition = Number(window.CreateSEViewer?.positionSec?.());
+    if (Number.isFinite(viewerPosition)) return viewerPosition;
+    const seekPosition = Number(seek.value);
+    return Number.isFinite(seekPosition) ? seekPosition : 0;
+  }
+
+  function lowerHit(hits, time) {
+    let lo = 0;
+    let hi = hits.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (hits[mid].time < time) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
   }
 
   function drawBeatLines(ctx, map, leftTime, rightTime, xForTime, laneTop, laneBottom) {
@@ -155,17 +192,24 @@
   }
 
   function render() {
-    const rect = viewport.getBoundingClientRect();
+    const rect = viewportSize;
+    if (!(rect.width > 0 && rect.height > 0)) measureViewport();
     if (rect.width <= 0 || rect.height <= 0) return;
-    const ctx = sizeCanvas(rect);
-    ctx.clearRect(0, 0, rect.width, rect.height);
 
     const map = activeMap();
     const durationMs = Number(seek.max) > 0 ? Number(seek.max) * 1000 : 0;
+    const nowMs = currentPositionSec() * 1000;
+    const span = zoomSpanMs();
+    if (!renderInvalidated && map === lastRenderedMap && span === lastRenderedSpanMs && Math.abs(nowMs - lastRenderedPositionMs) < 0.01) return;
+    renderInvalidated = false;
+    lastRenderedMap = map;
+    lastRenderedSpanMs = span;
+    lastRenderedPositionMs = nowMs;
+
+    const ctx = sizeCanvas(rect);
+    ctx.clearRect(0, 0, rect.width, rect.height);
     if (!map || !map.hits.length || !(durationMs > 0)) return;
 
-    const nowMs = Number(seek.value) * 1000;
-    const span = zoomSpanMs();
     const hitX = Math.max(50, Math.min(76, rect.width * 0.16));
     const pxPerMs = rect.width / span;
     const xForTime = time => hitX + (time - nowMs) * pxPerMs;
@@ -181,8 +225,7 @@
     const bigRadius = 22.5;
 
     // Fully mask the legacy OBJECT canvas, including every Kiai yellow region.
-    const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#0f1014';
-    ctx.fillStyle = surface;
+    ctx.fillStyle = surfaceColor;
     ctx.fillRect(0, 0, rect.width, rect.height);
 
     // Back: lane.
@@ -205,8 +248,8 @@
     // Notes.
     const visibleLeftTime = nowMs - POST_HIT_FADE_MS;
     const visibleRightTime = rightTime + 50;
-    for (const hit of map.hits) {
-      if (hit.time < visibleLeftTime) continue;
+    for (let index = lowerHit(map.hits, visibleLeftTime); index < map.hits.length; index++) {
+      const hit = map.hits[index];
       if (hit.time > visibleRightTime) break;
 
       const ageMs = nowMs - hit.time;
@@ -262,9 +305,15 @@
     ctx.stroke();
   }
 
-  diff.addEventListener('change', () => setTimeout(render, 0));
-  window.addEventListener('resize', render);
-  window.addEventListener('orientationchange', render);
+  diff.addEventListener('change', () => {
+    renderInvalidated = true;
+    setTimeout(render, 0);
+  });
+  window.addEventListener('resize', measureViewport);
+  window.addEventListener('orientationchange', measureViewport);
+  const timelineResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(measureViewport) : null;
+  timelineResizeObserver?.observe(viewport);
+  measureViewport();
 
   function frame() {
     render();

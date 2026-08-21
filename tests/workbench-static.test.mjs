@@ -10,6 +10,7 @@ const controller = read('hitsound-controller.js');
 const favorites = read('hitsound-favorites.js');
 const workbench = read('workbench-ui.js');
 const css = read('workbench.css');
+const timeline = read('object-timeline-v2.js');
 
 test('required workbench controls have unique IDs', () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
@@ -63,9 +64,9 @@ test('responsive split and touch target tokens are present', () => {
   assert.doesNotMatch(css, /幅375px以上で利用してください/);
 });
 
-test('active Don or Kat has a slow persistent border loop with reduced-motion fallback', () => {
-  assert.match(css, /--active-border-loop:5\.6s/);
-  assert.match(css, /animation:active-border-orbit var\(--active-border-loop\) linear infinite/);
+test('active Don or Kat has a static neon gradient without a continuous animation', () => {
+  assert.match(css, /background:conic-gradient\(from 215deg/);
+  assert.doesNotMatch(css, /active-border-orbit|--active-glow-angle|--active-border-loop/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(css, /\.current-sound-card\.active::before/);
   assert.match(css, /\.mini-current\[aria-pressed="true"\]::before/);
@@ -84,6 +85,17 @@ test('iPad judgment actions remain reachable and timeline avoids repeated style 
   assert.match(css, /\.judgment-panel\{position:sticky/);
   assert.match(app, /const cssTokenCache = new Map\(\);/);
   assert.match(app, /const timelineResizeObserver = new ResizeObserver\(redraw\);/);
+});
+
+test('timeline clock stays frame-synchronous and the visible renderer avoids duplicate canvas work', () => {
+  assert.match(app, /if \(canSyncSeek\) el\.seek\.value = String\(p\);\s+if \(now - lastTransportUiPaint >= 33\)/);
+  assert.match(app, /positionSec: audiblePosition/);
+  assert.match(app, /if \(externalTimelineRenderer\) return;/);
+  assert.match(timeline, /CreateSEViewer\?\.positionSec\?\.\(\)/);
+  assert.match(timeline, /Math\.min\(MAX_CANVAS_DPR, window\.devicePixelRatio/);
+  assert.match(timeline, /new ResizeObserver\(measureViewport\)/);
+  assert.match(timeline, /lowerHit\(map\.hits, visibleLeftTime\)/);
+  assert.doesNotMatch(timeline, /const nowMs = Number\(seek\.value\) \* 1000/);
 });
 
 test('Don and Kat preserve independent candidate scroll positions', () => {

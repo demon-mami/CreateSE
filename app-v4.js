@@ -80,6 +80,7 @@
   let lastNativeTimestamp = null;
   let lastDebugPaint = 0;
   let lastTransportUiPaint = 0;
+  let externalTimelineRenderer = false;
   const cssTokenCache = new Map();
   const timelineSize = { width: 0, height: 0 };
   const overviewSize = { width: 0, height: 0 };
@@ -962,6 +963,7 @@
   }
 
   function renderObjectAt(positionSec) {
+    if (externalTimelineRenderer) return;
     if (!map || !musicBuffer || !el.timelineViewport || !el.timelineStatic) return;
     const rect = viewportSize(el.timelineViewport, timelineSize);
     if (rect.width <= 0 || rect.height <= 0) return;
@@ -1246,13 +1248,12 @@
         .catch(error => fail(error instanceof Error ? error.message : '区間を繰り返せませんでした。'))
         .finally(() => { loopSeekPending = false; });
     }
+    const canSyncSeek = !seekScrub && !timelineScrub && !overviewScrub && el.seek;
+    if (canSyncSeek) el.seek.value = String(p);
     if (now - lastTransportUiPaint >= 33) {
       const formatted = fmt(p * 1000);
       if (el.time && el.time.textContent !== formatted) el.time.textContent = formatted;
-      if (!seekScrub && !timelineScrub && !overviewScrub && el.seek) {
-        el.seek.value = String(p);
-        el.seek.setAttribute('aria-valuetext', formatted);
-      }
+      if (canSyncSeek) el.seek.setAttribute('aria-valuetext', formatted);
       lastTransportUiPaint = now;
     }
     renderObjectAt(p);
@@ -1506,6 +1507,8 @@
   window.CreateSEViewer = {
     resetChart,
     reportError: message => fail(String(message || '読み込みに失敗しました。')),
+    positionSec: audiblePosition,
+    setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },
     loopState: () => ({
       startMs: startMark?.time ?? null,
       endMs: endMark?.time ?? null,
