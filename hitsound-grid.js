@@ -11,8 +11,10 @@
   const roleKatButton = $('roleKatButton');
   const silentButton = $('silentButton');
   const previewButton = $('previewButton');
+  const deleteCandidateButton = $('deleteCandidateButton');
   const songPlayButton = $('playButton');
   const recommendationLine = $('recommendationLine');
+  const deleteCandidateLine = $('deleteCandidateLine');
   const customInput = $('customHitsoundInput');
   const customSlots = $('customSoundSlots');
   const customCount = $('customSoundCount');
@@ -21,6 +23,7 @@
 
   const SILENT_ID = controller.SILENT_ID;
   const PIN_STORAGE_KEY = 'osutaiko-hitsound-lab:pinned-sources:v1';
+  const DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:v1';
   const CUSTOM_SLOT_COUNT = 4;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
   const CUSTOM_STORE_NAME = 'sounds';
@@ -54,9 +57,26 @@
 
   const pinnedIds = readPinnedIds();
 
+  function readDeleteCandidateIds() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DELETE_CANDIDATE_STORAGE_KEY) || '[]');
+      return new Set(Array.isArray(saved) ? saved.filter(id => validCandidateIds.has(id)) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  const deleteCandidateIds = readDeleteCandidateIds();
+
   function savePinnedIds() {
     try {
       localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(Array.from(pinnedIds)));
+    } catch {}
+  }
+
+  function saveDeleteCandidateIds() {
+    try {
+      localStorage.setItem(DELETE_CANDIDATE_STORAGE_KEY, JSON.stringify(Array.from(deleteCandidateIds)));
     } catch {}
   }
 
@@ -312,6 +332,55 @@
     recommendationLine.textContent = `推奨：${numbers.length ? numbers.join(' ') : '—'}`;
   }
 
+  function currentDeleteCandidateId() {
+    const id = controller.getSelection()[activeSide];
+    return validCandidateIds.has(id) ? id : null;
+  }
+
+  function paintDeleteCandidates() {
+    const currentId = currentDeleteCandidateId();
+    const currentCandidate = byId(currentId);
+    const marked = !!currentId && deleteCandidateIds.has(currentId);
+    const candidates = Array.from(deleteCandidateIds)
+      .map(byId)
+      .filter(candidate => candidate && !candidate.excluded)
+      .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber));
+
+    sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
+      const isMarked = deleteCandidateIds.has(button.dataset.hsId);
+      button.classList.toggle('delete-candidate', isMarked);
+      button.setAttribute('aria-description', [
+        button.classList.contains('pinned') ? 'ピン留め中。長押しで解除できます。' : '長押しでピン留めできます。',
+        isMarked ? '削除候補として記録済みです。' : '',
+      ].filter(Boolean).join(' '));
+    });
+
+    if (deleteCandidateButton) {
+      deleteCandidateButton.disabled = !currentId;
+      deleteCandidateButton.classList.toggle('marked', marked);
+      deleteCandidateButton.setAttribute('aria-pressed', marked ? 'true' : 'false');
+      const number = currentCandidate?.sourceNumber || '';
+      const action = marked ? '削除候補から解除' : '削除候補に追加';
+      deleteCandidateButton.setAttribute('aria-label', currentId ? `${number}を${action}` : '削除候補にできる内蔵音源が未選択');
+      deleteCandidateButton.title = currentId ? `${number}を${action}` : '内蔵音源を選択してください';
+    }
+
+    if (deleteCandidateLine) {
+      const numbers = candidates.map(candidate => candidate.sourceNumber);
+      deleteCandidateLine.textContent = `削除候補（${numbers.length}）：${numbers.length ? numbers.join(' ') : '—'}`;
+      deleteCandidateLine.title = numbers.length ? `${numbers.length}音を記録中` : '削除候補はありません';
+    }
+  }
+
+  function toggleCurrentDeleteCandidate() {
+    const id = currentDeleteCandidateId();
+    if (!id) return;
+    if (deleteCandidateIds.has(id)) deleteCandidateIds.delete(id);
+    else deleteCandidateIds.add(id);
+    saveDeleteCandidateIds();
+    paintDeleteCandidates();
+  }
+
   function paint() {
     const selection = controller.getSelection();
     const donSource = controller.byId(selection.don);
@@ -344,6 +413,7 @@
     }
 
     paintRecommendation();
+    paintDeleteCandidates();
   }
 
   function syncSongTransportButton() {
@@ -537,6 +607,7 @@
   previewButton?.addEventListener('click', () => {
     if (!songPlayButton?.disabled) songPlayButton.click();
   });
+  deleteCandidateButton?.addEventListener('click', toggleCurrentDeleteCandidate);
 
   if (songPlayButton && previewButton) {
     new MutationObserver(syncSongTransportButton).observe(songPlayButton, {
@@ -633,6 +704,13 @@
   });
 
   window.addEventListener('hitsound-selection-change', paint);
+  window.addEventListener('storage', event => {
+    if (event.key !== DELETE_CANDIDATE_STORAGE_KEY) return;
+    const saved = readDeleteCandidateIds();
+    deleteCandidateIds.clear();
+    saved.forEach(id => deleteCandidateIds.add(id));
+    paintDeleteCandidates();
+  });
 
   buildGrid();
   renderCustomSlots();

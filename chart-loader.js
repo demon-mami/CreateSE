@@ -44,6 +44,19 @@
     return packPromise;
   }
 
+  async function chartBytes(chart) {
+    if (chart.file) {
+      const response = await fetch(`./${chart.file}`, { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`譜面ファイルがありません: ${chart.file}`);
+      return response.arrayBuffer();
+    }
+
+    const pack = await mapPack();
+    const entry = pack.file(chart.entry);
+    if (!entry) throw new Error(`maps.zip内にありません: ${chart.entry}`);
+    return entry.async('arraybuffer');
+  }
+
   async function waitForViewerReady(mySerial, timeoutMs = 30000) {
     const start = performance.now();
     while (mySerial === serial && performance.now() - start < timeoutMs) {
@@ -69,12 +82,7 @@
     if (el.title) el.title.textContent = chart.title;
     if (el.difficulty) el.difficulty.textContent = chart.difficulty;
 
-    const pack = await mapPack();
-    if (mySerial !== serial) return;
-    const entry = pack.file(chart.entry);
-    if (!entry) throw new Error(`maps.zip内にありません: ${chart.entry}`);
-
-    const bytes = await entry.async('arraybuffer');
+    const bytes = await chartBytes(chart);
     if (mySerial !== serial) return;
 
     const file = new File([bytes], `${chart.title}.osz`, {

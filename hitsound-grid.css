@@ -17,7 +17,7 @@
 .hs-toolbar-actions{
   grid-column:1/-1;
   display:grid;
-  grid-template-columns:44px 44px minmax(58px,1fr) minmax(58px,1fr);
+  grid-template-columns:44px 44px minmax(58px,1fr) minmax(58px,1fr) minmax(58px,1fr);
   gap:6px;
 }
 
@@ -131,6 +131,17 @@
 .hs-action-button:disabled{opacity:.28;cursor:default}
 .hs-action-button:disabled>span{transform:none!important}
 
+.hs-delete-candidate-button.marked{
+  --edge:rgba(224,151,151,.46);
+  --back:rgba(86,43,48,.92);
+}
+.hs-delete-candidate-button.marked>span{
+  transform:translateY(4px);
+  background:linear-gradient(180deg,rgba(151,87,93,.84),rgba(112,58,64,.88));
+  color:rgba(255,232,232,.94);
+  box-shadow:inset 0 2px 4px rgba(58,20,25,.24);
+}
+
 .hs-recommendation{
   min-height:18px;
   margin:0 2px 6px;
@@ -139,6 +150,15 @@
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+}
+
+.hs-delete-candidate-line{
+  min-height:18px;
+  margin:-4px 2px 6px;
+  color:rgba(231,174,174,.72);
+  font:750 10px/18px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
 
 #hitsoundGrid{
@@ -253,6 +273,19 @@
   height:30px;
   color:rgba(255,255,255,.72);
   font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+/* Deletion candidates are only notes: a small muted marker avoids implying immediate deletion. */
+.hs-key.delete-candidate>span::after{
+  content:"";
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:#d98f93;
+  box-shadow:0 0 0 1px rgba(58,27,31,.44),0 0 5px rgba(217,143,147,.26);
 }
 
 /* A long press pins a source without changing its Don/Kat selection state. */
@@ -411,7 +444,7 @@
 @media(max-width:430px){
   .hs-toolbar{gap:6px}
   .hs-role-button>span{height:36px}
-  .hs-toolbar-actions{grid-template-columns:42px 42px 1fr 1fr;gap:5px}
+  .hs-toolbar-actions{grid-template-columns:40px 40px repeat(3,minmax(52px,1fr));gap:5px}
   .hs-action-button>span{height:31px}
   .hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:5px}
   .custom-sound-grid{gap:5px}
