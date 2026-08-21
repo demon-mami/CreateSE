@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
   <link rel="stylesheet" href="./hitsound-grid.css?v=3.0-workbench">
-  <link rel="stylesheet" href="./workbench.css?v=1.4.0-compact-controls">
+  <link rel="stylesheet" href="./workbench.css?v=1.5.0-pane-identity">
 </head>
 <body>
   <a class="skip-link" href="#auditionPanel">比較操作へ移動</a>
@@ -53,6 +53,16 @@
             <button id="roleDonButton" class="hs-role-button don target" type="button" aria-label="Donを操作対象にする" aria-pressed="true"><span><strong>Don</strong><small id="roleDonCurrent">—</small></span></button>
             <button id="roleKatButton" class="hs-role-button kat" type="button" aria-label="Katを操作対象にする" aria-pressed="false"><span><strong>Kat</strong><small id="roleKatCurrent">—</small></span></button>
           </div>
+          <section class="judgment-panel" aria-label="候補の判断">
+            <h2>判断</h2>
+            <div class="judgment-actions">
+              <button id="favSetButton" class="favorite-action" type="button" aria-label="現在のDonとKatをFavoriteへ追加" aria-pressed="false" disabled>♡</button>
+              <button id="deleteCandidateButton" class="delete-action" type="button" aria-label="現在の候補を削除候補にする" aria-pressed="false" disabled>候補</button>
+              <button id="favoriteOpenButton" class="secondary-action" type="button" aria-label="Favoriteを開く" aria-haspopup="dialog">♡ <span id="favoriteCount">0</span></button>
+            </div>
+            <div id="setFeedback" class="set-feedback sr-only" role="status" aria-live="polite"></div>
+            <div id="workbenchStatus" class="workbench-status sr-only" role="status" aria-live="polite">候補を選択して比較を開始できます</div>
+          </section>
         </div>
 
         <div id="hitsoundGrid" data-active-side="don" aria-label="音源一覧">
@@ -89,14 +99,14 @@
           <h2 id="currentPairTitle">現在の組み合わせ</h2>
           <div class="current-pair-grid">
             <article class="current-sound-card don" id="currentDonCard">
-              <button id="currentDonTarget" class="current-target" type="button" aria-pressed="true"><span>Don</span><strong id="currentDonValue">—</strong><small id="currentDonMeta">未選択</small></button>
+              <button id="currentDonTarget" class="current-target" type="button" aria-pressed="true"><span>Don</span><strong id="currentDonValue">—</strong></button>
               <div class="current-card-actions">
                 <button id="previewDonButton" type="button" aria-label="Donの単音を試聴" disabled>▶</button>
                 <button id="muteDonButton" type="button" aria-label="Donを無音にする" aria-pressed="false">—</button>
               </div>
             </article>
             <article class="current-sound-card kat" id="currentKatCard">
-              <button id="currentKatTarget" class="current-target" type="button" aria-pressed="false"><span>Kat</span><strong id="currentKatValue">—</strong><small id="currentKatMeta">未選択</small></button>
+              <button id="currentKatTarget" class="current-target" type="button" aria-pressed="false"><span>Kat</span><strong id="currentKatValue">—</strong></button>
               <div class="current-card-actions">
                 <button id="previewKatButton" type="button" aria-label="Katの単音を試聴" disabled>▶</button>
                 <button id="muteKatButton" type="button" aria-label="Katを無音にする" aria-pressed="false">—</button>
@@ -153,16 +163,6 @@
           </div>
         </section>
 
-        <section class="judgment-panel" aria-label="候補の判断">
-          <h2>判断</h2>
-          <div class="judgment-actions">
-            <button id="favSetButton" class="favorite-action" type="button" aria-label="現在のDonとKatをFavoriteへ追加" aria-pressed="false" disabled>♡</button>
-            <button id="deleteCandidateButton" class="delete-action" type="button" aria-label="現在の候補を削除候補にする" aria-pressed="false" disabled>候補</button>
-            <button id="favoriteOpenButton" class="secondary-action" type="button" aria-label="Favoriteを開く" aria-haspopup="dialog">♡ <span id="favoriteCount">0</span></button>
-          </div>
-          <div id="setFeedback" class="set-feedback" role="status" aria-live="polite"></div>
-          <div id="workbenchStatus" class="workbench-status" role="status" aria-live="polite">候補を選択して比較を開始できます</div>
-        </section>
       </div>
     </aside>
     </div>
@@ -208,12 +208,12 @@
   <script src="./candidates.js?v=2.0-single-base-116"></script>
   <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.3-15charts"></script>
-  <script src="./app-v4.js?v=3.2-smooth-timeline"></script>
-  <script src="./object-timeline-v2.js?v=viewer-smooth-20260822"></script>
+  <script src="./app-v4.js?v=3.3-smaller-notes"></script>
+  <script src="./object-timeline-v2.js?v=viewer-small-notes-20260822"></script>
   <script src="./hitsound-controller.js?v=3.1-no-ducking"></script>
   <script src="./hitsound-favorites.js?v=3.1-compact"></script>
   <script src="./hitsound-grid.js?v=3.1-select-preview"></script>
-  <script src="./workbench-ui.js?v=1.4.0-compact-controls"></script>
+  <script src="./workbench-ui.js?v=1.5.0-compact-pair"></script>
   <script src="./chart-loader.js?v=0.6-state-safe"></script>
 </body>
 </html>

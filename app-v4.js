@@ -3,7 +3,7 @@
 
   const SPANS_MS = [1000, 800, 600];
   const ZOOM_LABELS = ['±0.5s', '±0.4s', '±0.3s'];
-  const OBJECT_NOTE_RADIUS = [19, 19, 18.5];
+  const OBJECT_NOTE_RADIUS = [14, 14, 13.5];
   const START_DELAY_SEC = 0.10;
   const MUSIC_GAIN = 0.85;
   const EFFECT_GAIN = 1.00;
@@ -989,7 +989,7 @@
 
     const noteY = Math.max(36, Math.min(rect.height - 44, rect.height * 0.48));
     const normalRadius = OBJECT_NOTE_RADIUS[zoom] || OBJECT_NOTE_RADIUS[0];
-    const bigRadius = normalRadius * 1.34;
+    const bigRadius = normalRadius * 1.22;
     const don = css('--don', '#ef6862');
     const ka = css('--ka', '#69bde0');
     const first = lowerHit(left);
@@ -1000,7 +1000,7 @@
       const radius = hit.big ? bigRadius : normalRadius;
       ctx.fillStyle = hit.kind === 'ka' ? ka : don;
       ctx.strokeStyle = 'rgba(255,255,255,.78)';
-      ctx.lineWidth = hit.big ? 3 : 2;
+      ctx.lineWidth = hit.big ? 2.6 : 2;
       ctx.beginPath();
       ctx.arc(x, noteY, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -1009,7 +1009,7 @@
         ctx.strokeStyle = 'rgba(255,255,255,.28)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(x, noteY, radius + 5, 0, Math.PI * 2);
+        ctx.arc(x, noteY, radius + 3, 0, Math.PI * 2);
         ctx.stroke();
       }
     }

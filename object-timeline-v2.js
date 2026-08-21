@@ -221,8 +221,8 @@
     const laneTop = Math.round((rect.height - laneHeight) / 2);
     const laneBottom = laneTop + laneHeight;
     const noteY = laneTop + laneHeight * 0.50;
-    const normalRadius = 19;
-    const bigRadius = 22.5;
+    const normalRadius = 14;
+    const bigRadius = 17;
 
     // Fully mask the legacy OBJECT canvas, including every Kiai yellow region.
     ctx.fillStyle = surfaceColor;
@@ -268,7 +268,7 @@
       ctx.globalAlpha = alpha;
       ctx.fillStyle = hit.kind === 'ka' ? KA : DON;
       ctx.strokeStyle = 'rgba(255,255,255,.96)';
-      ctx.lineWidth = hit.big ? 3.0 : 2.4;
+      ctx.lineWidth = hit.big ? 2.6 : 2.1;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -277,14 +277,14 @@
         ctx.strokeStyle = 'rgba(255,255,255,.28)';
         ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.arc(x, y, radius + 3.2 * scale, 0, Math.PI * 2);
+        ctx.arc(x, y, radius + 2.6 * scale, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
     }
 
-    // Front: hit target, approximately the same outer diameter as resized Big note.
-    const targetRadius = 24.5;
+    // Front: keep the target compact while remaining distinct from the moving notes.
+    const targetRadius = 19.5;
     ctx.strokeStyle = 'rgba(235,235,238,.82)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -294,7 +294,7 @@
     ctx.strokeStyle = 'rgba(235,235,238,.30)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(hitX, noteY, targetRadius - 4, 0, Math.PI * 2);
+    ctx.arc(hitX, noteY, targetRadius - 3.5, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = 'rgba(255,255,255,.40)';

@@ -72,6 +72,8 @@ test('compact visible copy keeps accessible labels and CSS-only dock icons', () 
   assert.match(html, /id="statusBadge" class="status-badge sr-only"/);
   assert.match(html, /id="recommendationLine" class="hs-recommendation sr-only"/);
   assert.match(html, /id="deleteCandidateLine" class="hs-delete-candidate-line sr-only"/);
+  assert.doesNotMatch(html, /currentDonMeta|currentKatMeta/);
+  assert.doesNotMatch(workbench, /current\$\{cap\}Meta/);
   assert.doesNotMatch(workbench, /\$\{activeSide === 'don' \? 'Don' : 'Kat'\} 操作中/);
   assert.doesNotMatch(workbench, /A–B \$\{detail\.enabled \? '反復中' : '設定済み'\}/);
   assert.match(css, /\.dock-toggle \.dock-icon\{[^}]*border:2px solid currentColor/);
@@ -83,6 +85,7 @@ test('transport spacing is relaxed and Dock transitions shield the candidate lay
   assert.match(css, /\.transport-row\{grid-template-columns:minmax\(0,1fr\) 96px minmax\(0,1fr\);gap:10px/);
   assert.doesNotMatch(css, /\.audition-panel\.is-transitioning\{pointer-events:none\}/);
   assert.match(css, /\.audition-panel\.is-transitioning \.dock-mini,\.audition-panel\.is-transitioning \.dock-expanded\{pointer-events:none!important\}/);
+  assert.match(css, /\.seek-bar\{width:100%;height:44px;margin:2px 0 10px/);
 });
 
 test('active Don or Kat has a static neon gradient without a continuous animation', () => {
@@ -101,11 +104,31 @@ test('iPhone Dock morphs between mini and expanded states without hiding control
   assert.match(workbench, /addEventListener\('transitionend', dockTransitionHandler\)/);
 });
 
-test('iPad judgment actions remain reachable and timeline avoids repeated style reads', () => {
+test('judgment actions live with candidate selection and timeline avoids repeated style reads', () => {
+  const toolbarIndex = html.indexOf('<div class="hs-toolbar">');
+  const judgmentIndex = html.indexOf('<section class="judgment-panel"');
+  const gridIndex = html.indexOf('<div id="hitsoundGrid"');
+  const auditionIndex = html.indexOf('<aside id="auditionPanel"');
+  assert.ok(toolbarIndex >= 0 && toolbarIndex < judgmentIndex);
+  assert.ok(judgmentIndex < gridIndex && gridIndex < auditionIndex);
   assert.match(css, /\.dock-expanded\{[^}]*overflow-y:auto/);
-  assert.match(css, /\.judgment-panel\{position:sticky/);
+  assert.match(css, /\.judgment-panel\{position:static/);
   assert.match(app, /const cssTokenCache = new Map\(\);/);
   assert.match(app, /const timelineResizeObserver = new ResizeObserver\(redraw\);/);
+});
+
+test('candidate and playback panes use distinct requested base colors', () => {
+  assert.match(css, /--source-pane-base:#0ac6d7/);
+  assert.match(css, /--playback-pane-base:#ed7855/);
+  assert.match(css, /\.source-panel\{[\s\S]*?rgba\(10,198,215,\.30\)/);
+  assert.match(css, /\.audition-panel\{[\s\S]*?rgba\(237,120,85,\.30\)/);
+});
+
+test('timeline notes are reduced in both visible and fallback renderers', () => {
+  assert.match(app, /const OBJECT_NOTE_RADIUS = \[14, 14, 13\.5\];/);
+  assert.match(timeline, /const normalRadius = 14;/);
+  assert.match(timeline, /const bigRadius = 17;/);
+  assert.match(timeline, /const targetRadius = 19\.5;/);
 });
 
 test('timeline clock stays frame-synchronous and the visible renderer avoids duplicate canvas work', () => {

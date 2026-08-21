@@ -71,7 +71,6 @@
       const cap = side === 'don' ? 'Don' : 'Kat';
       setText(`mini${cap}Value`, label.number);
       setText(`current${cap}Value`, label.number);
-      setText(`current${cap}Meta`, `${label.family}${label.family ? ' · ' : ''}${label.name}`);
       for (const targetId of [`mini${cap}Target`, `current${cap}Target`]) {
         const target = $(targetId);
         if (target) target.setAttribute('aria-label', `${cap}を操作対象にする。現在${label.number} ${label.name}`);
