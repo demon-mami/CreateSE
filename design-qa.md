@@ -1,179 +1,167 @@
 # CreateSE mobile comparison workbench — Design QA
 
 実施日: 2026-08-22（JST）  
-対象: PR #3 `feat/mobile-comparison-workbench` / UI commit `bd9f84ce8f39cf54f3787a85dc2f31114c551b80`  
-Preview: https://demon-mami.github.io/CreateSE-preview/?qa=bd9f84c  
-iPhone QA: https://demon-mami.github.io/CreateSE-preview/qa-iphone.html?qa=bd9f84c
+対象: PR #3 `feat/mobile-comparison-workbench` / UI commit `8a614e6a40c3751a3202356f4f31acacfc4d7e01`  
+Preview: https://demon-mami.github.io/CreateSE-preview/?qa=8a614e6  
+iPhone QA: https://demon-mami.github.io/CreateSE-preview/qa-iphone.html?qa=8a614e6
 
 ## 判定
 
-Cloud Browserで再現したiPad 13インチ横相当とiPhone縦では、今回の変更による未解決のP0 / P1 / P2はありません。active Don / Katは常時アニメーションを廃止し、side colorの静止ネオングラデーションへ変更しました。timelineの描画時刻を33ms更新制限から分離し、重複Canvas描画と毎フレームの高コスト処理も抑制しています。
+今回指定された可視コピーの削減、iPhoneのCSS最小化／最大化アイコン、−4秒／再生／＋4秒の比率と間隔、Dock遷移中の誤タップ防止を反映しました。Cloud Browserで再現したiPhone縦とiPad 13インチ横相当では、未解決のP0 / P1 / P2はありません。
 
-Production `demon-mami/CreateSE`の`main`、Production GitHub Pages、既存Production用Workflowは変更していません。実機iPhone / iPad Safariでの最終的な体感確認は、Cloud Browserと同一視せず未確認事項に残します。
+Production `demon-mami/CreateSE`の`main`、Production GitHub Pages、既存Production用Workflowは変更していません。Previewは`demon-mami/CreateSE-preview`のGitHub Pages Run #18で公開済みです。
 
 ## Source visual truth
 
-- Production UI: `/workspace/scratch/audit-production-original-ipad-current-20260822.jpg`（1348 × 926 px）。
-  - 文字量、暗色surface、Don / Kat色、候補密度、ボタン表現の基準。
+- ユーザー添付の全体ラフ: `/workspace/scratch/534ae2b2b179/upload/IMG_7214(1).jpeg`（1290 × 1646 px）。
+  - iPhone展開面の情報量、再生操作の余白、中央ボタン比率の方向性を確認するラフ基準。
+- ユーザー添付の操作部ラフ: `/workspace/scratch/534ae2b2b179/upload/IMG_7216.jpeg`（1290 × 621 px）。
+  - −4秒／再生／＋4秒の密集緩和と、現在ペアからtransportへの間隔の基準。
 - 変更前Preview:
-  - iPad: `/workspace/scratch/534ae2b2b179/createse-preview-ipad-final-638b168-20260822.jpg`（1363 × 936 px）。
-  - iPhone展開: `/workspace/scratch/534ae2b2b179/createse-preview-iphone-screen-expanded-638b168-20260822.jpg`（390 × 844 px）。
-  - レイアウト、情報密度、端末別構成を維持する回帰比較の基準。
-- 添付motion reference: `/workspace/scratch/534ae2b2b179/upload/CSSアニメ.mp4`。
-  - 今回のユーザー指示でactive枠の周回表現は正式に廃止。参考動画は履歴資料のみとし、現在のvisual targetは「Don / Kat色に追従する静止ネオングラデーション」。
-- 合意済み端末要件:
-  - iPad: 候補変更と実譜面再生・判断を同一作業面に置く。
-  - iPhone: 96pxの常設Dockと展開面をPIP風に連続変形させる。
-  - visible copyはProductionに近い密度へ抑え、詳細はaccessible nameに保持する。
+  - iPad: `/workspace/scratch/createse-preview-ipad-static-neon-loop-bd9f84c-20260822.jpg`（1363 × 936 px）。
+  - iPhone: `/workspace/scratch/createse-preview-iphone-static-neon-bd9f84c-20260822.jpg`（390 × 844 px）。
+  - 既存の2-pane / PIP構成、色、文字、候補密度、Favorite到達性を守る回帰基準。
+- 添付は「目安程度のラフ参考」と明示されているため、見た目の完全複製ではなく、指定されたコピー削減・比率・間隔・誤タップ防止を判定対象にした。
 
 ## Browser-rendered implementation evidence
 
-### iPad 13インチ横相当
-
-- CSS viewport: 1363 × 936 px、Cloud Browser Chrome。
-- Implementation screenshot: `/workspace/scratch/createse-preview-ipad-static-neon-loop-bd9f84c-20260822.jpg`（1363 × 936 px）。
-- State: 譜面読込済み、Don 001 / Kat 021、Kat操作中、A=10秒 / B=12秒、loop ON、Favorite 2件、実譜面再生中。
-- Density normalization: CSS viewportとscreenshotが1:1のため追加変換なし。
-- Full-view comparison: `/workspace/scratch/qa-compare-ipad-static-neon-bd9f84c-20260822.jpg`（変更前 / 変更後を同一画像内で比較）。
-- Focused active-state comparison: `/workspace/scratch/qa-focus-ipad-active-static-neon-bd9f84c-20260822.jpg`。
-- Focused timeline comparison: `/workspace/scratch/qa-focus-ipad-timeline-bd9f84c-20260822.jpg`。
-
 ### iPhone縦
 
-- CSS viewport: QA harness内390 × 844 px iframe、outer Cloud Browser 1363 × 936 px。
-- Implementation screenshot: `/workspace/scratch/createse-preview-iphone-static-neon-bd9f84c-20260822.jpg`（iframeを390 × 844 pxで直接clip）。
-- State: 譜面読込済み、Don 001 / Kat 021、Kat操作中、Dock展開、実譜面再生中、Favorite 2件。
-- Density normalization: inner CSS viewportとscreen clipが1:1のため追加変換なし。
-- Full-view comparison: `/workspace/scratch/qa-compare-iphone-static-neon-bd9f84c-20260822.jpg`。
-- Focused active-state comparison: `/workspace/scratch/qa-focus-iphone-active-static-neon-bd9f84c-20260822.jpg`。
+- CSS viewport: QA harness内390 × 844 px iframe、outer Cloud Browser 1363 × 936 px、deviceScaleFactor 1。
+- 展開状態: `/workspace/scratch/createse-preview-iphone-compact-controls-8a614e6-20260822.jpg`（390 × 844 px）。
+- 収納状態: `/workspace/scratch/createse-preview-iphone-mini-css-icon-8a614e6-20260822.jpg`（390 × 844 px）。
+- State: 譜面読込済み、Don 026 / Kat 027、Kat操作中、Dock展開／収納、再生／一時停止確認済み。
+- Density normalization: inner CSS viewportとscreenshotが1:1のため追加変換なし。
+- Full-view comparison: `/workspace/scratch/qa-iphone-full-reference-vs-8a614e6.jpg`（添付ラフ / 実装を同一画像内で比較）。
+- Focused comparison: `/workspace/scratch/qa-iphone-transport-reference-vs-8a614e6.jpg`（現在ペアとtransportを同一画像内で比較）。
 
-## Focused implementation verification
+### iPad 13インチ横相当
 
-### 静止ネオングラデーション
-
-- iPadのactive Kat cardとiPhone mini / expanded Katで、computed `animation-name: none`を確認。
-- computed backgroundはKat token `rgb(176, 204, 215)`と白を用いた固定`conic-gradient(from 215deg, ...)`、opacity `0.94`。
-- `@property --active-glow-angle`、`active-border-orbit` keyframes、連続animation、active枠の`filter: drop-shadow()`を削除。
-- Don / Katの文字、番号、`aria-pressed`、side color、静的borderは維持し、色だけに依存しない。
-
-### Timelineのカクつき対策
-
-- 変更前は`seek.value`を約33msごとに更新し、`object-timeline-v2.js`が同じ値を描画時計として参照していたため、表示位置が約30fps相当に段階化していた。
-- 変更後は`seek.value`を`requestAnimationFrame`ごとに同期。33ms制限は時刻テキストと`aria-valuetext`だけに残し、可視timelineの時計には適用しない。
-- 外部timeline rendererは`CreateSEViewer.positionSec()`から再生位置を直接取得。range inputのDOM更新状態にも依存しない。
-- 可視renderer有効時はlegacy timeline Canvasの再描画を停止。Cloud Browser実測ではlegacyのintrinsic bufferは既定300 × 150のまま、可視CanvasのみiPad 464 × 80、iPhone 341 × 58へ更新された。
-- 可視Canvas DPRは最大2、viewportは`ResizeObserver`でcache、styleサイズは差分時のみ更新、表示候補の開始位置はbinary searchで取得、停止中の同一frame再描画をskip。
-- Cloud Browserは実iOS Safariのframe pacingを再現しないため、「実機で完全に滑らか」はまだPASS判定していない。コード上の30fps上限制約と重複描画は解消済み。
+- CSS viewport: 1363 × 936 px、deviceScaleFactor 1、Cloud Browser Chrome。
+- Implementation: `/workspace/scratch/createse-preview-ipad-compact-controls-8a614e6-20260822.jpg`（1363 × 936 px）。
+- State: 譜面読込済み、Don 026 / Kat 027、Kat操作中、再生／一時停止確認済み、Favorite 2件。
+- Density normalization: CSS viewportとscreenshotが1:1のため追加変換なし。
+- Full-view regression comparison: `/workspace/scratch/qa-ipad-regression-bd9f84c-vs-8a614e6.jpg`（変更前 / 変更後を同一画像内で比較）。
+- Focused controls comparison: `/workspace/scratch/qa-ipad-controls-bd9f84c-vs-8a614e6.jpg`。
 
 ## Required fidelity surfaces
 
 ### Fonts and typography
 
-- Productionと同じsystem sans系、白文字と数字中心の情報密度を維持。
-- 変更前後比較で文字サイズ、weight、line-height、truncate、主要操作の改行に新たな差異なし。
+- 既存のsystem sans、数字のtabular表示、white / muted text階層を維持。
+- 可視見出し「試聴・判断」と上部status badgeを除去し、候補比較で不要な文字量を削減。
+- 「Don / Katを操作中」はactive side切替時に表示せず、選択結果・無音・Favorite等の意味のあるfeedbackは維持。
+- 表示文字を削った収納／展開ボタンには`試聴パネルを収納` / `試聴パネルを展開`のaccessible nameを保持。
 
 ### Spacing and layout rhythm
 
-- iPadの2-pane比率、right pane、Favorite到達性、A–B、timelineの配置を維持。
-- iPhoneの96px収納 / 607.67px展開、PIP変形、候補scroll位置保持を維持。
-- visible target計測: iPad 143件、iPhone展開144件。44 × 44 CSS px未満は両方0件。
-- horizontal page overflowはiPad / iPhoneとも0px。
+- iPhone transportは中央列を72pxから96pxへ拡幅、左右とのgapを5pxから10pxへ変更。実測は左右108.5px、中央96px、gap 10px。
+- iPhoneの現在ペア下端からtransport上端は10px。3ボタンの中心で`elementFromPoint`が各ボタン自身を返し、意図しない重なりなし。
+- iPad transportは中央列92px、左右170.22px、gap 10px。現在ペアとの間隔9px。
+- 両端末でhorizontal overflow 0px。可視操作対象に44 × 44 CSS px未満なし。
 
 ### Colors and visual tokens
 
-- Production由来のdark gray surface、Don `#EEB9B2`系、Kat `#B0CCD7`系を維持。
-- active枠は静止gradientと既存のouter glowを併用。常時再描画を発生させず、操作対象を視覚的に識別できる。
+- 既存のdark gray surface、Don `#EEB9B2`系、Kat `#B0CCD7`系、cyan再生actionを維持。
+- active sideの静止ネオングラデーション、文字、番号、`aria-pressed`を維持し、コピー削減後も状態を識別できる。
 
 ### Image quality and asset fidelity
 
 - 写真、illustration、logo、外部image assetの変更なし。
-- timeline CanvasはCloud BrowserのDPR 1でCSS寸法とほぼ1:1。実機高DPRでは最大2に制限し、過剰なpixel bufferを防ぐ。
+- 今回の最小化／最大化はユーザー指定どおりCSSによる単純記号。画像やロゴの代替ではない。
+- Timeline Canvasの寸法・DPR制御は前回修正を維持し、今回のレイアウト変更によるぼけやcropなし。
 
 ### Copy and content
 
-- visible copyは変更なし。Production寄りの短い候補番号、カテゴリ名、記号中心のUIを維持。
-- `曲を再生`、`Kat 021を単音試聴`、`現在位置をAに設定`などのaccessible nameも維持。
+- 画面上から「試聴・判断」「推奨：—」「削除候補（0）：—」「準備完了 / 譜面を選択」のstatus badgeを除去。
+- 有効なA–B区間が設定済みでも未反復ならmini Dockに「A–B 設定済み」を表示しない。反復中と未設定は状態把握のため維持。
+- recommendation、削除候補一覧、譜面load statusはscreen reader向けlive regionとして保持し、視覚上のみ1px clip。
+
+### Icons and controls
+
+- iPhoneの収納は16 × 2pxのminus、展開は15 × 15pxのmaximize mark。どちらも44 × 44pxボタン内で中央揃え。
+- visible textは空で、accessible nameとfocus ringは維持。
+- play / pause、単音試聴、mute、Favorite、削除候補の既存記号は変更なし。
 
 ## Primary interactions tested
 
-| 操作 | 今回の結果 |
+| 操作 | 結果 |
 |---|---|
-| Preview公開 | GitHub Pages Run #16、Preview commit `006f55508be61708cc3f0f00663ec802348345e6`がsuccess。 |
-| 譜面選択・読み込み | iPad / iPhoneとも`準備完了`へ遷移し、`#errorCard`はhidden。 |
-| 再生 / 一時停止 | 両端末で`aria-pressed`がtrue / falseへ同期し、時刻・timeline・overviewが更新。 |
-| Timeline / A–B | iPadでA=10秒、B=12秒、2.000秒loop ON、再生位置が区間へ戻る状態を確認。 |
-| active Don / Kat | Kat操作中に静止ネオン枠、文字、番号、`aria-pressed`が同期。computed animationは`none`。 |
-| iPhone PIP展開 | 96pxから607.67pxへ遷移し、完了まで`aria-busy=true`、完了後に解除。 |
+| Preview公開 | GitHub Pages Run #18、Preview commit `e71f61e661820c779015bfc5446f72f174c33dc9`がsuccess。 |
+| 譜面選択・読み込み | iPhone / iPadとも対象譜面を読み込み、play control enabled、`#errorCard` hidden。 |
+| 候補選択 | Don 026 / Kat 027を選択し、番号・色・静止neon・`aria-pressed`が同期。 |
+| 再生 / 一時停止 | iPadで`aria-pressed`がtrue / falseへ同期し、時刻・timeline・overviewが更新。iPhoneでもcontrol enabledと表示状態を確認。 |
+| iPhone収納 / 展開 | CSS icon、accessible name、96px収納 / 607.67px展開を確認。 |
+| 遷移中の誤タップ防止 | 収納開始直後、panel `pointer-events:auto`、inner layer `none`、panel上のhit targetは`#auditionPanel`。入力が背後候補へ貫通しない。 |
+| transport | 中央幅拡張、gap 10px、各ボタン中心のhit target一致を両端末で確認。 |
 | Touch target / overflow | 44px未満0件、horizontal overflow 0px。 |
-| 既存主要フロー | 候補cycle、再生中の候補切替、±4秒、シーク、zoom、無音、Favorite追加 / 再適用、削除候補、CSV、譜面変更は前回QA結果を維持。 |
+| Favorite到達性 | iPad / iPhone展開状態でFavorite open buttonが44px以上でviewport内。 |
 
 ## Console and error check
 
-- CreateSE URL / script由来のconsole error / warningはiPad / iPhoneとも0件。
+- CreateSE URL / script由来のconsole error / warningはiPhone / iPadとも0件。
 - Cloud Browser拡張のmetadata送信エラーのみ観測し、CreateSE由来ではない。
 - visible app errorなし、`#errorCard`はhidden。
 
 ## Comparison history — resolved P0 / P1 / P2
 
+### Resolved P1 — iPhone Dock遷移中に背後の候補へタップが抜ける
+
+- Earlier evidence: ユーザー添付で再生ビューと上部button領域が重なり、意図しないbutton pressを報告。
+- Cause: `.audition-panel.is-transitioning{pointer-events:none}`がfixed panel全体をhit testから外していた。
+- Fix: panelを常にinput shieldとして残し、遷移中だけ`.dock-mini` / `.dock-expanded`内のcontrolを無効化。
+- Post-fix: transition中のcomputed `panelPointerEvents: auto`、inner layer `none`、`elementFromPoint`は`#auditionPanel`。
+
+### Resolved P2 — transport controlsの密集感
+
+- Earlier evidence: iPhoneで左右skipが広く、中央play / pauseが72pxと狭く、control間gapが5pxだった。
+- Fix: iPhone中央96px、iPad中央92px、gap 10pxへ変更し、現在ペアとの縦間隔も確保。
+- Post-fix: focused side-by-side comparisonと実測geometryで重なりなし。
+
+### Resolved P2 — 不要な可視コピーが比較面を圧迫
+
+- Fix: 指定文字を視覚上削除し、状態通知が必要な内容はaccessible live region / accessible nameに保持。
+- Post-fix: iPhone / iPad screenshotで上部status、recommendation、削除候補一覧、展開見出しが非表示。
+
 ### Resolved P1 — iPhone / iPadのtimelineが段階的に動く
 
-- Earlier evidence: ユーザー実機iPad・iPhoneでtimelineの強いカクつきを報告。
-- Cause: 約33msのDOM throttle対象に、可視timelineが時計として読む`seek.value`を含めていた。
-- Fix: frame-synchronous clockへ復帰し、visible rendererをtransport positionへ直接接続。重複Canvas、uncapped DPR、毎frame layout/style read、先頭からの候補走査も除去。
-- Post-fix evidence: iPad / iPhoneの再生中screenshot、focused timeline比較、Canvas geometry、11 / 11 static tests。実機Safariの体感確認は継続項目。
+- Previous fix: frame-synchronous clock、visible renderer直結、重複legacy Canvas停止、DPR / viewport / style read最適化。
+- Post-fix: ユーザーが実機iPad / iPhoneで「解消した」と確認。今回の変更ではtimeline実装を変更していない。
 
 ### Resolved P2 — 操作対象Don / Katが判別しにくい
 
-- Earlier evidence: active側が主に色差だけで、視線移動後に対象を失いやすかった。
-- First fix: 周回するperimeter tracerを追加。
-- Current fix: ユーザー判断によりcontinuous motionを廃止し、同じside colorと強度を持つ静止ネオングラデーションへ変更。
-- Post-fix evidence: focused active-state比較、computed `animation-name: none`、Kat gradient token、文字・番号・ARIAの併用。
-
-### Resolved P1 — iPad Favoriteが作業面から消える
-
-- Fix: iPad expanded regionへsafe inner scrollを追加し、judgment panelをbottomへsticky配置。
-- Post-fix: 今回の1363 × 936 screenshotでもFavorite導線はviewport内に維持。
-
-### Resolved P1 — A / Bボタンが44px未満へ退行
-
-- Fix: control columnsを44px固定へ復帰。
-- Post-fix: 今回の両端末再計測でも44 × 44 CSS px未満0件。
-
-### Resolved P2 — Dockがvisual transition中にunlockする
-
-- Fix: `height`の`transitionend`でunlockし、fallback timerを保険として保持。
-- Post-fix: iPhoneで最終高さ到達後だけ`aria-busy`と`is-transitioning`が解除。
+- Previous fix: side colorの静止ネオングラデーション、番号、文字、`aria-pressed`を併用。
+- Post-fix: 今回の両端末screenshotでもKat 027のactive stateを維持。
 
 ## Findings
 
 - P0 / P1 / P2: Cloud Browser範囲ではなし。
-- P3: 静止glowの強度は実機OLED / LCDと暗所で微調整余地があるが、操作対象の識別は成立している。
+- P3: maximize markは視覚上簡潔だが、実機でcheckbox等と誤認されないかは指操作QAで確認余地あり。accessible nameは保持済み。
 
 ## Accessibility
 
 - visible tap targetは両端末で44px以上。
+- 文字を除去した収納／展開buttonにも明確なaccessible name、44px hit area、3px `:focus-visible` ringを維持。
+- clipしたload / recommendation / delete-candidate statusはDOMから削除せず、screen reader向けlive regionとして維持。
 - Don / Katは文字、番号、border、`aria-pressed`を併用し、色だけに依存しない。
-- active state自体が静止したため、`prefers-reduced-motion`に関係なく常時motion-free。PIP transitionは既存のreduced-motion規則で短縮。
-- 3px `:focus-visible` ring、Skip link、accessible nameを維持。
+- PIP transitionは既存の`prefers-reduced-motion`規則で短縮。
 
 ## Open questions / 未確認事項
 
-- 今回のPreviewを実機iPhone / iPad Safariで再生した際、timelineの体感カクつきが解消したか。
-- Safariのsafe area、address barによるdynamic viewport、長押し、実指誤タップ、iOSオーディオ制約。
+- 実機iPhone Safariで、収納／展開中に高速連打・実指swipeを行った際も背後候補が選択されないか。
+- Safariのsafe area、address barによるdynamic viewport、長押し、iOSオーディオ制約。
 - Dynamic Type / Safariページ拡大時の最終レイアウト。
 - 適切なWAVがないためMy Soundのファイル選択、キャンセル、不正形式、8MB / 5秒上限、iOS file picker。
-- Favorite削除 / 6秒Undoは保存データの破壊を避け、導線・accessible name・実装の静的確認まで。
+- Favorite削除 / 6秒Undoは保存データの破壊を避け、今回も未実行。
 
 ## Implementation checklist
 
-- [x] active Don / Katを静止ネオングラデーションへ変更し、continuous animationを全削除。
-- [x] timeline clockを33ms UI throttleから分離。
-- [x] range seekをframe同期へ復帰し、visible rendererをtransport positionへ直接接続。
-- [x] 重複legacy Canvas描画を停止。
-- [x] visible timelineのDPR上限2、viewport / CSS token cache、binary search、停止中skipを追加。
-- [x] Music 0.85 / Hitsound 1.00と、単音previewの非ducking仕様を維持。
-- [x] `node --check` PASS、`node --test tests/workbench-static.test.mjs`: 11 / 11 PASS。
-- [x] Preview GitHub Pages Run #16 success、Cloud BrowserでiPad / iPhoneを再QA。
+- [x] 指定された可視コピーを削減し、accessible stateは保持。
+- [x] iPhone収納／展開をCSS iconへ変更。
+- [x] −4秒／再生／＋4秒の列幅とgapを調整。
+- [x] Dock遷移中のhit-throughを防止。
+- [x] `node --check` PASS、`node --test tests/*.test.mjs`: 13 / 13 PASS。
+- [x] Preview GitHub Pages Run #18 success、Cloud BrowserでiPhone / iPadを再QA。
 - [x] Production `main` / Pages / Workflowは未変更。
 
 final result: passed
