@@ -5,7 +5,7 @@
   const ZOOM_LABELS = ['±0.5s', '±0.4s', '±0.3s'];
   const OBJECT_NOTE_RADIUS = [19, 19, 18.5];
   const START_DELAY_SEC = 0.10;
-  const MUSIC_GAIN = 0.70;
+  const MUSIC_GAIN = 0.85;
   const EFFECT_GAIN = 1.00;
   const EFFECT_SCHEDULE_AHEAD_SEC = 0.50;
   const EFFECT_RESCHEDULE_LEAD_SEC = 0.03;
@@ -79,6 +79,10 @@
   let overviewScrub = null;
   let lastNativeTimestamp = null;
   let lastDebugPaint = 0;
+  let lastTransportUiPaint = 0;
+  const cssTokenCache = new Map();
+  const timelineSize = { width: 0, height: 0 };
+  const overviewSize = { width: 0, height: 0 };
 
   const setStatus = text => { if (el.status) el.status.textContent = text; };
   const clearError = () => {
@@ -99,7 +103,12 @@
     const length = rangeDurationMs();
     return Number.isFinite(length) && length >= LOOP_MIN_MS && length <= LOOP_MAX_MS;
   };
-  const css = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  const css = (name, fallback) => {
+    if (!cssTokenCache.has(name)) {
+      cssTokenCache.set(name, getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+    }
+    return cssTokenCache.get(name) || fallback;
+  };
   const clampSec = value => {
     const d = durationSec();
     const v = Number.isFinite(value) ? value : 0;
@@ -133,7 +142,7 @@
 
   function setPlayState(nextPlaying) {
     if (!el.play) return;
-    el.play.textContent = nextPlaying ? '一時停止' : '再生';
+    el.play.textContent = nextPlaying ? 'Ⅱ' : '▶';
     el.play.setAttribute('aria-pressed', nextPlaying ? 'true' : 'false');
     el.play.setAttribute('aria-label', nextPlaying ? '曲を一時停止' : '曲を再生');
     window.dispatchEvent(new CustomEvent('viewer-play-state', { detail: { playing: nextPlaying } }));
@@ -159,11 +168,13 @@
   function updateRange() {
     if (el.start) {
       el.start.classList.toggle('marked', !!startMark);
-      el.start.textContent = startMark ? 'Aを更新' : 'Aを設定';
+      el.start.textContent = 'A';
+      el.start.setAttribute('aria-label', startMark ? '現在位置でAを更新' : '現在位置をAに設定');
     }
     if (el.end) {
       el.end.classList.toggle('marked', !!endMark);
-      el.end.textContent = endMark ? 'Bを更新' : 'Bを設定';
+      el.end.textContent = 'B';
+      el.end.setAttribute('aria-label', endMark ? '現在位置でBを更新' : '現在位置をBに設定');
       el.end.disabled = !ready || !startMark;
     }
     if (el.startValue) el.startValue.textContent = startMark ? `A ${fmt(startMark.time)}` : 'A 未設定';
@@ -173,7 +184,8 @@
     if (el.loopToggle) {
       el.loopToggle.disabled = !ready || !validRange();
       el.loopToggle.setAttribute('aria-pressed', loopEnabled ? 'true' : 'false');
-      el.loopToggle.textContent = `リピート ${loopEnabled ? 'ON' : 'OFF'}`;
+      el.loopToggle.textContent = `↻ ${loopEnabled ? 'ON' : 'OFF'}`;
+      el.loopToggle.setAttribute('aria-label', loopEnabled ? 'A–Bリピートを停止' : 'A–Bリピートを開始');
     }
     if (el.clearLoop) el.clearLoop.disabled = !ready || (!startMark && !endMark);
     if (el.loopStatus) {
@@ -869,18 +881,38 @@
   }
 
   function sizeCanvas(canvas, cssWidth, cssHeight) {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const width = Math.max(1, Math.round(cssWidth * dpr));
     const height = Math.max(1, Math.round(cssHeight * dpr));
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
     }
-    canvas.style.width = `${cssWidth}px`;
-    canvas.style.height = `${cssHeight}px`;
+    const styleWidth = `${cssWidth}px`;
+    const styleHeight = `${cssHeight}px`;
+    if (canvas.style.width !== styleWidth) canvas.style.width = styleWidth;
+    if (canvas.style.height !== styleHeight) canvas.style.height = styleHeight;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return ctx;
+  }
+
+  function measureViewport(viewport, target) {
+    if (!viewport) return target;
+    const rect = viewport.getBoundingClientRect();
+    target.width = Math.max(0, rect.width);
+    target.height = Math.max(0, rect.height);
+    return target;
+  }
+
+  function viewportSize(viewport, target) {
+    if (!(target.width > 0 && target.height > 0)) measureViewport(viewport, target);
+    return target;
+  }
+
+  function refreshViewportMetrics() {
+    measureViewport(el.timelineViewport, timelineSize);
+    measureViewport(el.overviewViewport, overviewSize);
   }
 
   function lowerHit(timeMs) {
@@ -931,7 +963,7 @@
 
   function renderObjectAt(positionSec) {
     if (!map || !musicBuffer || !el.timelineViewport || !el.timelineStatic) return;
-    const rect = el.timelineViewport.getBoundingClientRect();
+    const rect = viewportSize(el.timelineViewport, timelineSize);
     if (rect.width <= 0 || rect.height <= 0) return;
     const ctx = sizeCanvas(el.timelineStatic, rect.width, rect.height);
     const center = positionSec * 1000;
@@ -1055,7 +1087,7 @@
 
   function renderSongStatic() {
     if (!el.overviewViewport || !el.overviewStatic) return;
-    const rect = el.overviewViewport.getBoundingClientRect();
+    const rect = viewportSize(el.overviewViewport, overviewSize);
     if (rect.width <= 0 || rect.height <= 0) return;
     const ctx = sizeCanvas(el.overviewStatic, rect.width, rect.height);
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -1145,7 +1177,7 @@
 
   function drawSongCursor(positionSec) {
     if (!el.overviewViewport || !el.overviewCursor || !musicBuffer || durationSec() <= 0) return;
-    const rect = el.overviewViewport.getBoundingClientRect();
+    const rect = viewportSize(el.overviewViewport, overviewSize);
     if (rect.width <= 0 || rect.height <= 0) return;
     const ctx = sizeCanvas(el.overviewCursor, rect.width, rect.height);
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -1214,10 +1246,14 @@
         .catch(error => fail(error instanceof Error ? error.message : '区間を繰り返せませんでした。'))
         .finally(() => { loopSeekPending = false; });
     }
-    if (el.time) el.time.textContent = fmt(p * 1000);
-    if (!seekScrub && !timelineScrub && !overviewScrub && el.seek) {
-      el.seek.value = String(p);
-      el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
+    if (now - lastTransportUiPaint >= 33) {
+      const formatted = fmt(p * 1000);
+      if (el.time && el.time.textContent !== formatted) el.time.textContent = formatted;
+      if (!seekScrub && !timelineScrub && !overviewScrub && el.seek) {
+        el.seek.value = String(p);
+        el.seek.setAttribute('aria-valuetext', formatted);
+      }
+      lastTransportUiPaint = now;
     }
     renderObjectAt(p);
     drawSongCursor(p);
@@ -1418,12 +1454,19 @@
   }
 
   const redraw = () => {
+    cssTokenCache.clear();
+    refreshViewportMetrics();
     if (!map || !musicBuffer) return;
     renderSongStatic();
     syncVisualToPosition();
   };
   window.addEventListener('resize', redraw);
   window.addEventListener('orientationchange', redraw);
+  if ('ResizeObserver' in window) {
+    const timelineResizeObserver = new ResizeObserver(redraw);
+    if (el.timelineViewport) timelineResizeObserver.observe(el.timelineViewport);
+    if (el.overviewViewport) timelineResizeObserver.observe(el.overviewViewport);
+  }
   window.addEventListener('beforeunload', () => {
     cancelAnimationFrame(raf);
     stopSources();

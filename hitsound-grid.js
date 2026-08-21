@@ -249,7 +249,7 @@
         addButton.title = `My Sound ${slot} に音源を追加`;
         addButton.setAttribute('aria-label', `ユーザー音源 ${slot} を追加`);
         const face = document.createElement('span');
-        face.textContent = customReady ? `音源を追加 ${slot}` : '読み込み中';
+        face.textContent = customReady ? '＋' : '…';
         addButton.append(face);
         item.append(addButton);
       } else {
@@ -366,7 +366,7 @@
       const action = marked ? '削除候補から解除' : '削除候補に追加';
       deleteCandidateButton.setAttribute('aria-label', currentId ? `${number}を${action}` : '削除候補にできる内蔵音源が未選択');
       deleteCandidateButton.title = currentId ? `${number}を${action}` : '内蔵音源を選択してください';
-      deleteCandidateButton.textContent = marked ? '削除候補を解除' : '削除候補にする';
+      deleteCandidateButton.textContent = marked ? '候補 ✓' : '候補';
     }
 
     if (deleteCandidateLine) {
@@ -435,9 +435,12 @@
     paintDeleteCandidates();
   }
 
-  async function chooseSound(id, { preview = false } = {}) {
+  async function chooseSound(id, { preview = true } = {}) {
+    const current = controller.getSelection()[activeSide];
+    const deselecting = current === id;
+    const nextId = deselecting ? null : id;
     try {
-      await controller.setSide(activeSide, id, { preview });
+      await controller.setSide(activeSide, nextId, { preview: preview && !deselecting });
     } finally {
       paint();
     }

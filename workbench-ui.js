@@ -30,6 +30,9 @@
   let savePositionTimer = 0;
   let swipeStart = null;
   let previewingSide = null;
+  let dockTransitionTimer = 0;
+  const DOCK_TRANSITION_MS = 480;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   function readJson(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
@@ -75,7 +78,10 @@
       const mute = $(`mute${cap}Button`);
       if (mute) {
         mute.setAttribute('aria-pressed', muted ? 'true' : 'false');
-        mute.textContent = muted && lastNonSilent[side] ? `${cap}を戻す` : `${cap}を無音`;
+        const canRestore = muted && lastNonSilent[side];
+        mute.textContent = canRestore ? '↺' : '—';
+        mute.setAttribute('aria-label', canRestore ? `${cap}の音源を戻す` : `${cap}を無音にする`);
+        mute.title = canRestore ? `${cap}を戻す` : `${cap}を無音`;
       }
       const preview = $(`preview${cap}Button`);
       if (preview) {
@@ -123,7 +129,7 @@
       if (!button) continue;
       const pressed = active && previewingSide === side;
       button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-      button.textContent = pressed ? '単音を停止' : '単音試聴';
+      button.textContent = pressed ? '■' : '▶';
       if (pressed) button.setAttribute('aria-label', `${cap}の単音試聴を停止`);
       else {
         const selectedId = controller.getSelection()[side];
@@ -157,16 +163,31 @@
     miniPlay.disabled = playButton.disabled;
     miniPlay.setAttribute('aria-pressed', playing ? 'true' : 'false');
     miniPlay.setAttribute('aria-label', playing ? '曲を一時停止' : '曲を再生');
-    miniPlay.querySelector('span').textContent = playing ? '一時停止' : '再生';
+    miniPlay.querySelector('span').textContent = playing ? 'Ⅱ' : '▶';
   }
 
   function setDockExpanded(expanded, { moveFocus = false } = {}) {
     if (!auditionPanel || !dockToggle) return;
+    const currentlyExpanded = auditionPanel.classList.contains('is-expanded');
+    if (currentlyExpanded === expanded) return;
+    if (auditionPanel.classList.contains('is-transitioning')) return;
+
+    clearTimeout(dockTransitionTimer);
+    auditionPanel.classList.add('is-transitioning');
+    auditionPanel.setAttribute('aria-busy', 'true');
     auditionPanel.classList.toggle('is-expanded', expanded);
     dockToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    dockToggle.querySelector('span').textContent = expanded ? '試聴パネルを閉じる' : '試聴パネルを開く';
+    dockToggle.setAttribute('aria-label', expanded ? '試聴パネルを収納' : '試聴パネルを展開');
+    dockToggle.querySelector('span').textContent = expanded ? '収納' : '展開';
     if (expanded && moveFocus) auditionPanel.focus({ preventScroll: true });
     if (!expanded && moveFocus) dockToggle.focus({ preventScroll: true });
+
+    const finishTransition = () => {
+      auditionPanel.classList.remove('is-transitioning');
+      auditionPanel.removeAttribute('aria-busy');
+    };
+    if (reducedMotion.matches) finishTransition();
+    else dockTransitionTimer = window.setTimeout(finishTransition, DOCK_TRANSITION_MS);
   }
 
   function openFavorites() {
@@ -299,7 +320,7 @@
     if (workbenchStatus) {
       const side = activeSide === 'don' ? 'Don' : 'Kat';
       const selected = sourceLabel(event.detail?.[activeSide]);
-      workbenchStatus.textContent = `${side}に ${selected.number} ${selected.name} を選択中`;
+      workbenchStatus.textContent = `${side} ${selected.number} を選択`;
     }
   });
   window.addEventListener('hitsound-active-side-change', event => {
@@ -310,7 +331,7 @@
     }
     activeSide = nextSide;
     syncActiveSide();
-    if (workbenchStatus) workbenchStatus.textContent = `${activeSide === 'don' ? 'Don' : 'Kat'}を操作対象にしました`;
+    if (workbenchStatus) workbenchStatus.textContent = `${activeSide === 'don' ? 'Don' : 'Kat'} 操作中`;
     restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);

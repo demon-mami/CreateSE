@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
   <link rel="stylesheet" href="./hitsound-grid.css?v=3.0-workbench">
-  <link rel="stylesheet" href="./workbench.css?v=1.2">
+  <link rel="stylesheet" href="./workbench.css?v=1.3-motion">
 </head>
 <body>
   <a class="skip-link" href="#auditionPanel">試聴・判断操作へ移動</a>
@@ -74,10 +74,10 @@
     <aside id="auditionPanel" class="audition-panel panel" aria-label="試聴と判断" tabindex="-1">
       <div class="dock-mini" aria-label="固定試聴Dock">
         <button id="miniDonTarget" class="mini-current don" type="button" aria-label="Donを操作対象にする" aria-pressed="true"><span>Don</span><strong id="miniDonValue">—</strong></button>
-        <button id="previewButton" class="mini-play" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>再生</span></button>
+        <button id="previewButton" class="mini-play" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>▶</span></button>
         <button id="miniKatTarget" class="mini-current kat" type="button" aria-label="Katを操作対象にする" aria-pressed="false"><span>Kat</span><strong id="miniKatValue">—</strong></button>
         <div class="mini-state"><span id="miniLoopState">A–B 未設定</span><strong id="miniTimeDisplay">00:00:000</strong></div>
-        <button id="dockToggleButton" class="dock-toggle" type="button" aria-expanded="false" aria-controls="dockExpanded"><span>試聴パネルを開く</span></button>
+        <button id="dockToggleButton" class="dock-toggle" type="button" aria-label="試聴パネルを展開" aria-expanded="false" aria-controls="dockExpanded"><span>展開</span></button>
       </div>
 
       <div id="dockExpanded" class="dock-expanded">
@@ -92,15 +92,15 @@
             <article class="current-sound-card don" id="currentDonCard">
               <button id="currentDonTarget" class="current-target" type="button" aria-pressed="true"><span>Don</span><strong id="currentDonValue">—</strong><small id="currentDonMeta">未選択</small></button>
               <div class="current-card-actions">
-                <button id="previewDonButton" type="button" disabled>単音試聴</button>
-                <button id="muteDonButton" type="button" aria-pressed="false">Donを無音</button>
+                <button id="previewDonButton" type="button" aria-label="Donの単音を試聴" disabled>▶</button>
+                <button id="muteDonButton" type="button" aria-label="Donを無音にする" aria-pressed="false">—</button>
               </div>
             </article>
             <article class="current-sound-card kat" id="currentKatCard">
               <button id="currentKatTarget" class="current-target" type="button" aria-pressed="false"><span>Kat</span><strong id="currentKatValue">—</strong><small id="currentKatMeta">未選択</small></button>
               <div class="current-card-actions">
-                <button id="previewKatButton" type="button" disabled>単音試聴</button>
-                <button id="muteKatButton" type="button" aria-pressed="false">Katを無音</button>
+                <button id="previewKatButton" type="button" aria-label="Katの単音を試聴" disabled>▶</button>
+                <button id="muteKatButton" type="button" aria-label="Katを無音にする" aria-pressed="false">—</button>
               </div>
             </article>
           </div>
@@ -108,9 +108,9 @@
 
         <section class="editor-panel" aria-label="譜面再生">
           <div class="transport-row">
-            <button id="backButton" class="transport-button" type="button" aria-label="4秒戻る" disabled>−4秒</button>
-            <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>再生</button>
-            <button id="forwardButton" class="transport-button" type="button" aria-label="4秒進む" disabled>＋4秒</button>
+            <button id="backButton" class="transport-button" type="button" aria-label="4秒戻る" disabled>−4s</button>
+            <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>▶</button>
+            <button id="forwardButton" class="transport-button" type="button" aria-label="4秒進む" disabled>＋4s</button>
           </div>
 
           <div class="time-row" aria-label="再生時刻">
@@ -121,14 +121,14 @@
 
           <section class="loop-panel" aria-label="A–B区間リピート">
             <div class="loop-controls">
-              <button id="startMarkButton" type="button" disabled>Aを設定</button>
+              <button id="startMarkButton" type="button" aria-label="現在位置をAに設定" disabled>A</button>
               <span id="startMarkValue">A 未設定</span>
-              <button id="endMarkButton" type="button" disabled>Bを設定</button>
+              <button id="endMarkButton" type="button" aria-label="現在位置をBに設定" disabled>B</button>
               <span id="endMarkValue">B 未設定</span>
             </div>
             <div class="loop-actions">
-              <button id="loopToggleButton" type="button" aria-pressed="false" disabled>リピート OFF</button>
-              <button id="clearLoopButton" type="button" disabled>解除</button>
+              <button id="loopToggleButton" type="button" aria-label="A–Bリピートを開始" aria-pressed="false" disabled>↻ OFF</button>
+              <button id="clearLoopButton" type="button" aria-label="A–B設定を解除" disabled>×</button>
               <span id="rangeLength" class="range-length">—</span>
             </div>
             <p id="loopStatus" class="inline-status" role="status" aria-live="polite">AとBを設定してください</p>
@@ -157,9 +157,9 @@
         <section class="judgment-panel" aria-label="候補の判断">
           <h2>判断</h2>
           <div class="judgment-actions">
-            <button id="favSetButton" class="favorite-action" type="button" aria-label="現在のDonとKatをFavoriteへ追加" aria-pressed="false" disabled>Favoriteへ追加</button>
-            <button id="deleteCandidateButton" class="delete-action" type="button" aria-label="現在の候補を削除候補にする" aria-pressed="false" disabled>削除候補にする</button>
-            <button id="favoriteOpenButton" class="secondary-action" type="button" aria-haspopup="dialog">Favoriteを開く <span id="favoriteCount">0</span></button>
+            <button id="favSetButton" class="favorite-action" type="button" aria-label="現在のDonとKatをFavoriteへ追加" aria-pressed="false" disabled>♡</button>
+            <button id="deleteCandidateButton" class="delete-action" type="button" aria-label="現在の候補を削除候補にする" aria-pressed="false" disabled>候補</button>
+            <button id="favoriteOpenButton" class="secondary-action" type="button" aria-label="Favoriteを開く" aria-haspopup="dialog">♡ <span id="favoriteCount">0</span></button>
           </div>
           <div id="setFeedback" class="set-feedback" role="status" aria-live="polite"></div>
           <div id="workbenchStatus" class="workbench-status" role="status" aria-live="polite">候補を選択して比較を開始できます</div>
@@ -182,7 +182,7 @@
           <span class="field-label">保存した組み合わせ</span>
           <h2 id="favoriteSheetTitle">Favorite</h2>
         </div>
-        <button id="favoriteCloseButton" type="button" data-close-favorites>閉じる</button>
+        <button id="favoriteCloseButton" type="button" data-close-favorites aria-label="Favoriteを閉じる">×</button>
       </header>
       <div class="favorite-dialog-actions">
         <button id="exportFavoritesButton" type="button">CSV出力</button>
@@ -209,13 +209,12 @@
   <script src="./candidates.js?v=2.0-single-base-116"></script>
   <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.3-15charts"></script>
-  <script src="./audio-ducking-bridge.js?v=1.1-music-070"></script>
-  <script src="./app-v4.js?v=3.0-workbench"></script>
+  <script src="./app-v4.js?v=3.1-music-085"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./hitsound-controller.js?v=3.0-workbench"></script>
-  <script src="./hitsound-favorites.js?v=3.0-workbench"></script>
-  <script src="./hitsound-grid.js?v=3.0-workbench"></script>
-  <script src="./workbench-ui.js?v=1.2"></script>
+  <script src="./hitsound-controller.js?v=3.1-no-ducking"></script>
+  <script src="./hitsound-favorites.js?v=3.1-compact"></script>
+  <script src="./hitsound-grid.js?v=3.1-select-preview"></script>
+  <script src="./workbench-ui.js?v=1.3-motion"></script>
   <script src="./chart-loader.js?v=0.6-state-safe"></script>
 </body>
 </html>

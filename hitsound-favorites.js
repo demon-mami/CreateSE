@@ -216,7 +216,8 @@
     const saved = entry && readSets().some(item => entryKey(item) === entryKey(entry));
     setButton.disabled = !entry;
     setButton.setAttribute('aria-pressed', saved ? 'true' : 'false');
-    setButton.textContent = saved ? 'Favorite登録済み' : 'Favoriteへ追加';
+    setButton.textContent = saved ? '♥' : '♡';
+    setButton.setAttribute('aria-label', saved ? '現在のDonとKatはFavorite登録済み' : '現在のDonとKatをFavoriteへ追加');
     setButton.title = entry ? (saved ? 'この組み合わせは登録済みです' : '現在の組み合わせをFavoriteへ追加') : 'DonとKatの両方に音源を選択してください。無音は登録できません';
   }
 
@@ -251,7 +252,7 @@
       deleteButton.dataset.deleteSet = entry.id;
       deleteButton.setAttribute('aria-label', `${pairLabel(entry)} をFavoriteから削除`);
       const deleteFace = document.createElement('span');
-      deleteFace.textContent = '削除';
+      deleteFace.textContent = '×';
       deleteButton.append(deleteFace);
 
       item.append(applyButton, deleteButton);
