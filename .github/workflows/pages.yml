@@ -48,6 +48,7 @@ jobs:
           cp charts.js _site/
           cp chart-loader.js _site/
           cp audio-ducking-bridge.js _site/
+          cp app-v4.js _site/
           cp hitsound-controller.js _site/
           cp hitsound-favorites.js _site/
           cp hitsound-grid.js _site/
@@ -55,8 +56,7 @@ jobs:
           cp hitsounds.zip _site/
           cp maps.zip _site/
 
-          # Freeze the audio/runtime dependencies to the verified Viewer commit.
-          cp _reference/app-v4.js _site/app-v4.js
+          # Keep the verified Viewer assets while using CreateSE's patched audio runtime.
           cp _reference/vendor/jszip.min.js _site/vendor/jszip.min.js
           cp -R _reference/hitsounds _site/hitsounds
 

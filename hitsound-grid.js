@@ -24,6 +24,8 @@
   const CUSTOM_SLOT_COUNT = 4;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
   const CUSTOM_STORE_NAME = 'sounds';
+  const MAX_CUSTOM_FILE_BYTES = 8 * 1024 * 1024;
+  const MAX_CUSTOM_DURATION_SEC = 5;
   const LONG_PRESS_MS = 520;
   const MOVE_TOLERANCE_PX = 11;
   const validCandidateIds = new Set(CANDIDATES.filter(candidate => !candidate.excluded).map(candidate => candidate.id));
@@ -164,7 +166,7 @@
         name: record.name,
         type: record.type,
         lastModified: record.lastModified,
-        bytes: record.bytes.slice(0),
+        bytes: record.bytes,
       });
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error || new Error('ユーザー音源を保存できません。'));
@@ -342,12 +344,12 @@
     previewButton.setAttribute('aria-label', playing ? '曲を一時停止' : '曲を再生');
   }
 
-  async function chooseSound(id) {
+  async function chooseSound(id, { preview = true } = {}) {
     const current = controller.getSelection()[activeSide];
     const deselecting = current === id;
     const nextId = deselecting ? null : id;
     try {
-      await controller.setSide(activeSide, nextId, { preview: !deselecting });
+      await controller.setSide(activeSide, nextId, { preview: preview && !deselecting });
     } finally {
       paint();
     }
@@ -361,6 +363,48 @@
     customInput.click();
   }
 
+  function probeAudioDuration(file) {
+    return new Promise((resolve, reject) => {
+      const audio = document.createElement('audio');
+      const url = URL.createObjectURL(file);
+      let timer = 0;
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        audio.onloadedmetadata = null;
+        audio.onerror = null;
+        audio.removeAttribute('src');
+        URL.revokeObjectURL(url);
+      };
+
+      audio.preload = 'metadata';
+      audio.onloadedmetadata = () => {
+        const duration = audio.duration;
+        cleanup();
+        if (Number.isFinite(duration) && duration > 0) resolve(duration);
+        else reject(new Error('音源の長さを確認できません。'));
+      };
+      audio.onerror = () => {
+        cleanup();
+        reject(new Error('この音声形式はブラウザで読み込めません。'));
+      };
+      timer = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('音源の確認に時間がかかりすぎました。'));
+      }, 8000);
+      audio.src = url;
+    });
+  }
+
+  async function validateCustomSound(file) {
+    if (!file.size) throw new Error('空の音源ファイルは追加できません。');
+    if (file.size > MAX_CUSTOM_FILE_BYTES) throw new Error('音源は8MB以下にしてください。');
+    const duration = await probeAudioDuration(file);
+    if (duration > MAX_CUSTOM_DURATION_SEC + 0.01) {
+      throw new Error('ヒットサウンドは5秒以下にしてください。');
+    }
+  }
+
   async function addCustomSound(file, slot) {
     const id = customIdForSlot(slot);
     if (!file || customBusy || customRecords.has(id)) return;
@@ -371,6 +415,7 @@
     let persistenceError = null;
 
     try {
+      await validateCustomSound(file);
       const bytes = await file.arrayBuffer();
       record = controller.registerCustomSource(id, {
         id,
@@ -405,7 +450,11 @@
       alert('音源は使用できますが、ブラウザへの保存に失敗しました。次回は再追加してください。');
     }
 
-    chooseSound(id).catch(error => alert(`音源を再生できませんでした。\n${error.message}`));
+    try {
+      await chooseSound(id, { preview: false });
+    } catch (error) {
+      alert(`音源は追加しましたが、選択を反映できませんでした。\n${error.message}`);
+    }
   }
 
   async function removeCustomSound(id) {

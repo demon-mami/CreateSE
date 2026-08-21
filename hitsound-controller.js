@@ -37,6 +37,7 @@
   let previewSerial = 0;
   let previewUrl = '';
   const pendingSides = new Set();
+  const silentBytes = makeSilentWav();
 
   async function hitsoundPack() {
     if (!packPromise) {
@@ -81,10 +82,10 @@
   }
 
   async function candidateBytes(id) {
-    if (id === null || id === SILENT_ID) return makeSilentWav();
+    if (id === null || id === SILENT_ID) return silentBytes;
     const custom = customSources.get(id);
-    if (custom) return custom.bytes.slice(0);
-    if (bytesCache.has(id)) return bytesCache.get(id).slice(0);
+    if (custom) return custom.bytes;
+    if (bytesCache.has(id)) return bytesCache.get(id);
 
     const candidate = builtInById(id);
     if (!available(candidate)) throw new Error('候補音源が見つかりません。');
@@ -93,7 +94,7 @@
     if (!entry) throw new Error(`hitsounds.zip 内にありません: ${candidate.entry}`);
     const bytes = await entry.async('arraybuffer');
     bytesCache.set(id, bytes);
-    return bytes.slice(0);
+    return bytes;
   }
 
   function fileFor(id, bytes) {
@@ -104,7 +105,7 @@
     const type = silent || !custom ? 'audio/wav' : (source?.type || '');
     return new File([bytes], name, {
       type,
-      lastModified: custom ? (source?.lastModified || Date.now()) : Date.now(),
+      lastModified: custom ? (source?.lastModified || Date.now()) : 0,
     });
   }
 
@@ -112,7 +113,7 @@
     if (!CUSTOM_ID_PATTERN.test(String(id))) throw new Error('ユーザー音源スロットが不正です。');
     const rawBytes = source?.bytes;
     let bytes = null;
-    if (rawBytes instanceof ArrayBuffer) bytes = rawBytes.slice(0);
+    if (rawBytes instanceof ArrayBuffer) bytes = rawBytes;
     else if (ArrayBuffer.isView(rawBytes)) {
       bytes = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
     }
@@ -134,7 +135,7 @@
       bytes,
     };
     customSources.set(id, entry);
-    return { ...entry, bytes: entry.bytes.slice(0) };
+    return { ...entry };
   }
 
   async function unregisterCustomSource(id) {
@@ -332,7 +333,14 @@
     emitSelection();
 
     try {
-      if (preview && id !== null && id !== SILENT_ID) await previewCandidate(id, { waitUntilEnded: true });
+      if (preview && id !== null && id !== SILENT_ID) {
+        try {
+          await previewCandidate(id);
+        } catch (previewError) {
+          stopPreview();
+          console.warn('音源の試聴は開始できませんでしたが、選択は反映します。', previewError);
+        }
+      }
       if (serial === selectionSerial) await applyPendingSelection(serial);
       return true;
     } catch (error) {
