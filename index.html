@@ -7,7 +7,7 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./hitsound-grid.css?v=1.8">
+  <link rel="stylesheet" href="./hitsound-grid.css?v=2.0-single-base-116">
   <style>
     .chart-field{display:block}.chart-field select{height:46px;min-height:46px;font-size:12px;font-weight:750}
     .chart-info{display:flex;align-items:center;min-height:34px;margin-top:8px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden}
@@ -112,7 +112,7 @@
   <audio id="samplePreviewAudio" preload="none"></audio>
   <script>
     (() => {
-      const datasetVersion = 'v1.2-116';
+      const datasetVersion = 'single-base-116-20260821';
       const versionKey = 'CreateSE:dataset-version';
       try {
         if (localStorage.getItem(versionKey) !== datasetVersion) {
@@ -124,15 +124,15 @@
     })();
   </script>
   <script src="./vendor/jszip.min.js?v=3.10.1"></script>
-  <script src="./candidates.js?v=1.2"></script>
-  <script src="./candidate-numbering.js?v=2.0"></script>
+  <script src="./candidates.js?v=2.0-single-base-116"></script>
+  <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.2"></script>
   <script src="./audio-ducking-bridge.js?v=1.0"></script>
-  <script src="./app-v4.js?v=2.0"></script>
+  <script src="./app-v4.js?v=2.1"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./hitsound-controller.js?v=1.9"></script>
-  <script src="./hitsound-favorites.js?v=1.4-dataset12"></script>
-  <script src="./hitsound-grid.js?v=1.9-dataset12"></script>
+  <script src="./hitsound-controller.js?v=2.0-single-base-116"></script>
+  <script src="./hitsound-favorites.js?v=2.0-single-base-116"></script>
+  <script src="./hitsound-grid.js?v=2.0-single-base-116"></script>
   <script src="./chart-loader.js?v=0.4"></script>
 </body>
 </html>

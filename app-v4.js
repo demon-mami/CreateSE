@@ -16,16 +16,9 @@
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
-  const HS_FILES = {
-    'normal:hitnormal': './hitsounds/taiko-normal-hitnormal.wav',
-    'normal:hitclap': './hitsounds/taiko-normal-hitclap.wav',
-    'normal:hitfinish': './hitsounds/taiko-normal-hitfinish.wav',
-    'normal:hitwhistle': './hitsounds/taiko-normal-hitwhistle.wav',
-    'soft:hitnormal': './hitsounds/taiko-soft-hitnormal.wav',
-    'soft:hitclap': './hitsounds/taiko-soft-hitclap.wav',
-    'soft:hitfinish': './hitsounds/taiko-soft-hitfinish.wav',
-    'soft:hitwhistle': './hitsounds/taiko-soft-hitwhistle.wav',
-  };
+  // Built-in effects are supplied exclusively by CreateSE's official 116-sound pack.
+  // Keeping this empty prevents the legacy Viewer hitsounds from being fetched or mixed in.
+  const HS_FILES = {};
 
   const $ = id => document.getElementById(id);
   const el = {
@@ -1305,7 +1298,7 @@
     if (ac) ac.close().catch(() => {});
   });
 
-  if (el.samplePolicy) el.samplePolicy.textContent = 'Hitsound: Normal / Soft対応、SampleSet=DrumはNormalへフォールバック';
+  if (el.samplePolicy) el.samplePolicy.textContent = 'Hitsound: 単音ベース正式版116音';
   if (el.debug) {
     el.debug.hidden = !DEBUG_MODE;
     if (DEBUG_MODE) {

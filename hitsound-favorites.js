@@ -20,14 +20,8 @@
   const validSideId = id => id === SILENT_ID || valid(byId(id));
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || '';
 
-  const GOOD_CROSS = new Map([
-    ['A003', new Set(['A026'])],
-    ['A005', new Set(['A026'])],
-    ['A010', new Set(['A026'])],
-    ['A026', new Set(['A021'])],
-    ['A058', new Set(['A053'])],
-    ['A060', new Set(['A055'])],
-  ]);
+  // Pair recommendations from the retired packs must not leak into this dataset.
+  const GOOD_CROSS = new Map();
 
   let feedback = $('setFeedback');
   if (!feedback && pairBuilder) {

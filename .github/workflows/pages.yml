@@ -26,7 +26,7 @@ jobs:
       - name: Checkout Hitsound Lab
         uses: actions/checkout@v6
 
-      - name: Checkout frozen reference runtime
+      - name: Checkout frozen reference vendor
         uses: actions/checkout@v6
         with:
           repository: demon-mami/osutaiko-mami-viewer
@@ -53,12 +53,11 @@ jobs:
           cp hitsound-favorites.js _site/
           cp hitsound-grid.js _site/
           cp object-timeline-v2.js _site/
-          cp hitsounds.zip _site/
+          cp hitsounds-single-base-116.zip _site/
           cp maps.zip _site/
 
-          # Keep the verified Viewer assets while using CreateSE's patched audio runtime.
+          # Keep only the verified JSZip vendor file from the frozen Viewer reference.
           cp _reference/vendor/jszip.min.js _site/vendor/jszip.min.js
-          cp -R _reference/hitsounds _site/hitsounds
 
           touch _site/.nojekyll
 

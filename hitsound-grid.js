@@ -39,7 +39,7 @@
   let uploadTargetSlot = null;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
-  const displayFamily = candidate => familyOf(candidate) === '808 / Sub' ? 'Bass Drum / Kick' : familyOf(candidate);
+  const displayFamily = candidate => familyOf(candidate);
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const customIdForSlot = slot => `__CUSTOM_${slot}__`;
 
@@ -61,15 +61,27 @@
   }
 
   const preferredOrder = [
+    'Annihilator',
+    'Doom Pulse',
     'Bass Drum / Kick',
-    'Tom',
-    'Timbale',
-    'Rimshot',
-    'Cowbell',
-    'Agogo',
-    'Woodblock',
+    'Clap',
     'Clave / Claves',
+    'Forest Perc A',
+    'Forest Perc B',
+    'Forest Perc C',
+    'Forest Perc D',
+    'Forest Perc E',
+    'Forest Perc F',
     'Hi-Hat',
+    'Rimshot',
+    'Agogo',
+    'Cowbell',
+    'Timbale',
+    'Woodblock',
+    'Snap',
+    'Snare',
+    'Tom',
+    'Taiko Reference',
   ];
 
   function groupedCandidates() {

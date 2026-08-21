@@ -43,8 +43,8 @@
     if (!packPromise) {
       packPromise = (async () => {
         if (!window.JSZip) throw new Error('JSZipを読み込めません。');
-        const response = await fetch('./hitsounds.zip', { cache: 'force-cache' });
-        if (!response.ok) throw new Error('hitsounds.zip を読み込めません。');
+        const response = await fetch('./hitsounds-single-base-116.zip', { cache: 'force-cache' });
+        if (!response.ok) throw new Error('正式版116音パックを読み込めません。');
         return JSZip.loadAsync(await response.arrayBuffer());
       })();
     }
@@ -91,7 +91,7 @@
     if (!available(candidate)) throw new Error('候補音源が見つかりません。');
     const pack = await hitsoundPack();
     const entry = pack.file(candidate.entry);
-    if (!entry) throw new Error(`hitsounds.zip 内にありません: ${candidate.entry}`);
+    if (!entry) throw new Error(`正式版116音パック内にありません: ${candidate.entry}`);
     const bytes = await entry.async('arraybuffer');
     bytesCache.set(id, bytes);
     return bytes;
@@ -386,7 +386,7 @@
       pendingSides.clear();
     } catch (error) {
       console.warn(error);
-      if (el.status) el.status.textContent = 'hitsounds.zip待ち';
+      if (el.status) el.status.textContent = '正式版116音パック待ち';
     }
   });
 
