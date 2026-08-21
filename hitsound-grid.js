@@ -10,30 +10,34 @@
   const roleDonButton = $('roleDonButton');
   const roleKatButton = $('roleKatButton');
   const silentButton = $('silentButton');
-  const previewButton = $('previewButton');
   const deleteCandidateButton = $('deleteCandidateButton');
-  const songPlayButton = $('playButton');
   const recommendationLine = $('recommendationLine');
   const deleteCandidateLine = $('deleteCandidateLine');
   const customInput = $('customHitsoundInput');
   const customSlots = $('customSoundSlots');
   const customCount = $('customSoundCount');
+  const customStatus = $('mySoundStatus');
+  const workbenchStatus = $('workbenchStatus');
+  const roleDonCurrent = $('roleDonCurrent');
+  const roleKatCurrent = $('roleKatCurrent');
 
   if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton || !customInput || !customSlots || !customCount) return;
 
   const SILENT_ID = controller.SILENT_ID;
-  const PIN_STORAGE_KEY = 'osutaiko-hitsound-lab:pinned-sources:v1';
   const DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:v1';
+  const ACTIVE_SIDE_STORAGE_KEY = 'osutaiko-hitsound-lab:active-side:v1';
   const CUSTOM_SLOT_COUNT = 4;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
   const CUSTOM_STORE_NAME = 'sounds';
   const MAX_CUSTOM_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_CUSTOM_DURATION_SEC = 5;
-  const LONG_PRESS_MS = 520;
   const MOVE_TOLERANCE_PX = 11;
   const validCandidateIds = new Set(CANDIDATES.filter(candidate => !candidate.excluded).map(candidate => candidate.id));
   const customRecords = new Map();
-  let activeSide = 'don';
+  let activeSide = (() => {
+    try { return localStorage.getItem(ACTIVE_SIDE_STORAGE_KEY) === 'kat' ? 'kat' : 'don'; }
+    catch { return 'don'; }
+  })();
   let pressState = null;
   let suppressClickFor = null;
   let customDbPromise = null;
@@ -46,17 +50,6 @@
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const customIdForSlot = slot => `__CUSTOM_${slot}__`;
 
-  function readPinnedIds() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(PIN_STORAGE_KEY) || '[]');
-      return new Set(Array.isArray(saved) ? saved.filter(id => validCandidateIds.has(id)) : []);
-    } catch {
-      return new Set();
-    }
-  }
-
-  const pinnedIds = readPinnedIds();
-
   function readDeleteCandidateIds() {
     try {
       const saved = JSON.parse(localStorage.getItem(DELETE_CANDIDATE_STORAGE_KEY) || '[]');
@@ -67,12 +60,6 @@
   }
 
   const deleteCandidateIds = readDeleteCandidateIds();
-
-  function savePinnedIds() {
-    try {
-      localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify(Array.from(pinnedIds)));
-    } catch {}
-  }
 
   function saveDeleteCandidateIds() {
     try {
@@ -138,15 +125,11 @@
     return `${candidate.sourceNumber} ${candidate.originalName || candidate.name || ''}`.trim();
   }
 
-  function pinHint(candidate) {
-    return `${candidateLabel(candidate)} · 長押しでピン留め${pinnedIds.has(candidate.id) ? '解除' : ''}`;
-  }
-
   function keyMarkup(candidate) {
     const source = String(candidate.originalName || candidate.name || '');
     const pitch = Number.isFinite(candidate.pitch) ? `${candidate.pitch.toFixed(1)} Hz` : '';
-    const pinned = pinnedIds.has(candidate.id);
-    return `<button class="hs-key${pinned ? ' pinned' : ''}" type="button" data-hs-id="${candidate.id}" title="${source}${pitch ? ` · ${pitch}` : ''} · 長押しでピン留め${pinned ? '解除' : ''}" aria-label="${pinHint(candidate)}" data-base-label="${candidateLabel(candidate)}"><span>${candidate.sourceNumber}</span></button>`;
+    const family = displayFamily(candidate);
+    return `<button class="hs-key" type="button" data-hs-id="${candidate.id}" title="${source}${pitch ? ` · ${pitch}` : ''}" aria-label="${candidate.sourceNumber}、${source}、${family}" aria-pressed="false" data-base-label="${candidateLabel(candidate)}"><span>${candidate.sourceNumber}</span></button>`;
   }
 
   function buildGrid() {
@@ -198,12 +181,43 @@
         name: record.name,
         type: record.type,
         lastModified: record.lastModified,
+        size: record.size,
+        fingerprint: record.fingerprint,
         bytes: record.bytes,
       });
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error || new Error('ユーザー音源を保存できません。'));
       transaction.onabort = () => reject(transaction.error || new Error('ユーザー音源の保存が中断されました。'));
     });
+  }
+
+  function setCustomStatus(message, { error = false } = {}) {
+    if (!customStatus) return;
+    customStatus.textContent = message;
+    customStatus.classList.toggle('error', error);
+  }
+
+  function reportActionError(error, fallback = '操作を完了できませんでした。') {
+    const message = error instanceof Error ? error.message : fallback;
+    if (workbenchStatus) workbenchStatus.textContent = message;
+  }
+
+  async function fingerprintBytes(bytes) {
+    const view = bytes instanceof ArrayBuffer
+      ? bytes
+      : bytes?.buffer?.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    if (!view?.byteLength) throw new Error('音源データを確認できません。');
+    if (!globalThis.crypto?.subtle) {
+      let first = 0x811c9dc5;
+      let second = 0x9e3779b9;
+      for (const value of new Uint8Array(view)) {
+        first = Math.imul(first ^ value, 0x01000193);
+        second = Math.imul(second ^ (value + 0x9d), 0x85ebca6b);
+      }
+      return `fnv-${view.byteLength}-${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
+    }
+    const digest = await crypto.subtle.digest('SHA-256', view);
+    return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
   }
 
   async function deleteCustomRecord(id) {
@@ -235,7 +249,7 @@
         addButton.title = `My Sound ${slot} に音源を追加`;
         addButton.setAttribute('aria-label', `ユーザー音源 ${slot} を追加`);
         const face = document.createElement('span');
-        face.textContent = customReady ? '＋' : '…';
+        face.textContent = customReady ? `音源を追加 ${slot}` : '読み込み中';
         addButton.append(face);
         item.append(addButton);
       } else {
@@ -245,7 +259,7 @@
         soundButton.dataset.customId = id;
         soundButton.disabled = customBusy;
         soundButton.title = record.name;
-        soundButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を選択・試聴`);
+        soundButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を選択`);
         const soundFace = document.createElement('span');
         soundFace.textContent = record.sourceNumber;
         soundButton.append(soundFace);
@@ -280,45 +294,30 @@
         const id = customIdForSlot(slot);
         if (slot < 1 || slot > CUSTOM_SLOT_COUNT || stored?.id !== id || customRecords.has(id)) continue;
         try {
-          const record = controller.registerCustomSource(id, stored);
+          const fingerprint = stored.fingerprint || await fingerprintBytes(stored.bytes);
+          const record = controller.registerCustomSource(id, {
+            ...stored,
+            fingerprint,
+            size: Number(stored.size) || stored.bytes?.byteLength || 0,
+          });
           customRecords.set(id, record);
+          if (!stored.fingerprint) await writeCustomRecord(record);
         } catch (error) {
           console.warn('保存済みユーザー音源を復元できませんでした。', error);
         }
       }
+      setCustomStatus(customRecords.size
+        ? `${customRecords.size}件のMy Soundを復元しました`
+        : 'WAV・8MB以下・5秒以下');
     } catch (error) {
       console.warn('ユーザー音源の保存領域を利用できません。', error);
+      setCustomStatus('My Soundの保存領域を利用できません', { error: true });
     } finally {
       customReady = true;
       renderCustomSlots();
       paint();
+      window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
     }
-  }
-
-  function paintPinnedButton(button) {
-    const id = button?.dataset.hsId;
-    const candidate = byId(id);
-    if (!button || !candidate) return;
-    const pinned = pinnedIds.has(id);
-    const source = String(candidate.originalName || candidate.name || '');
-    const pitch = Number.isFinite(candidate.pitch) ? `${candidate.pitch.toFixed(1)} Hz` : '';
-    button.classList.toggle('pinned', pinned);
-    button.setAttribute('aria-label', pinHint(candidate));
-    button.setAttribute('aria-description', pinned ? 'ピン留め中。長押しで解除できます。' : '長押しでピン留めできます。');
-    button.title = `${source}${pitch ? ` · ${pitch}` : ''} · 長押しでピン留め${pinned ? '解除' : ''}`;
-  }
-
-  function togglePin(button) {
-    const id = button?.dataset.hsId;
-    if (!validCandidateIds.has(id)) return;
-    if (pinnedIds.has(id)) pinnedIds.delete(id);
-    else pinnedIds.add(id);
-    savePinnedIds();
-    paintPinnedButton(button);
-    button.classList.remove('pin-pulse');
-    void button.offsetWidth;
-    button.classList.add('pin-pulse');
-    setTimeout(() => button.classList.remove('pin-pulse'), 360);
   }
 
   function paintRecommendation() {
@@ -349,10 +348,14 @@
     sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
       const isMarked = deleteCandidateIds.has(button.dataset.hsId);
       button.classList.toggle('delete-candidate', isMarked);
-      button.setAttribute('aria-description', [
-        button.classList.contains('pinned') ? 'ピン留め中。長押しで解除できます。' : '長押しでピン留めできます。',
-        isMarked ? '削除候補として記録済みです。' : '',
-      ].filter(Boolean).join(' '));
+      const candidate = byId(button.dataset.hsId);
+      const selection = controller.getSelection();
+      const states = [
+        button.dataset.hsId === selection.don ? '現在のDon' : '',
+        button.dataset.hsId === selection.kat ? '現在のKat' : '',
+        isMarked ? '削除候補として記録済み' : '',
+      ].filter(Boolean);
+      button.setAttribute('aria-description', states.join('。'));
     });
 
     if (deleteCandidateButton) {
@@ -363,6 +366,7 @@
       const action = marked ? '削除候補から解除' : '削除候補に追加';
       deleteCandidateButton.setAttribute('aria-label', currentId ? `${number}を${action}` : '削除候補にできる内蔵音源が未選択');
       deleteCandidateButton.title = currentId ? `${number}を${action}` : '内蔵音源を選択してください';
+      deleteCandidateButton.textContent = marked ? '削除候補を解除' : '削除候補にする';
     }
 
     if (deleteCandidateLine) {
@@ -375,10 +379,15 @@
   function toggleCurrentDeleteCandidate() {
     const id = currentDeleteCandidateId();
     if (!id) return;
-    if (deleteCandidateIds.has(id)) deleteCandidateIds.delete(id);
+    const remove = deleteCandidateIds.has(id);
+    if (remove) deleteCandidateIds.delete(id);
     else deleteCandidateIds.add(id);
     saveDeleteCandidateIds();
     paintDeleteCandidates();
+    const number = byId(id)?.sourceNumber || '';
+    if (workbenchStatus) workbenchStatus.textContent = remove
+      ? `${number} を削除候補から解除しました`
+      : `${number} を削除候補として記録しました`;
   }
 
   function paint() {
@@ -392,19 +401,22 @@
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
     roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${donSource?.sourceNumber || '—'}`;
     roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${katSource?.sourceNumber || '—'}`;
+    if (roleDonCurrent) roleDonCurrent.textContent = selection.don === SILENT_ID ? '無音' : (donSource?.sourceNumber || '未選択');
+    if (roleKatCurrent) roleKatCurrent.textContent = selection.kat === SILENT_ID ? '無音' : (katSource?.sourceNumber || '未選択');
 
     grid.dataset.activeSide = activeSide;
     sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
       const id = button.dataset.hsId;
       button.classList.toggle('selected-don', id === selection.don);
       button.classList.toggle('selected-kat', id === selection.kat);
-      paintPinnedButton(button);
+      button.setAttribute('aria-pressed', id === selection[activeSide] ? 'true' : 'false');
     });
 
     customSlots.querySelectorAll('.custom-sound-key[data-custom-id]').forEach(button => {
       const id = button.dataset.customId;
       button.classList.toggle('selected-don', id === selection.don);
       button.classList.toggle('selected-kat', id === selection.kat);
+      button.setAttribute('aria-pressed', id === selection[activeSide] ? 'true' : 'false');
     });
 
     if (silentButton) {
@@ -416,22 +428,9 @@
     paintDeleteCandidates();
   }
 
-  function syncSongTransportButton() {
-    if (!previewButton) return;
-    const face = previewButton.querySelector('span') || previewButton;
-    const playing = !!songPlayButton && !songPlayButton.disabled && songPlayButton.textContent.trim() !== '▶';
-    face.textContent = playing ? 'Ⅱ' : '▶';
-    previewButton.disabled = !songPlayButton || songPlayButton.disabled;
-    previewButton.setAttribute('aria-pressed', playing ? 'true' : 'false');
-    previewButton.setAttribute('aria-label', playing ? '曲を一時停止' : '曲を再生');
-  }
-
-  async function chooseSound(id, { preview = true } = {}) {
-    const current = controller.getSelection()[activeSide];
-    const deselecting = current === id;
-    const nextId = deselecting ? null : id;
+  async function chooseSound(id, { preview = false } = {}) {
     try {
-      await controller.setSide(activeSide, nextId, { preview: preview && !deselecting });
+      await controller.setSide(activeSide, id, { preview });
     } finally {
       paint();
     }
@@ -442,6 +441,7 @@
     if (customRecords.has(customIdForSlot(slot))) return;
     uploadTargetSlot = slot;
     customInput.value = '';
+    setCustomStatus(`My Sound ${slot} に追加するWAVを選択してください`);
     customInput.click();
   }
 
@@ -479,6 +479,8 @@
   }
 
   async function validateCustomSound(file) {
+    const isWav = /\.wav$/i.test(file.name || '') || /audio\/(?:wav|x-wav)/i.test(file.type || '');
+    if (!isWav) throw new Error('WAVファイルを選択してください。');
     if (!file.size) throw new Error('空の音源ファイルは追加できません。');
     if (file.size > MAX_CUSTOM_FILE_BYTES) throw new Error('音源は8MB以下にしてください。');
     const duration = await probeAudioDuration(file);
@@ -499,6 +501,7 @@
     try {
       await validateCustomSound(file);
       const bytes = await file.arrayBuffer();
+      const fingerprint = await fingerprintBytes(bytes);
       record = controller.registerCustomSource(id, {
         id,
         slot,
@@ -506,6 +509,8 @@
         name: file.name,
         type: file.type,
         lastModified: file.lastModified,
+        size: file.size,
+        fingerprint,
         bytes,
       });
       customRecords.set(id, record);
@@ -516,11 +521,13 @@
         persistenceError = error;
         console.warn('ユーザー音源をブラウザに保存できませんでした。', error);
       }
+      setCustomStatus(`${record.sourceNumber} ${record.name} を追加しました`);
     } catch (error) {
       if (record) {
         customRecords.delete(id);
         await controller.unregisterCustomSource(id).catch(() => {});
       }
+      setCustomStatus(error instanceof Error ? error.message : '音源を追加できませんでした。', { error: true });
       throw error;
     } finally {
       customBusy = false;
@@ -529,14 +536,15 @@
     }
 
     if (persistenceError) {
-      alert('音源は使用できますが、ブラウザへの保存に失敗しました。次回は再追加してください。');
+      setCustomStatus('音源は使用できますが保存できませんでした。次回は再追加してください。', { error: true });
     }
 
     try {
       await chooseSound(id, { preview: false });
     } catch (error) {
-      alert(`音源は追加しましたが、選択を反映できませんでした。\n${error.message}`);
+      setCustomStatus(`音源は追加しましたが選択を反映できませんでした。${error.message}`, { error: true });
     }
+    window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
   }
 
   async function removeCustomSound(id) {
@@ -561,8 +569,11 @@
 
     if (deleteError) {
       console.warn('保存済みユーザー音源を削除できませんでした。', deleteError);
-      alert('この画面からは削除しましたが、ブラウザの保存データを削除できませんでした。');
+      setCustomStatus('画面から削除しましたが保存データを削除できませんでした。', { error: true });
+    } else {
+      setCustomStatus(`${record.sourceNumber} ${record.name} を削除しました`);
     }
+    window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
   }
 
   async function chooseSilent() {
@@ -577,47 +588,29 @@
     if (side !== 'don' && side !== 'kat') return;
     controller.stopPreview();
     activeSide = side;
+    try { localStorage.setItem(ACTIVE_SIDE_STORAGE_KEY, activeSide); } catch {}
     paint();
-  }
-
-  function clearPressTimer() {
-    if (pressState?.timer) clearTimeout(pressState.timer);
-    if (pressState) pressState.timer = 0;
+    window.dispatchEvent(new CustomEvent('hitsound-active-side-change', { detail: { side: activeSide } }));
   }
 
   function finishPress(event, cancelled = false) {
     if (!pressState || (event?.pointerId != null && event.pointerId !== pressState.pointerId)) return;
     const releasedButton = pressState.button;
-    const wasLongPress = pressState.longPressed;
-    clearPressTimer();
     if (cancelled) pressState.cancelled = true;
-    if (wasLongPress) {
+    if (pressState.cancelled) {
+      suppressClickFor = releasedButton;
       event?.preventDefault?.();
-      event?.stopPropagation?.();
       setTimeout(() => {
         if (suppressClickFor === releasedButton) suppressClickFor = null;
-      }, 900);
+      }, 500);
     }
     pressState = null;
   }
 
   roleDonButton.addEventListener('click', () => setActiveSide('don'));
   roleKatButton.addEventListener('click', () => setActiveSide('kat'));
-  silentButton?.addEventListener('click', () => chooseSilent().catch(error => alert(error.message)));
-  previewButton?.addEventListener('click', () => {
-    if (!songPlayButton?.disabled) songPlayButton.click();
-  });
+  silentButton?.addEventListener('click', () => chooseSilent().catch(reportActionError));
   deleteCandidateButton?.addEventListener('click', toggleCurrentDeleteCandidate);
-
-  if (songPlayButton && previewButton) {
-    new MutationObserver(syncSongTransportButton).observe(songPlayButton, {
-      attributes: true,
-      attributeFilter: ['disabled'],
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-  }
 
   sources.addEventListener('pointerdown', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
@@ -630,36 +623,24 @@
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      longPressed: false,
       cancelled: false,
-      timer: 0,
     };
     button.setPointerCapture?.(event.pointerId);
-    pressState.timer = setTimeout(() => {
-      if (!pressState || pressState.button !== button || pressState.cancelled) return;
-      pressState.longPressed = true;
-      suppressClickFor = button;
-      togglePin(button);
-      if (navigator.vibrate) navigator.vibrate(12);
-    }, LONG_PRESS_MS);
   });
 
   sources.addEventListener('pointermove', event => {
-    if (!pressState || event.pointerId !== pressState.pointerId || pressState.longPressed) return;
+    if (!pressState || event.pointerId !== pressState.pointerId) return;
     const dx = event.clientX - pressState.startX;
     const dy = event.clientY - pressState.startY;
     if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) {
       pressState.cancelled = true;
-      clearPressTimer();
+      suppressClickFor = pressState.button;
     }
   });
 
   sources.addEventListener('pointerup', event => finishPress(event));
   sources.addEventListener('pointercancel', event => finishPress(event, true));
   sources.addEventListener('lostpointercapture', event => finishPress(event, true));
-  sources.addEventListener('contextmenu', event => {
-    if (event.target.closest('.hs-key[data-hs-id]')) event.preventDefault();
-  });
 
   sources.addEventListener('click', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
@@ -670,7 +651,7 @@
       event.stopPropagation();
       return;
     }
-    chooseSound(button.dataset.hsId).catch(error => alert(error.message));
+    chooseSound(button.dataset.hsId).catch(reportActionError);
   });
 
   customSlots.addEventListener('click', event => {
@@ -678,7 +659,11 @@
 
     const deleteButton = event.target.closest('[data-delete-custom]');
     if (deleteButton && customSlots.contains(deleteButton)) {
-      removeCustomSound(deleteButton.dataset.deleteCustom).catch(error => alert(error.message));
+      const record = customRecords.get(deleteButton.dataset.deleteCustom);
+      if (!record || !window.confirm(`${record.sourceNumber} ${record.name} をMy Soundから削除しますか？`)) return;
+      removeCustomSound(deleteButton.dataset.deleteCustom).catch(error => {
+        setCustomStatus(error.message || 'My Soundを削除できませんでした。', { error: true });
+      });
       return;
     }
 
@@ -690,7 +675,7 @@
 
     const soundButton = event.target.closest('.custom-sound-key[data-custom-id]');
     if (soundButton && customSlots.contains(soundButton)) {
-      chooseSound(soundButton.dataset.customId).catch(error => alert(error.message));
+      chooseSound(soundButton.dataset.customId).catch(reportActionError);
     }
   });
 
@@ -699,8 +684,17 @@
     const slot = uploadTargetSlot;
     uploadTargetSlot = null;
     customInput.value = '';
-    if (!file || !slot) return;
-    addCustomSound(file, slot).catch(error => alert(`音源を追加できませんでした。\n${error.message}`));
+    if (!slot) return;
+    if (!file) {
+      setCustomStatus('音源の追加をキャンセルしました');
+      return;
+    }
+    setCustomStatus(`${file.name} を確認しています…`);
+    addCustomSound(file, slot).catch(() => {});
+  });
+  customInput.addEventListener('cancel', () => {
+    uploadTargetSlot = null;
+    setCustomStatus('音源の追加をキャンセルしました');
   });
 
   window.addEventListener('hitsound-selection-change', paint);
@@ -715,6 +709,6 @@
   buildGrid();
   renderCustomSlots();
   paint();
-  syncSongTransportButton();
+  window.dispatchEvent(new CustomEvent('hitsound-active-side-change', { detail: { side: activeSide } }));
   restoreCustomSounds();
 })();

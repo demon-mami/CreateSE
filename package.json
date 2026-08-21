@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "test": "node --test tests/workbench-static.test.mjs"
+  }
+}

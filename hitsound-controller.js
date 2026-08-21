@@ -4,6 +4,7 @@
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   const SILENT_ID = '__SILENT__';
   const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-4]__$/;
+  const SELECTION_STORAGE_KEY = 'osutaiko-hitsound-lab:selection:v1';
   const $ = id => document.getElementById(id);
 
   const el = {
@@ -29,7 +30,21 @@
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
 
-  const selection = { don: initialDon, kat: initialKat };
+  function readPersistedSelection() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SELECTION_STORAGE_KEY) || 'null');
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  const persistedSelection = readPersistedSelection();
+  const restoreBuiltIn = (id, fallback) => id === SILENT_ID || available(builtInById(id)) ? id : fallback;
+  const selection = {
+    don: restoreBuiltIn(persistedSelection.don, initialDon),
+    kat: restoreBuiltIn(persistedSelection.kat, initialKat),
+  };
   let packPromise = null;
   const bytesCache = new Map();
   let applySerial = 0;
@@ -38,6 +53,16 @@
   let previewUrl = '';
   const pendingSides = new Set();
   const silentBytes = makeSilentWav();
+
+  function persistSelection() {
+    persistedSelection.don = selection.don;
+    persistedSelection.kat = selection.kat;
+    try { localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(selection)); } catch {}
+  }
+
+  function isViewerPlaying() {
+    return !!el.play && !el.play.disabled && el.play.getAttribute('aria-pressed') === 'true';
+  }
 
   async function hitsoundPack() {
     if (!packPromise) {
@@ -130,11 +155,25 @@
       originalFamily: 'My Sound',
       type: String(source?.type || ''),
       lastModified: Number(source?.lastModified) || Date.now(),
+      size: Number(source?.size) || bytes.byteLength,
+      fingerprint: String(source?.fingerprint || ''),
       slot: Number.isInteger(slot) ? slot : null,
       custom: true,
       bytes,
     };
     customSources.set(id, entry);
+    let restored = false;
+    for (const side of ['don', 'kat']) {
+      if (persistedSelection[side] === id && selection[side] !== id) {
+        selection[side] = id;
+        pendingSides.add(side);
+        restored = true;
+      }
+    }
+    if (restored) {
+      persistSelection();
+      emitSelection();
+    }
     return { ...entry };
   }
 
@@ -148,9 +187,10 @@
     if (affectedSides.length) {
       const serial = ++selectionSerial;
       affectedSides.forEach(side => {
-        selection[side] = null;
+        selection[side] = side === 'don' ? initialDon : initialKat;
         pendingSides.add(side);
       });
+      persistSelection();
       emitSelection();
       await applyPendingSelection(serial);
     }
@@ -172,7 +212,7 @@
   }
 
   function wasPlaying() {
-    return !!el.play && !el.play.disabled && el.play.textContent.trim() !== '▶';
+    return isViewerPlaying();
   }
 
   async function waitForViewerReady(timeoutMs = 30000) {
@@ -208,7 +248,7 @@
 
     if (resumeAfter) {
       const ready = await waitForRebuild(serial);
-      if (ready && serial === applySerial && el.play?.textContent.trim() === '▶') el.play.click();
+      if (ready && serial === applySerial && !isViewerPlaying()) el.play.click();
     }
     return true;
   }
@@ -232,7 +272,7 @@
     el.katInput.dispatchEvent(new Event('change', { bubbles: true }));
     if (!(await waitForRebuild(serial))) return false;
 
-    if (resumeAfter && serial === applySerial && el.play?.textContent.trim() === '▶') el.play.click();
+    if (resumeAfter && serial === applySerial && !isViewerPlaying()) el.play.click();
     return true;
   }
 
@@ -330,6 +370,7 @@
     pendingSides.add(side);
     stopPreview();
     selection[side] = id;
+    persistSelection();
     emitSelection();
 
     try {
@@ -348,6 +389,7 @@
         pendingSides.delete(side);
         stopPreview();
         selection[side] = previousId;
+        persistSelection();
         emitSelection();
       }
       throw error;
@@ -363,6 +405,7 @@
     pendingSides.add('kat');
     selection.don = donId;
     selection.kat = katId;
+    persistSelection();
     stopPreview();
     emitSelection();
 
@@ -397,6 +440,7 @@
 
   window.HitsoundController = {
     SILENT_ID,
+    SELECTION_STORAGE_KEY,
     byId,
     isValidSideId: validSideId,
     getSelection: () => ({ ...selection }),

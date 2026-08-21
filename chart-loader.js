@@ -77,6 +77,7 @@
   async function loadChart(chart) {
     const mySerial = ++serial;
     currentChart = chart;
+    window.CreateSEViewer?.resetChart?.('譜面読込中');
     keepChartInfoVisible();
     if (el.status) el.status.textContent = '譜面読込中';
     if (el.title) el.title.textContent = chart.title;
@@ -92,7 +93,8 @@
     setInputFile(el.oszInput, file);
     el.oszInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-    await waitForViewerReady(mySerial);
+    const ready = await waitForViewerReady(mySerial);
+    if (!ready && mySerial === serial) throw new Error('譜面の読み込みが完了しませんでした。通信状態を確認して再度選択してください。');
     enforceDisplay(chart);
   }
 
@@ -106,7 +108,9 @@
   el.select.addEventListener('change', async () => {
     const chart = CHARTS.find(x => x.id === el.select.value);
     if (!chart) {
+      serial++;
       currentChart = null;
+      window.CreateSEViewer?.resetChart?.('譜面を選択');
       keepChartInfoVisible();
       if (el.title) el.title.textContent = '—';
       if (el.difficulty) el.difficulty.textContent = '—';
@@ -116,8 +120,9 @@
       await loadChart(chart);
     } catch (error) {
       console.error(error);
-      if (el.status) el.status.textContent = 'エラー';
-      alert(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      window.CreateSEViewer?.resetChart?.('エラー');
+      window.CreateSEViewer?.reportError?.(message);
     }
   });
 

@@ -7,59 +7,54 @@
   <title>osu!taiko Hitsound Lab</title>
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
-  <link rel="stylesheet" href="./hitsound-grid.css?v=2.1-delete-memo">
-  <style>
-    .chart-field{display:block}.chart-field select{height:46px;min-height:46px;font-size:12px;font-weight:750}
-    .chart-info{display:flex;align-items:center;min-height:34px;margin-top:8px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden}
-    .chart-info strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.2}
-  </style>
+  <link rel="stylesheet" href="./hitsound-grid.css?v=3.0-workbench">
+  <link rel="stylesheet" href="./workbench.css?v=1.0">
 </head>
 <body>
+  <a class="skip-link" href="#auditionPanel">試聴・判断操作へ移動</a>
   <main class="app-shell">
     <header class="appbar">
       <div class="brand-block">
         <span class="brand-kicker">demon mami's</span>
         <h1>Hitsound Lab</h1>
       </div>
-      <span id="statusBadge" class="status-badge">待機中</span>
+      <span id="statusBadge" class="status-badge" role="status" aria-live="polite">譜面を選択</span>
     </header>
 
-    <section class="source-panel panel">
-      <label class="chart-field">
+    <section class="chart-bar panel" aria-label="譜面">
+      <label class="chart-field" for="chartSelect">
+        <span class="field-label">譜面</span>
         <select id="chartSelect" aria-label="譜面を選択">
           <option value="">譜面を選択</option>
         </select>
       </label>
 
-      <div class="chart-info" aria-label="難易度">
+      <div class="chart-info" aria-label="選択中の難易度">
+        <span class="field-label">難易度</span>
         <strong id="fixedDifficulty">—</strong>
         <span id="songTitle" hidden>—</span>
         <span id="songMeta" hidden>—</span>
       </div>
+    </section>
 
+    <div class="workbench">
+    <section class="source-panel panel" aria-label="Hitsound候補">
       <input id="oszInput" type="file" accept=".osz,.OSZ" hidden>
       <select id="difficultySelect" hidden disabled><option>固定難易度</option></select>
       <p id="fileName" hidden></p>
       <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
       <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
-      <input id="customHitsoundInput" type="file" accept="audio/*,.wav" hidden>
+      <input id="customHitsoundInput" type="file" accept=".wav,audio/wav" hidden>
 
       <div class="pair-builder" aria-label="Hitsound selector">
         <div class="hs-toolbar">
-          <button id="roleDonButton" class="hs-role-button don target" type="button" aria-label="DON割当先" aria-pressed="true"><span>Don</span></button>
-          <button id="roleKatButton" class="hs-role-button kat" type="button" aria-label="KAT割当先" aria-pressed="false"><span>Kat</span></button>
-
-          <div class="hs-toolbar-actions">
-            <button id="silentButton" class="hs-action-button compact" type="button" aria-label="選択中を無音にする"><span>—</span></button>
-            <button id="previewButton" class="hs-action-button compact" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>▶</span></button>
-            <button id="deleteCandidateButton" class="hs-action-button hs-delete-candidate-button" type="button" aria-label="選択中の内蔵音源を削除候補に追加" aria-pressed="false" disabled><span>候補</span></button>
-            <button id="favSetButton" class="hs-action-button" type="button" aria-label="現在の組み合わせをお気に入り登録" title="現在の組み合わせをお気に入り登録"><span class="hs-set-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 8a2 2 0 0 1-1.9 1.4H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9Z"/></svg></span></button>
-            <button id="exportFavoritesButton" class="hs-action-button" type="button" aria-label="CSV出力"><span>CSV</span></button>
+          <span class="hs-toolbar-label">操作対象</span>
+          <div class="role-switch" role="group" aria-label="候補の割当先">
+            <button id="roleDonButton" class="hs-role-button don target" type="button" aria-label="Donを操作対象にする" aria-pressed="true"><span><strong>Don</strong><small id="roleDonCurrent">—</small></span></button>
+            <button id="roleKatButton" class="hs-role-button kat" type="button" aria-label="Katを操作対象にする" aria-pressed="false"><span><strong>Kat</strong><small id="roleKatCurrent">—</small></span></button>
           </div>
         </div>
 
-        <div id="recommendationLine" class="hs-recommendation">推奨：—</div>
-        <div id="deleteCandidateLine" class="hs-delete-candidate-line" role="status" aria-live="polite">削除候補（0）：—</div>
         <div id="hitsoundGrid" data-active-side="don" aria-label="音源一覧">
           <section id="customSoundSection" class="hs-family hs-custom-family" aria-label="ユーザー音源">
             <div class="hs-family-title hs-custom-title">
@@ -67,49 +62,136 @@
               <span id="customSoundCount" aria-live="polite">0 / 4</span>
             </div>
             <div id="customSoundSlots" class="custom-sound-grid" aria-busy="true"></div>
+            <p id="mySoundStatus" class="inline-status" role="status" aria-live="polite">WAV・8MB以下・5秒以下</p>
           </section>
           <div id="hitsoundSources"></div>
-          <section id="savedSetsPanel" class="hs-family hs-favorite-family" aria-label="Favorite SET">
-            <div class="hs-family-title">Favorite</div>
-            <div id="savedSetsList" class="favorite-set-grid"></div>
+        </div>
+        <div id="recommendationLine" class="hs-recommendation">推奨：—</div>
+        <div id="deleteCandidateLine" class="hs-delete-candidate-line" role="status" aria-live="polite">削除候補（0）：—</div>
+      </div>
+    </section>
+
+    <aside id="auditionPanel" class="audition-panel panel" aria-label="試聴と判断" tabindex="-1">
+      <div class="dock-mini" aria-label="固定試聴Dock">
+        <button id="miniDonTarget" class="mini-current don" type="button" aria-label="Donを操作対象にする" aria-pressed="true"><span>Don</span><strong id="miniDonValue">—</strong></button>
+        <button id="previewButton" class="mini-play" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>再生</span></button>
+        <button id="miniKatTarget" class="mini-current kat" type="button" aria-label="Katを操作対象にする" aria-pressed="false"><span>Kat</span><strong id="miniKatValue">—</strong></button>
+        <div class="mini-state"><span id="miniLoopState">A–B 未設定</span><strong id="miniTimeDisplay">00:00:000</strong></div>
+        <button id="dockToggleButton" class="dock-toggle" type="button" aria-expanded="false" aria-controls="dockExpanded"><span>試聴パネルを開く</span></button>
+      </div>
+
+      <div id="dockExpanded" class="dock-expanded">
+        <div class="dock-heading">
+          <strong>試聴・判断</strong>
+          <button id="dockCollapseButton" class="dock-collapse" type="button"><span>収納</span></button>
+        </div>
+
+        <section class="current-pair" aria-labelledby="currentPairTitle">
+          <h2 id="currentPairTitle">現在の組み合わせ</h2>
+          <div class="current-pair-grid">
+            <article class="current-sound-card don" id="currentDonCard">
+              <button id="currentDonTarget" class="current-target" type="button" aria-pressed="true"><span>Don</span><strong id="currentDonValue">—</strong><small id="currentDonMeta">未選択</small></button>
+              <div class="current-card-actions">
+                <button id="previewDonButton" type="button" disabled>単音試聴</button>
+                <button id="muteDonButton" type="button" aria-pressed="false">Donを無音</button>
+              </div>
+            </article>
+            <article class="current-sound-card kat" id="currentKatCard">
+              <button id="currentKatTarget" class="current-target" type="button" aria-pressed="false"><span>Kat</span><strong id="currentKatValue">—</strong><small id="currentKatMeta">未選択</small></button>
+              <div class="current-card-actions">
+                <button id="previewKatButton" type="button" disabled>単音試聴</button>
+                <button id="muteKatButton" type="button" aria-pressed="false">Katを無音</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="editor-panel" aria-label="譜面再生">
+          <div class="transport-row">
+            <button id="backButton" class="transport-button" type="button" aria-label="4秒戻る" disabled>−4秒</button>
+            <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>再生</button>
+            <button id="forwardButton" class="transport-button" type="button" aria-label="4秒進む" disabled>＋4秒</button>
+          </div>
+
+          <div class="time-row" aria-label="再生時刻">
+            <strong id="timeDisplay" class="song-time">00:00:000</strong>
+            <span aria-hidden="true">/</span>
+            <span id="durationDisplay">00:00:000</span>
+          </div>
+
+          <section class="loop-panel" aria-label="A–B区間リピート">
+            <div class="loop-controls">
+              <button id="startMarkButton" type="button" disabled>Aを設定</button>
+              <span id="startMarkValue">A 未設定</span>
+              <button id="endMarkButton" type="button" disabled>Bを設定</button>
+              <span id="endMarkValue">B 未設定</span>
+            </div>
+            <div class="loop-actions">
+              <button id="loopToggleButton" type="button" aria-pressed="false" disabled>リピート OFF</button>
+              <button id="clearLoopButton" type="button" disabled>解除</button>
+              <span id="rangeLength" class="range-length">—</span>
+            </div>
+            <p id="loopStatus" class="inline-status" role="status" aria-live="polite">AとBを設定してください</p>
           </section>
-        </div>
+
+          <div id="timelineViewport" class="timeline-viewport" aria-label="現在位置周辺のTaikoヒットポイント">
+            <canvas id="timelineStaticCanvas" class="timeline-static" aria-hidden="true"></canvas>
+            <canvas id="timelineCursorCanvas" class="timeline-cursor" aria-hidden="true"></canvas>
+          </div>
+
+          <div id="overviewViewport" class="overview-viewport" aria-label="曲全体のタイムライン">
+            <canvas id="overviewStaticCanvas" class="overview-static" aria-hidden="true"></canvas>
+            <canvas id="overviewCursorCanvas" class="overview-cursor" aria-hidden="true"></canvas>
+          </div>
+
+          <label class="seek-label" for="seekBar">曲の位置</label>
+          <input id="seekBar" class="seek-bar" type="range" min="0" max="1" step="0.001" value="0" aria-valuetext="0秒000" disabled>
+
+          <div class="zoom-controls compact-zoom" role="group" aria-label="タイムラインのズーム">
+            <button id="zoomOutButton" type="button" aria-label="ズームアウト" disabled>−</button>
+            <span id="zoomLabel" class="zoom-label">±0.5秒</span>
+            <button id="zoomInButton" type="button" aria-label="ズームイン" disabled>＋</button>
+          </div>
+        </section>
+
+        <section class="judgment-panel" aria-label="候補の判断">
+          <h2>判断</h2>
+          <div class="judgment-actions">
+            <button id="favSetButton" class="favorite-action" type="button" aria-label="現在のDonとKatをFavoriteへ追加" aria-pressed="false" disabled>Favoriteへ追加</button>
+            <button id="deleteCandidateButton" class="delete-action" type="button" aria-label="現在の候補を削除候補にする" aria-pressed="false" disabled>削除候補にする</button>
+            <button id="favoriteOpenButton" class="secondary-action" type="button" aria-haspopup="dialog">Favoriteを開く <span id="favoriteCount">0</span></button>
+          </div>
+          <div id="setFeedback" class="set-feedback" role="status" aria-live="polite"></div>
+          <div id="workbenchStatus" class="workbench-status" role="status" aria-live="polite">候補を選択して比較を開始できます</div>
+        </section>
       </div>
-    </section>
+    </aside>
+    </div>
 
-    <section class="editor-panel panel" aria-label="譜面再生">
-      <div id="timelineViewport" class="timeline-viewport" aria-label="現在位置周辺のTaikoヒットポイント">
-        <canvas id="timelineStaticCanvas" class="timeline-static"></canvas>
-        <canvas id="timelineCursorCanvas" class="timeline-cursor"></canvas>
-      </div>
-
-      <div id="overviewViewport" class="overview-viewport" aria-label="曲全体">
-        <canvas id="overviewStaticCanvas" class="overview-static"></canvas>
-        <canvas id="overviewCursorCanvas" class="overview-cursor"></canvas>
-        <span id="timeDisplay" class="song-time">00:00:000</span>
-      </div>
-
-      <input id="seekBar" class="seek-bar" type="range" min="0" max="1" step="0.001" value="0" disabled>
-
-      <div class="editor-control-grid">
-        <div class="transport-row">
-          <button id="backButton" class="transport-button" type="button" disabled>−4s</button>
-          <button id="playButton" class="play-button" type="button" disabled>▶</button>
-          <button id="forwardButton" class="transport-button" type="button" disabled>+4s</button>
-        </div>
-        <div class="zoom-controls compact-zoom">
-          <button id="zoomOutButton" type="button" disabled>−</button>
-          <span id="zoomLabel" class="zoom-label">±0.5s</span>
-          <button id="zoomInButton" type="button" disabled>＋</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="errorCard" class="error-panel panel" hidden>
+    <section id="errorCard" class="error-panel panel" role="alert" hidden>
       <strong>読み込みエラー</strong>
       <p id="errorMessage"></p>
     </section>
   </main>
+
+  <div id="favoriteSheet" class="favorite-sheet" hidden>
+    <button class="favorite-backdrop" type="button" data-close-favorites aria-label="Favoriteを閉じる"></button>
+    <section id="savedSetsPanel" class="favorite-dialog" role="dialog" aria-modal="true" aria-labelledby="favoriteSheetTitle">
+      <header class="favorite-dialog-head">
+        <div>
+          <span class="field-label">保存した組み合わせ</span>
+          <h2 id="favoriteSheetTitle">Favorite</h2>
+        </div>
+        <button id="favoriteCloseButton" type="button" data-close-favorites>閉じる</button>
+      </header>
+      <div class="favorite-dialog-actions">
+        <button id="exportFavoritesButton" type="button">CSV出力</button>
+      </div>
+      <p id="favoriteEmpty" class="favorite-empty">Favoriteはまだありません</p>
+      <div id="savedSetsList" class="favorite-set-grid"></div>
+      <div id="favoriteSheetStatus" class="inline-status" role="status" aria-live="polite"></div>
+    </section>
+  </div>
 
   <audio id="samplePreviewAudio" preload="none"></audio>
   <script>
@@ -118,9 +200,6 @@
       const versionKey = 'CreateSE:dataset-version';
       try {
         if (localStorage.getItem(versionKey) !== datasetVersion) {
-          localStorage.removeItem('osutaiko-hitsound-lab:pinned-sources:v1');
-          localStorage.removeItem('osutaiko-hitsound-lab-favorites-v1');
-          localStorage.removeItem('osutaiko-hitsound-lab:deletion-candidates:v1');
           localStorage.setItem(versionKey, datasetVersion);
         }
       } catch {}
@@ -131,11 +210,12 @@
   <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.3-15charts"></script>
   <script src="./audio-ducking-bridge.js?v=1.1-music-070"></script>
-  <script src="./app-v4.js?v=2.2-music-070"></script>
+  <script src="./app-v4.js?v=3.0-workbench"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
-  <script src="./hitsound-controller.js?v=2.0-single-base-116"></script>
-  <script src="./hitsound-favorites.js?v=2.0-single-base-116"></script>
-  <script src="./hitsound-grid.js?v=2.1-delete-memo"></script>
-  <script src="./chart-loader.js?v=0.5-direct-maps"></script>
+  <script src="./hitsound-controller.js?v=3.0-workbench"></script>
+  <script src="./hitsound-favorites.js?v=3.0-workbench"></script>
+  <script src="./hitsound-grid.js?v=3.0-workbench"></script>
+  <script src="./workbench-ui.js?v=1.0"></script>
+  <script src="./chart-loader.js?v=0.6-state-safe"></script>
 </body>
 </html>

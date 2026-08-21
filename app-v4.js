@@ -13,6 +13,9 @@
   const MAX_HITSOUND_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_HITSOUND_DURATION_SEC = 5;
   const MAX_DECODED_HITSOUND_CACHE = 8;
+  const SKIP_SEC = 4;
+  const LOOP_MIN_MS = 500;
+  const LOOP_MAX_MS = 30000;
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
@@ -25,8 +28,10 @@
     oszInput: $('oszInput'), fileName: $('fileName'), status: $('statusBadge'),
     diff: $('difficultySelect'), songTitle: $('songTitle'), songMeta: $('songMeta'), samplePolicy: $('samplePolicy'),
     donHsInput: $('donHitsoundInput'), kaHsInput: $('kaHitsoundInput'),
-    time: $('timeDisplay'), copyTime: $('copyTimeButton'),
-    start: $('startMarkButton'), end: $('endMarkButton'), length: $('rangeLength'),
+    time: $('timeDisplay'), duration: $('durationDisplay'), copyTime: $('copyTimeButton'),
+    start: $('startMarkButton'), startValue: $('startMarkValue'),
+    end: $('endMarkButton'), endValue: $('endMarkValue'), length: $('rangeLength'),
+    loopToggle: $('loopToggleButton'), clearLoop: $('clearLoopButton'), loopStatus: $('loopStatus'),
     back: $('backButton'), play: $('playButton'), fwd: $('forwardButton'), seek: $('seekBar'),
     zoomOut: $('zoomOutButton'), zoomIn: $('zoomInButton'), zoomLabel: $('zoomLabel'),
     timelineViewport: $('timelineViewport'), timelineStatic: $('timelineStaticCanvas'), timelineCursor: $('timelineCursorCanvas'),
@@ -40,6 +45,8 @@
   let map = null;
   let startMark = null;
   let endMark = null;
+  let loopEnabled = false;
+  let loopSeekPending = false;
   let zoom = 0;
   let ready = false;
   let raf = 0;
@@ -87,7 +94,11 @@
   const durationSec = () => musicBuffer ? musicBuffer.duration : 0;
   const durationMs = () => durationSec() * 1000;
   const spanMs = () => SPANS_MS[zoom];
-  const validRange = () => !!(startMark && endMark && endMark.time >= startMark.time);
+  const rangeDurationMs = () => startMark && endMark ? endMark.time - startMark.time : NaN;
+  const validRange = () => {
+    const length = rangeDurationMs();
+    return Number.isFinite(length) && length >= LOOP_MIN_MS && length <= LOOP_MAX_MS;
+  };
   const css = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
   const clampSec = value => {
     const d = durationSec();
@@ -120,6 +131,14 @@
 
   const fmtLen = ms => Number.isFinite(ms) && ms >= 0 ? `${(ms / 1000).toFixed(3)} s` : '—';
 
+  function setPlayState(nextPlaying) {
+    if (!el.play) return;
+    el.play.textContent = nextPlaying ? '一時停止' : '再生';
+    el.play.setAttribute('aria-pressed', nextPlaying ? 'true' : 'false');
+    el.play.setAttribute('aria-label', nextPlaying ? '曲を一時停止' : '曲を再生');
+    window.dispatchEvent(new CustomEvent('viewer-play-state', { detail: { playing: nextPlaying } }));
+  }
+
   function outputText() {
     if (!map) return '**曲名：—**\n用途：—\n難易度：**—**\n区間：—（Fade-in/out：含まない）';
     const title = map.metadata.TitleUnicode || map.metadata.Title || 'Untitled';
@@ -140,13 +159,40 @@
   function updateRange() {
     if (el.start) {
       el.start.classList.toggle('marked', !!startMark);
-      el.start.textContent = startMark ? 'START ✓' : 'START';
+      el.start.textContent = startMark ? 'Aを更新' : 'Aを設定';
     }
     if (el.end) {
       el.end.classList.toggle('marked', !!endMark);
-      el.end.textContent = endMark ? 'END ✓' : 'END';
+      el.end.textContent = endMark ? 'Bを更新' : 'Bを設定';
+      el.end.disabled = !ready || !startMark;
     }
-    if (el.length) el.length.textContent = validRange() ? fmtLen(endMark.time - startMark.time) : '—';
+    if (el.startValue) el.startValue.textContent = startMark ? `A ${fmt(startMark.time)}` : 'A 未設定';
+    if (el.endValue) el.endValue.textContent = endMark ? `B ${fmt(endMark.time)}` : 'B 未設定';
+    if (el.length) el.length.textContent = validRange() ? fmtLen(rangeDurationMs()) : '—';
+    if (!validRange()) loopEnabled = false;
+    if (el.loopToggle) {
+      el.loopToggle.disabled = !ready || !validRange();
+      el.loopToggle.setAttribute('aria-pressed', loopEnabled ? 'true' : 'false');
+      el.loopToggle.textContent = `リピート ${loopEnabled ? 'ON' : 'OFF'}`;
+    }
+    if (el.clearLoop) el.clearLoop.disabled = !ready || (!startMark && !endMark);
+    if (el.loopStatus) {
+      const length = rangeDurationMs();
+      if (!startMark) el.loopStatus.textContent = 'Aを設定してください';
+      else if (!endMark) el.loopStatus.textContent = 'Bを設定してください（0.500〜30.000秒）';
+      else if (length < LOOP_MIN_MS) el.loopStatus.textContent = '区間は0.500秒以上にしてください';
+      else if (length > LOOP_MAX_MS) el.loopStatus.textContent = '区間は30.000秒以下にしてください';
+      else el.loopStatus.textContent = loopEnabled ? `${fmtLen(length)}を反復中` : `${fmtLen(length)}を反復できます`;
+    }
+    window.dispatchEvent(new CustomEvent('viewer-loop-change', {
+      detail: {
+        startMs: startMark?.time ?? null,
+        endMs: endMark?.time ?? null,
+        durationMs: validRange() ? rangeDurationMs() : null,
+        valid: validRange(),
+        enabled: loopEnabled,
+      }
+    }));
     updateOutput();
     if (map && musicBuffer) renderSongStatic();
   }
@@ -154,14 +200,33 @@
   function resetRange() {
     startMark = null;
     endMark = null;
+    loopEnabled = false;
     updateRange();
   }
 
   function toggleMark(which) {
     if (!map || !musicBuffer) return;
     const point = { time: Math.round(audiblePosition() * 1000) };
-    if (which === 'start') startMark = startMark ? null : point;
-    else endMark = endMark ? null : point;
+    if (which === 'start') {
+      startMark = point;
+      endMark = null;
+      loopEnabled = false;
+    } else {
+      if (!startMark) return;
+      const length = point.time - startMark.time;
+      if (length < LOOP_MIN_MS || length > LOOP_MAX_MS) {
+        endMark = null;
+        loopEnabled = false;
+      } else {
+        endMark = point;
+      }
+    }
+    updateRange();
+  }
+
+  function toggleLoop() {
+    if (!validRange()) return;
+    loopEnabled = !loopEnabled;
     updateRange();
   }
 
@@ -568,13 +633,18 @@
       try { source.disconnect(); } catch {}
     }
     playing = false;
-    if (el.play) el.play.textContent = '▶';
+    setPlayState(false);
   }
 
   async function startPlayback(offset) {
     if (!musicBuffer || !hitsoundsReady || !map) return;
     await ensureContext(true);
-    const startAt = clampSec(offset);
+    const requested = clampSec(offset);
+    const loopStart = startMark ? startMark.time / 1000 : 0;
+    const loopEnd = endMark ? endMark.time / 1000 : 0;
+    const startAt = loopEnabled && validRange() && (requested < loopStart || requested >= loopEnd)
+      ? loopStart
+      : requested;
     pausedOffset = startAt >= durationSec() - 0.001 ? 0 : startAt;
     stopSources();
 
@@ -591,7 +661,7 @@
     const generation = ++sourceGeneration;
     musicSource = musicNode;
     playing = true;
-    if (el.play) el.play.textContent = '❚❚';
+    setPlayState(true);
     startEffectScheduler(transportOffset);
 
     musicSource.onended = () => {
@@ -602,7 +672,7 @@
       stopEffectVoices();
       playing = false;
       if (reachedEnd) pausedOffset = durationSec();
-      if (el.play) el.play.textContent = '▶';
+      setPlayState(false);
     };
   }
 
@@ -612,8 +682,16 @@
     stopSources();
   }
 
-  async function seekTo(target) {
+  async function seekTo(target, { fromLoop = false } = {}) {
     const next = clampSec(target);
+    if (!fromLoop && loopEnabled && validRange()) {
+      const start = startMark.time / 1000;
+      const end = endMark.time / 1000;
+      if (next < start || next >= end) {
+        loopEnabled = false;
+        updateRange();
+      }
+    }
     const wasPlaying = playing;
     if (wasPlaying) pausedOffset = enginePosition();
     stopSources();
@@ -683,9 +761,10 @@
 
   function setControls(enabled) {
     ready = enabled;
-    [el.play, el.back, el.fwd, el.seek, el.copyTime, el.start, el.end].forEach(node => {
+    [el.play, el.back, el.fwd, el.seek, el.copyTime, el.start].forEach(node => {
       if (node) node.disabled = !enabled;
     });
+    updateRange();
     updateZoom();
     updateOutput();
   }
@@ -711,8 +790,10 @@
       if (el.seek) {
         el.seek.max = String(durationSec());
         el.seek.value = '0';
+        el.seek.setAttribute('aria-valuetext', '00:00:000');
       }
       if (el.time) el.time.textContent = '00:00:000';
+      if (el.duration) el.duration.textContent = fmt(durationMs());
       pausedOffset = 0;
       setControls(true);
       setStatus('準備完了');
@@ -746,9 +827,8 @@
     musicName = '';
     map = null;
     maps = [];
-    startMark = null;
-    endMark = null;
-    updateRange();
+    resetRange();
+    if (el.duration) el.duration.textContent = '00:00:000';
     setControls(false);
     if (el.diff) {
       el.diff.disabled = true;
@@ -1095,7 +1175,10 @@
   function syncVisualToPosition() {
     const p = audiblePosition();
     if (el.time) el.time.textContent = fmt(p * 1000);
-    if (!seekScrub && el.seek) el.seek.value = String(p);
+    if (!seekScrub && el.seek) {
+      el.seek.value = String(p);
+      el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
+    }
     renderObjectAt(p);
     drawSongCursor(p);
   }
@@ -1125,8 +1208,17 @@
 
   function frame(now) {
     const p = audiblePosition();
+    if (playing && loopEnabled && validRange() && !loopSeekPending && p >= endMark.time / 1000) {
+      loopSeekPending = true;
+      seekTo(startMark.time / 1000, { fromLoop: true })
+        .catch(error => fail(error instanceof Error ? error.message : '区間を繰り返せませんでした。'))
+        .finally(() => { loopSeekPending = false; });
+    }
     if (el.time) el.time.textContent = fmt(p * 1000);
-    if (!seekScrub && !timelineScrub && !overviewScrub && el.seek) el.seek.value = String(p);
+    if (!seekScrub && !timelineScrub && !overviewScrub && el.seek) {
+      el.seek.value = String(p);
+      el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
+    }
     renderObjectAt(p);
     drawSongCursor(p);
     renderDebug(now);
@@ -1148,8 +1240,19 @@
 
   function scrubTo(targetSec) {
     pausedOffset = clampSec(targetSec);
+    if (loopEnabled && validRange()) {
+      const start = startMark.time / 1000;
+      const end = endMark.time / 1000;
+      if (pausedOffset < start || pausedOffset >= end) {
+        loopEnabled = false;
+        updateRange();
+      }
+    }
     if (el.time) el.time.textContent = fmt(pausedOffset * 1000);
-    if (el.seek) el.seek.value = String(pausedOffset);
+    if (el.seek) {
+      el.seek.value = String(pausedOffset);
+      el.seek.setAttribute('aria-valuetext', fmt(pausedOffset * 1000));
+    }
     renderObjectAt(pausedOffset);
     drawSongCursor(pausedOffset);
   }
@@ -1192,14 +1295,16 @@
       fail(error instanceof Error ? error.message : '再生できませんでした。');
     }
   });
-  el.back?.addEventListener('click', () => seekTo(audiblePosition() - 5));
-  el.fwd?.addEventListener('click', () => seekTo(audiblePosition() + 5));
+  el.back?.addEventListener('click', () => seekTo(audiblePosition() - SKIP_SEC));
+  el.fwd?.addEventListener('click', () => seekTo(audiblePosition() + SKIP_SEC));
   el.copyTime?.addEventListener('click', event => {
     event.stopPropagation();
     copy(fmt(audiblePosition() * 1000), el.copyTime);
   });
   el.start?.addEventListener('click', () => toggleMark('start'));
   el.end?.addEventListener('click', () => toggleMark('end'));
+  el.loopToggle?.addEventListener('click', toggleLoop);
+  el.clearLoop?.addEventListener('click', resetRange);
   el.purpose?.addEventListener('change', updateOutput);
   el.fade?.addEventListener('change', updateOutput);
   el.copyOut?.addEventListener('click', () => {
@@ -1285,6 +1390,33 @@
     await endScrub(state);
   });
 
+  function resetChart(statusText = '譜面を選択') {
+    stopSources();
+    zip = null;
+    maps = [];
+    map = null;
+    musicBuffer = null;
+    hitsoundsReady = false;
+    musicName = '';
+    pausedOffset = 0;
+    resetRange();
+    setControls(false);
+    if (el.seek) {
+      el.seek.max = '1';
+      el.seek.value = '0';
+      el.seek.setAttribute('aria-valuetext', '00:00:000');
+    }
+    if (el.time) el.time.textContent = '00:00:000';
+    if (el.duration) el.duration.textContent = '00:00:000';
+    for (const canvas of [el.timelineStatic, el.timelineCursor, el.overviewStatic, el.overviewCursor]) {
+      if (!canvas) continue;
+      const context = canvas.getContext('2d');
+      context?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    clearError();
+    setStatus(statusText);
+  }
+
   const redraw = () => {
     if (!map || !musicBuffer) return;
     renderSongStatic();
@@ -1319,9 +1451,28 @@
       decodedHitsounds: decodedHitsoundCache.size,
       nextHitIndex: nextEffectHitIndex,
     }),
+    skipSeconds: SKIP_SEC,
+    loopState: () => ({
+      startMs: startMark?.time ?? null,
+      endMs: endMark?.time ?? null,
+      valid: validRange(),
+      enabled: loopEnabled,
+    }),
+  };
+
+  window.CreateSEViewer = {
+    resetChart,
+    reportError: message => fail(String(message || '読み込みに失敗しました。')),
+    loopState: () => ({
+      startMs: startMark?.time ?? null,
+      endMs: endMark?.time ?? null,
+      valid: validRange(),
+      enabled: loopEnabled,
+    }),
   };
 
   updateRange();
   updateZoom();
+  setPlayState(false);
   raf = requestAnimationFrame(frame);
 })();
