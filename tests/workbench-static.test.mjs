@@ -64,6 +64,27 @@ test('responsive split and touch target tokens are present', () => {
   assert.doesNotMatch(css, /幅375px以上で利用してください/);
 });
 
+test('compact visible copy keeps accessible labels and CSS-only dock icons', () => {
+  assert.doesNotMatch(html, />試聴・判断</);
+  assert.doesNotMatch(html, /<span>収納<\/span>|<span>展開<\/span>/);
+  assert.match(html, /id="dockToggleButton"[^>]*aria-label="試聴パネルを展開"/);
+  assert.match(html, /id="dockCollapseButton"[^>]*aria-label="試聴パネルを収納"/);
+  assert.match(html, /id="statusBadge" class="status-badge sr-only"/);
+  assert.match(html, /id="recommendationLine" class="hs-recommendation sr-only"/);
+  assert.match(html, /id="deleteCandidateLine" class="hs-delete-candidate-line sr-only"/);
+  assert.doesNotMatch(workbench, /\$\{activeSide === 'don' \? 'Don' : 'Kat'\} 操作中/);
+  assert.doesNotMatch(workbench, /A–B \$\{detail\.enabled \? '反復中' : '設定済み'\}/);
+  assert.match(css, /\.dock-toggle \.dock-icon\{[^}]*border:2px solid currentColor/);
+  assert.match(css, /\.dock-collapse \.dock-icon\{[^}]*height:2px/);
+});
+
+test('transport spacing is relaxed and Dock transitions shield the candidate layer', () => {
+  assert.match(css, /\.transport-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 92px minmax\(0,1fr\);gap:10px/);
+  assert.match(css, /\.transport-row\{grid-template-columns:minmax\(0,1fr\) 96px minmax\(0,1fr\);gap:10px/);
+  assert.doesNotMatch(css, /\.audition-panel\.is-transitioning\{pointer-events:none\}/);
+  assert.match(css, /\.audition-panel\.is-transitioning \.dock-mini,\.audition-panel\.is-transitioning \.dock-expanded\{pointer-events:none!important\}/);
+});
+
 test('active Don or Kat has a static neon gradient without a continuous animation', () => {
   assert.match(css, /background:conic-gradient\(from 215deg/);
   assert.doesNotMatch(css, /active-border-orbit|--active-glow-angle|--active-border-loop/);

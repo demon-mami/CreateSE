@@ -181,7 +181,6 @@
     auditionPanel.classList.toggle('is-expanded', expanded);
     dockToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     dockToggle.setAttribute('aria-label', expanded ? '試聴パネルを収納' : '試聴パネルを展開');
-    dockToggle.querySelector('span').textContent = expanded ? '収納' : '展開';
     if (expanded && moveFocus) auditionPanel.focus({ preventScroll: true });
     if (!expanded && moveFocus) dockToggle.focus({ preventScroll: true });
 
@@ -342,13 +341,13 @@
     }
     activeSide = nextSide;
     syncActiveSide();
-    if (workbenchStatus) workbenchStatus.textContent = `${activeSide === 'don' ? 'Don' : 'Kat'} 操作中`;
+    if (workbenchStatus) workbenchStatus.textContent = '';
     restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);
   window.addEventListener('viewer-loop-change', event => {
     const detail = event.detail || {};
-    setText('miniLoopState', detail.valid ? `A–B ${detail.enabled ? '反復中' : '設定済み'}` : 'A–B 未設定');
+    setText('miniLoopState', detail.valid ? (detail.enabled ? 'A–B 反復中' : '') : 'A–B 未設定');
   });
   window.addEventListener('hitsound-saved-sets-change', () => {
     const length = window.HitsoundFavorites?.readSets?.().length || 0;
