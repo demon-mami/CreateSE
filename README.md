@@ -30,13 +30,23 @@ Don / Katの現在側で選択している内蔵音源を、実際には削除�
 
 ## テスト譜面
 
-以下5譜面を固定選択できます。
+以下15譜面を固定選択できます。追加10譜面は選択した1曲分だけを取得するため、全譜面を一括展開しません。
 
 - What Hurts The Most (Topmodelz ReMix) — `Gomen Yuuka [1.4x Rate]`
 - Over the Fullereneshift — `Eternity`
 - navi 98 — `genjuro's hell oni`
 - Tool-Assisted Speedcore (TQBF Frame Advance RMX) — `Frame Perfect`
 - Sunglow (Sped Up Ver.) — `Blazing Hope of the Dazzling Sun`
+- Everytime We Touch [Fvrwvrd's 700 BPM Speedcore Edit] — `ler's Elite Rizz`
+- ファジィフューチャー — `Future`
+- Paralysis — `Roxy- & Maeda's Hell Oni`
+- 迷える音色は恋の唄 — `Melodic Romance`
+- A flying Dance Hall — `Skyglide Pavilion`
+- monochrome (Asterisk Makina Remix) — `Kaleidoscope`
+- Pacific Girls — `Hell Oni`
+- 草草！ミミカ — `kusa sugite kusa`
+- 才能シュレッダー — `ll-taiko Sp.`
+- 12^2x3.14-13 — `13 Hours of Love`
 
 ## GitHub Pages
 
