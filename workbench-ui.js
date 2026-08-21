@@ -311,7 +311,7 @@
     activeSide = nextSide;
     syncActiveSide();
     if (workbenchStatus) workbenchStatus.textContent = `${activeSide === 'don' ? 'Don' : 'Kat'}を操作対象にしました`;
-    requestAnimationFrame(restoreCandidatePosition);
+    restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);
   window.addEventListener('viewer-loop-change', event => {

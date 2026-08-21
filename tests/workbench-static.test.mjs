@@ -52,4 +52,5 @@ test('Don and Kat preserve independent candidate scroll positions', () => {
   assert.match(workbench, /scrollTop: Math\.max\(0, sourcePanel\.scrollTop\)/);
   assert.match(workbench, /sourcePanel\.scrollTop = Math\.max\(0, saved\.scrollTop\)/);
   assert.match(workbench, /clearTimeout\(savePositionTimer\);\s+saveCandidatePosition\(activeSide\);/);
+  assert.match(workbench, /activeSide = nextSide;\s+syncActiveSide\(\);[\s\S]*?restoreCandidatePosition\(\);/);
 });
