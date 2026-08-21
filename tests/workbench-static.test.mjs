@@ -127,6 +127,7 @@ test('candidate and playback panes use distinct requested base colors', () => {
   assert.match(css, /--playback-pane-base:#ed7855/);
   assert.match(css, /\.source-panel\{[\s\S]*?rgba\(10,198,215,\.30\)/);
   assert.match(css, /\.audition-panel\{[\s\S]*?rgba\(237,120,85,\.30\)/);
+  assert.doesNotMatch(css, /rgba\(25,78,86,0\)/);
 });
 
 test('timeline notes are reduced in both visible and fallback renderers', () => {
