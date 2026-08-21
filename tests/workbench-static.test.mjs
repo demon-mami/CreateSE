@@ -11,6 +11,7 @@ const favorites = read('hitsound-favorites.js');
 const workbench = read('workbench-ui.js');
 const css = read('workbench.css');
 const timeline = read('object-timeline-v2.js');
+const pages = read('.github/workflows/pages.yml');
 
 test('required workbench controls have unique IDs', () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
@@ -43,6 +44,9 @@ test('audio levels are fixed and preview ducking is fully removed', () => {
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
   assert.doesNotMatch(controller, /DuckingBridge|setPreviewDucking/);
   assert.doesNotMatch(html, /audio-ducking-bridge\.js/);
+  assert.doesNotMatch(pages, /audio-ducking-bridge\.js/);
+  assert.match(pages, /cp workbench\.css _site\//);
+  assert.match(pages, /cp workbench-ui\.js _site\//);
   assert.equal(existsSync(new URL('../audio-ducking-bridge.js', import.meta.url)), false);
 });
 

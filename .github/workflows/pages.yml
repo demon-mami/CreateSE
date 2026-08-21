@@ -43,15 +43,16 @@ jobs:
           cp style.css _site/
           cp theme-col07.css _site/
           cp hitsound-grid.css _site/
+          cp workbench.css _site/
           cp candidates.js _site/
           cp candidate-numbering.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
-          cp audio-ducking-bridge.js _site/
           cp app-v4.js _site/
           cp hitsound-controller.js _site/
           cp hitsound-favorites.js _site/
           cp hitsound-grid.js _site/
+          cp workbench-ui.js _site/
           cp object-timeline-v2.js _site/
           cp hitsounds-single-base-116.zip _site/
           cp maps.zip _site/
