@@ -129,6 +129,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 .favorite-dialog-actions{display:flex;justify-content:flex-end;margin:10px 0}.favorite-dialog-actions button{padding:0 18px}
 .favorite-set-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
 .favorite-set-item{display:grid;grid-template-columns:1fr 52px;gap:6px}
+.favorite-set-reason{grid-column:1/-1;color:#ffd0d2;font-size:11px;line-height:1.4}
 .favorite-set-apply,.favorite-set-delete{position:static!important;width:auto!important;min-width:44px!important;padding:0!important}
 .favorite-set-apply>span,.favorite-set-delete>span{height:44px!important;padding:0 10px!important;border-radius:9px!important}
 .favorite-set-delete>span{color:#ffd0d2!important;background:rgba(121,48,55,.34)!important}

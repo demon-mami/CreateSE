@@ -232,6 +232,7 @@
       const item = document.createElement('div');
       item.className = 'favorite-set-item';
       const state = entryAvailability(entry);
+      item.classList.toggle('unavailable', !state.ok);
 
       const applyButton = document.createElement('button');
       applyButton.type = 'button';
@@ -254,6 +255,12 @@
       deleteButton.append(deleteFace);
 
       item.append(applyButton, deleteButton);
+      if (!state.ok) {
+        const reason = document.createElement('small');
+        reason.className = 'favorite-set-reason';
+        reason.textContent = state.reason;
+        item.append(reason);
+      }
       list.append(item);
     }
     if (empty) empty.hidden = sets.length > 0;

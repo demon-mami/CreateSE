@@ -401,6 +401,8 @@
     roleKatButton.setAttribute('aria-pressed', activeSide === 'kat' ? 'true' : 'false');
     roleDonButton.title = selection.don === SILENT_ID ? 'Don: 無音' : `Don: ${donSource?.sourceNumber || '—'}`;
     roleKatButton.title = selection.kat === SILENT_ID ? 'Kat: 無音' : `Kat: ${katSource?.sourceNumber || '—'}`;
+    roleDonButton.setAttribute('aria-label', `Donを操作対象にする。現在${selection.don === SILENT_ID ? '無音' : (donSource?.sourceNumber || '未選択')}`);
+    roleKatButton.setAttribute('aria-label', `Katを操作対象にする。現在${selection.kat === SILENT_ID ? '無音' : (katSource?.sourceNumber || '未選択')}`);
     if (roleDonCurrent) roleDonCurrent.textContent = selection.don === SILENT_ID ? '無音' : (donSource?.sourceNumber || '未選択');
     if (roleKatCurrent) roleKatCurrent.textContent = selection.kat === SILENT_ID ? '無音' : (katSource?.sourceNumber || '未選択');
 
@@ -417,6 +419,11 @@
       button.classList.toggle('selected-don', id === selection.don);
       button.classList.toggle('selected-kat', id === selection.kat);
       button.setAttribute('aria-pressed', id === selection[activeSide] ? 'true' : 'false');
+      const states = [
+        id === selection.don ? '現在のDon' : '',
+        id === selection.kat ? '現在のKat' : '',
+      ].filter(Boolean);
+      button.setAttribute('aria-description', states.join('。'));
     });
 
     if (silentButton) {

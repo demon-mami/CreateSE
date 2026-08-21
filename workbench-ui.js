@@ -67,6 +67,10 @@
       setText(`mini${cap}Value`, label.number);
       setText(`current${cap}Value`, label.number);
       setText(`current${cap}Meta`, `${label.family}${label.family ? ' · ' : ''}${label.name}`);
+      for (const targetId of [`mini${cap}Target`, `current${cap}Target`]) {
+        const target = $(targetId);
+        if (target) target.setAttribute('aria-label', `${cap}を操作対象にする。現在${label.number} ${label.name}`);
+      }
       const muted = id === SILENT_ID;
       const mute = $(`mute${cap}Button`);
       if (mute) {
@@ -120,6 +124,12 @@
       const pressed = active && previewingSide === side;
       button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
       button.textContent = pressed ? '単音を停止' : '単音試聴';
+      if (pressed) button.setAttribute('aria-label', `${cap}の単音試聴を停止`);
+      else {
+        const selectedId = controller.getSelection()[side];
+        const label = sourceLabel(selectedId);
+        button.setAttribute('aria-label', selectedId === SILENT_ID ? `${cap}は無音です` : `${cap} ${label.number} を単音試聴`);
+      }
     }
     if (!active) previewingSide = null;
   }
