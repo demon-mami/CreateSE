@@ -110,16 +110,29 @@
   </main>
 
   <audio id="samplePreviewAudio" preload="none"></audio>
+  <script>
+    (() => {
+      const datasetVersion = 'v1.2-116';
+      const versionKey = 'CreateSE:dataset-version';
+      try {
+        if (localStorage.getItem(versionKey) !== datasetVersion) {
+          localStorage.removeItem('osutaiko-hitsound-lab:pinned-sources:v1');
+          localStorage.removeItem('osutaiko-hitsound-lab-favorites-v1');
+          localStorage.setItem(versionKey, datasetVersion);
+        }
+      } catch {}
+    })();
+  </script>
   <script src="./vendor/jszip.min.js?v=3.10.1"></script>
-  <script src="./candidates.js?v=0.1"></script>
-  <script src="./candidate-numbering.js?v=1.2"></script>
+  <script src="./candidates.js?v=1.2"></script>
+  <script src="./candidate-numbering.js?v=2.0"></script>
   <script src="./charts.js?v=0.2"></script>
   <script src="./audio-ducking-bridge.js?v=1.0"></script>
   <script src="./app-v4.js?v=2.0"></script>
   <script src="./object-timeline-v2.js?v=viewer-exact-20260819"></script>
   <script src="./hitsound-controller.js?v=1.9"></script>
-  <script src="./hitsound-favorites.js?v=1.4"></script>
-  <script src="./hitsound-grid.js?v=1.9"></script>
+  <script src="./hitsound-favorites.js?v=1.4-dataset12"></script>
+  <script src="./hitsound-grid.js?v=1.9-dataset12"></script>
   <script src="./chart-loader.js?v=0.4"></script>
 </body>
 </html>
