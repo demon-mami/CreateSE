@@ -76,6 +76,7 @@ test('iPhone Dock morphs between mini and expanded states without hiding control
   assert.match(css, /\.audition-panel\.is-expanded \.dock-expanded\{opacity:1;visibility:visible/);
   assert.match(workbench, /const DOCK_TRANSITION_MS = 480;/);
   assert.match(workbench, /classList\.add\('is-transitioning'\)/);
+  assert.match(workbench, /addEventListener\('transitionend', dockTransitionHandler\)/);
 });
 
 test('iPad judgment actions remain reachable and timeline avoids repeated style reads', () => {

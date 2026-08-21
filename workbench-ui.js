@@ -31,7 +31,9 @@
   let swipeStart = null;
   let previewingSide = null;
   let dockTransitionTimer = 0;
+  let dockTransitionHandler = null;
   const DOCK_TRANSITION_MS = 480;
+  const DOCK_TRANSITION_FALLBACK_MS = DOCK_TRANSITION_MS * 3;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   function readJson(key, fallback) {
@@ -173,6 +175,7 @@
     if (auditionPanel.classList.contains('is-transitioning')) return;
 
     clearTimeout(dockTransitionTimer);
+    if (dockTransitionHandler) auditionPanel.removeEventListener('transitionend', dockTransitionHandler);
     auditionPanel.classList.add('is-transitioning');
     auditionPanel.setAttribute('aria-busy', 'true');
     auditionPanel.classList.toggle('is-expanded', expanded);
@@ -182,12 +185,20 @@
     if (expanded && moveFocus) auditionPanel.focus({ preventScroll: true });
     if (!expanded && moveFocus) dockToggle.focus({ preventScroll: true });
 
-    const finishTransition = () => {
+    const finishTransition = event => {
+      if (event && (event.target !== auditionPanel || event.propertyName !== 'height')) return;
+      clearTimeout(dockTransitionTimer);
+      if (dockTransitionHandler) auditionPanel.removeEventListener('transitionend', dockTransitionHandler);
+      dockTransitionHandler = null;
       auditionPanel.classList.remove('is-transitioning');
       auditionPanel.removeAttribute('aria-busy');
     };
     if (reducedMotion.matches) finishTransition();
-    else dockTransitionTimer = window.setTimeout(finishTransition, DOCK_TRANSITION_MS);
+    else {
+      dockTransitionHandler = finishTransition;
+      auditionPanel.addEventListener('transitionend', dockTransitionHandler);
+      dockTransitionTimer = window.setTimeout(finishTransition, DOCK_TRANSITION_FALLBACK_MS);
+    }
   }
 
   function openFavorites() {
