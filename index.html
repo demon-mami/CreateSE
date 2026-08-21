@@ -123,6 +123,18 @@
       } catch {}
     })();
   </script>
+  <script>
+    (() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const raw = typeof input === 'string' ? input : input?.url;
+        if (typeof raw === 'string' && /(?:^|\/)hitsounds\.zip(?:[?#].*)?$/.test(raw)) {
+          return originalFetch('./hitsounds-v12.zip', init);
+        }
+        return originalFetch(input, init);
+      };
+    })();
+  </script>
   <script src="./vendor/jszip.min.js?v=3.10.1"></script>
   <script src="./candidates.js?v=1.2"></script>
   <script src="./candidate-numbering.js?v=2.0"></script>
