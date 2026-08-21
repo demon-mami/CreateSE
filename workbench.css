@@ -121,7 +121,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 .time-row{display:flex;align-items:center;justify-content:center;gap:7px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
 .song-time{position:static;min-height:0;padding:0;border:0;background:none;font-size:15px;color:#fff}
 .loop-panel{padding:7px;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(10,17,21,.26)}
-.loop-controls{display:grid;grid-template-columns:auto minmax(72px,1fr) auto minmax(72px,1fr);gap:5px;align-items:center}
+.loop-controls{display:grid;grid-template-columns:44px minmax(72px,1fr) 44px minmax(72px,1fr);gap:5px;align-items:center}
 .loop-controls span,.loop-actions span{font-size:11px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.75)}
 .loop-actions{display:grid;grid-template-columns:minmax(120px,1fr) 70px auto;gap:5px;align-items:center;margin-top:5px}
 .loop-panel button{min-height:44px;padding:0 9px}
