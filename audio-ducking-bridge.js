@@ -56,12 +56,12 @@
         context: this,
         music: gains[0],
         effect: gains[1],
-        baseMusic: 0.60,
+        baseMusic: 0.70,
         baseEffect: 1.00,
       };
       queueMicrotask(() => {
         if (!target) return;
-        target.baseMusic = Number.isFinite(target.music.gain.value) ? target.music.gain.value : 0.60;
+        target.baseMusic = Number.isFinite(target.music.gain.value) ? target.music.gain.value : 0.70;
         target.baseEffect = Number.isFinite(target.effect.gain.value) ? target.effect.gain.value : 1.00;
         applyState(true);
       });
