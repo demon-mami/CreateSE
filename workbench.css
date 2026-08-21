@@ -160,7 +160,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
   .mini-current,.mini-play,.dock-toggle{border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(45,59,66,.82);color:#fff;font-weight:800}
   .mini-current{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px;padding:0 8px}.mini-current span{font-size:11px}.mini-current strong{font-size:17px;font-variant-numeric:tabular-nums}
   .mini-current.don strong{color:var(--don)}.mini-current.kat strong{color:var(--ka)}.mini-current[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
-  .mini-play{background:#79d4ec;color:#10242b}.mini-state{grid-column:1/4;display:flex;align-items:center;justify-content:space-between;padding:0 7px;color:rgba(255,255,255,.68);font-size:11px}.mini-state strong{font-variant-numeric:tabular-nums;color:#fff}
+  .mini-play{padding:0 3px;background:#79d4ec;color:#10242b;font-size:13px;white-space:nowrap}.mini-state{grid-column:1/4;display:flex;align-items:center;justify-content:space-between;padding:0 7px;color:rgba(255,255,255,.68);font-size:11px}.mini-state strong{font-variant-numeric:tabular-nums;color:#fff}
   .dock-toggle{grid-column:4;grid-row:1/3;min-width:44px;padding:4px;writing-mode:vertical-rl;font-size:10px}
   .audition-panel.is-expanded{height:min(72dvh,610px);max-height:calc(100dvh - 58px - env(safe-area-inset-top));padding:7px 8px 8px}
   .audition-panel.is-expanded .dock-mini{display:none}
@@ -183,7 +183,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 
 @media(max-width:374px){
   .app-shell{padding-left:calc(4px + env(safe-area-inset-left));padding-right:calc(4px + env(safe-area-inset-right))}.audition-panel{left:calc(4px + env(safe-area-inset-left));right:calc(4px + env(safe-area-inset-right))}
-  .dock-mini{grid-template-columns:1fr 62px 1fr 44px}.mini-current{padding:0 5px}.mini-current strong{font-size:15px}
+  .dock-mini{grid-template-columns:1fr 62px 1fr 44px}.mini-current{padding:0 5px}.mini-current strong{font-size:15px}.mini-play{font-size:12px}
   .chart-bar{grid-template-columns:minmax(0,1fr) 104px}.current-card-actions button,.judgment-actions button{font-size:10px}
 }
 

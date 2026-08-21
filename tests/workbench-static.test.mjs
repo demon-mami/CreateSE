@@ -43,6 +43,7 @@ test('responsive split and touch target tokens are present', () => {
   assert.match(css, /--tap-size:44px/);
   assert.match(css, /\.seek-bar\{width:100%;height:44px/);
   assert.doesNotMatch(css, /\.seek-bar\{height:(?:28|30)px/);
+  assert.match(css, /\.mini-play\{[^}]*white-space:nowrap/);
   assert.match(css, /grid-template-columns:minmax\(0,1\.62fr\) minmax\(390px,1fr\)/);
   assert.match(css, /@media\(max-width:899px\), \(orientation:portrait\)/);
   assert.doesNotMatch(css, /幅375px以上で利用してください/);
