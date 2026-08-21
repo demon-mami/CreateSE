@@ -40,6 +40,7 @@ jobs:
         run: |
           mkdir -p _site/vendor _site/maps
           cp index.html _site/
+          cp qa-iphone.html _site/
           cp style.css _site/
           cp theme-col07.css _site/
           cp hitsound-grid.css _site/

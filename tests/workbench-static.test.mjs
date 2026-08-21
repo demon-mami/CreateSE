@@ -47,6 +47,7 @@ test('audio levels are fixed and preview ducking is fully removed', () => {
   assert.doesNotMatch(pages, /audio-ducking-bridge\.js/);
   assert.match(pages, /cp workbench\.css _site\//);
   assert.match(pages, /cp workbench-ui\.js _site\//);
+  assert.match(pages, /cp qa-iphone\.html _site\//);
   assert.equal(existsSync(new URL('../audio-ducking-bridge.js', import.meta.url)), false);
 });
 

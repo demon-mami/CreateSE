@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>CreateSE — iPhone 390 × 844 QA</title>
+  <style>
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden}
+    body{display:grid;place-items:center;background:#17262d}
+    iframe{display:block;width:390px;height:844px;border:0;background:#40535d;box-shadow:0 22px 70px rgba(0,0,0,.48)}
+    @media(max-width:390px),(max-height:844px){body{display:block}iframe{width:100vw;height:100dvh;box-shadow:none}}
+  </style>
+</head>
+<body>
+  <iframe id="iphoneViewport" title="CreateSE iPhone縦 390 × 844 QA viewport"></iframe>
+  <script>
+    const build = new URLSearchParams(location.search).get('qa') || 'current';
+    document.getElementById('iphoneViewport').src = './?qa-viewport=iphone-390x844&build=' + encodeURIComponent(build);
+  </script>
+</body>
+</html>
