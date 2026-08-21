@@ -39,7 +39,10 @@
         const response = await fetch('./maps.zip', { cache: 'force-cache' });
         if (!response.ok) throw new Error('maps.zip がありません。GitHub repo rootへアップロードしてください。');
         return JSZip.loadAsync(await response.arrayBuffer());
-      })();
+      })().catch(error => {
+        packPromise = null;
+        throw error;
+      });
     }
     return packPromise;
   }

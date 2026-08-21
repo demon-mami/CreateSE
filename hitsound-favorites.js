@@ -117,7 +117,7 @@
     if (!side?.id || side.id === SILENT_ID || side.silent) return { ok: false, reason: '無音を含むFavoriteは適用できません' };
     const source = controller.byId(side.id);
     if (!source) return { ok: false, reason: `${side.sourceNumber} ${side.name} を再登録してください` };
-    if (side.custom) {
+    if (side.custom || source.custom) {
       if (!side.fingerprint) return { ok: false, reason: '旧My Sound Favoriteは音源を再登録して保存し直してください' };
       if (!source.custom || source.fingerprint !== side.fingerprint) {
         return { ok: false, reason: `${side.sourceNumber} ${side.name} と同じMy Soundを再登録してください` };

@@ -8,7 +8,7 @@
 }
 
 html,body{height:100%;overflow:hidden}
-body{padding:env(safe-area-inset-top) 0 0}
+body{padding:0}
 button{min-height:var(--tap-size)}
 button:disabled{opacity:.48;cursor:not-allowed}
 button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{
@@ -20,7 +20,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 }
 .skip-link:focus{transform:translateY(0)}
 .app-shell{
-  width:100%;height:100dvh;max-width:none;margin:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  width:100%;height:100dvh;max-width:none;margin:0;
+  padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
   display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:8px
 }
 .appbar{padding:0 2px;align-items:center}
@@ -120,7 +121,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 .set-feedback{opacity:1!important;animation:none!important}
 .error-panel{position:fixed;z-index:90;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));margin:0 auto;max-width:760px}
 
-.favorite-sheet{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px}
+.favorite-sheet{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:calc(18px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left))}
 .favorite-sheet[hidden]{display:none}
 .favorite-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;background:rgba(2,8,11,.70)}
 .favorite-dialog{position:relative;z-index:1;width:min(680px,100%);max-height:min(78dvh,760px);overflow:auto;padding:16px;border:1px solid rgba(255,255,255,.20);border-radius:16px;background:#26373e;box-shadow:0 22px 70px rgba(0,0,0,.48)}
@@ -135,7 +136,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 .favorite-undo{min-height:44px;margin-left:7px;padding:0 12px}
 
 @media(min-width:900px) and (orientation:landscape){
-  .app-shell{padding:10px 16px 12px;grid-template-rows:auto auto minmax(0,1fr)}
+  .app-shell{padding:calc(10px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));grid-template-rows:auto auto minmax(0,1fr)}
   .workbench{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(390px,1fr);gap:var(--workbench-gap)}
   .source-panel{height:100%}
   .audition-panel{height:100%}
@@ -145,7 +146,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 
 @media(max-width:899px), (orientation:portrait){
   :root{--dock-mini-height:96px}
-  .app-shell{padding:7px 7px 0;grid-template-rows:auto auto minmax(0,1fr)}
+  .app-shell{padding:calc(7px + env(safe-area-inset-top)) calc(7px + env(safe-area-inset-right)) 0 calc(7px + env(safe-area-inset-left));grid-template-rows:auto auto minmax(0,1fr)}
   .appbar{min-height:40px}.brand-kicker{display:none}.brand-block h1{font-size:18px}.status-badge{font-size:11px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chart-bar{grid-template-columns:minmax(0,1fr) 116px;padding:6px 7px;gap:6px}.field-label{font-size:10px}.chart-field select,.chart-info{height:44px}.chart-info strong{font-size:12px}
   .workbench{display:block;min-height:0}
@@ -153,7 +154,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
   .hs-toolbar{grid-template-columns:1fr;padding-top:7px;gap:5px}.hs-toolbar-label{display:none}
   #hitsoundGrid{padding:7px}.hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(48px,1fr))!important;gap:6px!important}
   .custom-sound-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-  .audition-panel{position:fixed;z-index:60;left:7px;right:7px;bottom:calc(5px + env(safe-area-inset-bottom));height:var(--dock-mini-height);padding:7px;border-radius:15px;box-shadow:0 -10px 32px rgba(3,9,12,.38)}
+  .audition-panel{position:fixed;z-index:60;left:calc(7px + env(safe-area-inset-left));right:calc(7px + env(safe-area-inset-right));bottom:calc(5px + env(safe-area-inset-bottom));height:var(--dock-mini-height);padding:7px;border-radius:15px;box-shadow:0 -10px 32px rgba(3,9,12,.38)}
   .dock-mini{height:100%;display:grid;grid-template-columns:1fr 68px 1fr 44px;grid-template-rows:48px 28px;gap:5px}
   .mini-current,.mini-play,.dock-toggle{border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(45,59,66,.82);color:#fff;font-weight:800}
   .mini-current{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px;padding:0 8px}.mini-current span{font-size:11px}.mini-current strong{font-size:17px;font-variant-numeric:tabular-nums}
@@ -180,7 +181,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 }
 
 @media(max-width:374px){
-  .app-shell{padding-left:4px;padding-right:4px}.audition-panel{left:4px;right:4px}
+  .app-shell{padding-left:calc(4px + env(safe-area-inset-left));padding-right:calc(4px + env(safe-area-inset-right))}.audition-panel{left:calc(4px + env(safe-area-inset-left));right:calc(4px + env(safe-area-inset-right))}
   .dock-mini{grid-template-columns:1fr 62px 1fr 44px}.mini-current{padding:0 5px}.mini-current strong{font-size:15px}
   .chart-bar{grid-template-columns:minmax(0,1fr) 104px}.current-card-actions button,.judgment-actions button{font-size:9px}
 }

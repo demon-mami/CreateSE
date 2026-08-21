@@ -71,7 +71,10 @@
         const response = await fetch('./hitsounds-single-base-116.zip', { cache: 'force-cache' });
         if (!response.ok) throw new Error('正式版116音パックを読み込めません。');
         return JSZip.loadAsync(await response.arrayBuffer());
-      })();
+      })().catch(error => {
+        packPromise = null;
+        throw error;
+      });
     }
     return packPromise;
   }
