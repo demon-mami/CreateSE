@@ -7,6 +7,7 @@ const html = read('index.html');
 const app = read('app-v4.js');
 const grid = read('hitsound-grid.js');
 const favorites = read('hitsound-favorites.js');
+const workbench = read('workbench-ui.js');
 const css = read('workbench.css');
 
 test('required workbench controls have unique IDs', () => {
@@ -40,7 +41,15 @@ test('Favorite excludes mute and verifies My Sound fingerprints', () => {
 
 test('responsive split and touch target tokens are present', () => {
   assert.match(css, /--tap-size:44px/);
+  assert.match(css, /\.seek-bar\{width:100%;height:44px/);
+  assert.doesNotMatch(css, /\.seek-bar\{height:(?:28|30)px/);
   assert.match(css, /grid-template-columns:minmax\(0,1\.62fr\) minmax\(390px,1fr\)/);
   assert.match(css, /@media\(max-width:899px\), \(orientation:portrait\)/);
   assert.doesNotMatch(css, /幅375px以上で利用してください/);
+});
+
+test('Don and Kat preserve independent candidate scroll positions', () => {
+  assert.match(workbench, /scrollTop: Math\.max\(0, sourcePanel\.scrollTop\)/);
+  assert.match(workbench, /sourcePanel\.scrollTop = Math\.max\(0, saved\.scrollTop\)/);
+  assert.match(workbench, /clearTimeout\(savePositionTimer\);\s+saveCandidatePosition\(activeSide\);/);
 });

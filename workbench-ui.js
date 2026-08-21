@@ -216,9 +216,11 @@
     const panelTop = sourcePanel.getBoundingClientRect().top + 58;
     const candidates = Array.from(sourcePanel.querySelectorAll('[data-hs-id]'));
     const firstVisible = candidates.find(button => button.getBoundingClientRect().bottom > panelTop);
-    if (!firstVisible) return;
     const positions = readPositions();
-    positions[`${layout}:${side}`] = firstVisible.dataset.hsId;
+    positions[`${layout}:${side}`] = {
+      scrollTop: Math.max(0, sourcePanel.scrollTop),
+      candidateId: firstVisible?.dataset.hsId || '',
+    };
     try { localStorage.setItem(POSITION_KEY, JSON.stringify(positions)); } catch {}
   }
 
@@ -231,16 +233,25 @@
 
   function restoreCandidatePosition() {
     if (!sourcePanel) return;
-    const id = readPositions()[`${layoutKey()}:${activeSide}`];
-    if (!id) return;
+    const saved = readPositions()[`${layoutKey()}:${activeSide}`];
+    if (saved && typeof saved === 'object' && Number.isFinite(saved.scrollTop)) {
+      sourcePanel.scrollTop = Math.max(0, saved.scrollTop);
+      return;
+    }
+    const id = typeof saved === 'string' ? saved : saved?.candidateId;
+    if (!id) {
+      sourcePanel.scrollTop = 0;
+      return;
+    }
     const target = sourcePanel.querySelector(`[data-hs-id="${CSS.escape(id)}"]`);
-    if (!target) return;
+    if (!target) {
+      sourcePanel.scrollTop = 0;
+      return;
+    }
     const toolbarHeight = sourcePanel.querySelector('.hs-toolbar')?.offsetHeight || 0;
     sourcePanel.scrollTop += target.getBoundingClientRect().top - sourcePanel.getBoundingClientRect().top - toolbarHeight - 8;
   }
 
-  roleDon?.addEventListener('click', () => { activeSide = 'don'; syncActiveSide(); });
-  roleKat?.addEventListener('click', () => { activeSide = 'kat'; syncActiveSide(); });
   $('miniDonTarget')?.addEventListener('click', () => chooseSide('don'));
   $('miniKatTarget')?.addEventListener('click', () => chooseSide('kat'));
   $('currentDonTarget')?.addEventListener('click', () => chooseSide('don'));
@@ -293,7 +304,10 @@
   });
   window.addEventListener('hitsound-active-side-change', event => {
     const nextSide = event.detail?.side === 'kat' ? 'kat' : 'don';
-    if (nextSide !== activeSide) saveCandidatePosition(activeSide);
+    if (nextSide !== activeSide) {
+      clearTimeout(savePositionTimer);
+      saveCandidatePosition(activeSide);
+    }
     activeSide = nextSide;
     syncActiveSide();
     if (workbenchStatus) workbenchStatus.textContent = `${activeSide === 'don' ? 'Don' : 'Kat'}を操作対象にしました`;
