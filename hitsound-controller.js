@@ -68,7 +68,7 @@
     if (!packPromise) {
       packPromise = (async () => {
         if (!window.JSZip) throw new Error('JSZipを読み込めません。');
-        const response = await fetch('./hitsounds-current111-abc-v5.zip', { cache: 'force-cache' });
+        const response = await fetch('./hitsounds-current111-abc-v5.zip?v=64eb7144', { cache: 'force-cache' });
         if (!response.ok) throw new Error('Current111音パックを読み込めません。');
         return JSZip.loadAsync(await response.arrayBuffer());
       })().catch(error => {
