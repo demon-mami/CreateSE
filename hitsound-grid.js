@@ -47,7 +47,7 @@
   let renderedRowCapacity = 0;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
-  const displayFamily = candidate => familyOf(candidate);
+  const displayFamily = candidate => familyOf(candidate) === 'Taiko Reference' ? 'Taiko' : familyOf(candidate);
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const customIdForSlot = slot => `__CUSTOM_${slot}__`;
 
@@ -89,7 +89,7 @@
     'Snap',
     'Snare',
     'Tom',
-    'Taiko Reference',
+    'Taiko',
   ];
 
   function groupedCandidates() {
@@ -136,7 +136,7 @@
   function candidateRowCapacity() {
     const width = Math.max(0, sources.clientWidth);
     if (!width) return 12;
-    return Math.max(4, Math.min(12, Math.floor((width + 7) / 59)));
+    return Math.max(4, Math.min(12, Math.floor((width + 7) / 51)));
   }
 
   function packCandidateRows(groups, capacity) {

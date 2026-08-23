@@ -153,6 +153,7 @@ test('Current111 replaces the old pack and keeps ABC visible without source file
 
 test('candidate rows use twelve slots with one category boundary slot', () => {
   assert.match(grid, /Math\.max\(4, Math\.min\(12,/);
+  assert.match(grid, /\(width \+ 7\) \/ 51/);
   assert.match(grid, /first\.count \+ candidate\.count \+ 1 > capacity/);
   assert.match(grid, /class="hs-family-spacer"/);
   assert.match(gridCss, /grid-template-columns:repeat\(var\(--source-row-slots,12\),minmax\(0,1fr\)\)/);
