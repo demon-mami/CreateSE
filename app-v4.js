@@ -16,6 +16,7 @@
   const SKIP_SEC = 4;
   const LOOP_MIN_MS = 500;
   const LOOP_MAX_MS = 30000;
+  const TRANSPORT_UI_INTERVAL_MS = 33;
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
@@ -87,6 +88,7 @@
   const cssTokenCache = new Map();
   const timelineSize = { width: 0, height: 0 };
   const overviewSize = { width: 0, height: 0 };
+  let copyTimeButtonWidth = 70;
 
   const setStatus = text => { if (el.status) el.status.textContent = text; };
   const clearError = () => {
@@ -1058,6 +1060,7 @@
   function refreshViewportMetrics() {
     measureViewport(el.timelineViewport, timelineSize);
     measureViewport(el.overviewViewport, overviewSize);
+    if (el.copyTime) copyTimeButtonWidth = Math.max(58, el.copyTime.offsetWidth || 70);
   }
 
   function lowerHit(timeMs) {
@@ -1343,7 +1346,7 @@
     ctx.fill();
 
     if (el.copyTime) {
-      const buttonWidth = Math.max(58, el.copyTime.offsetWidth || 70);
+      const buttonWidth = copyTimeButtonWidth;
       const labelX = Math.max(buttonWidth / 2 + 3, Math.min(rect.width - buttonWidth / 2 - 3, x));
       el.copyTime.style.left = `${labelX}px`;
       el.copyTime.style.transform = 'translateX(-50%)';
@@ -1393,15 +1396,18 @@
         .finally(() => { loopSeekPending = false; });
     }
     const canSyncSeek = !seekScrub && !timelineScrub && !overviewScrub && el.seek;
-    if (canSyncSeek) el.seek.value = String(p);
-    if (now - lastTransportUiPaint >= 33) {
+    if (now - lastTransportUiPaint >= TRANSPORT_UI_INTERVAL_MS) {
       const formatted = fmt(p * 1000);
       if (el.time && el.time.textContent !== formatted) el.time.textContent = formatted;
-      if (canSyncSeek) el.seek.setAttribute('aria-valuetext', formatted);
+      if (canSyncSeek) {
+        const position = String(p);
+        if (el.seek.value !== position) el.seek.value = position;
+        if (el.seek.getAttribute('aria-valuetext') !== formatted) el.seek.setAttribute('aria-valuetext', formatted);
+      }
+      drawSongCursor(p);
       lastTransportUiPaint = now;
     }
     renderObjectAt(p);
-    drawSongCursor(p);
     renderDebug(now);
     raf = requestAnimationFrame(frame);
   }

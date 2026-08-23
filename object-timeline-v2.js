@@ -29,6 +29,10 @@
 
   const POST_HIT_FADE_MS = 110;
   const MAX_CANVAS_DPR = 2;
+  // ProMotion iPads can schedule requestAnimationFrame at 120Hz. The lane is
+  // intentionally capped near 60fps so canvas work cannot consume two frames
+  // for every visual update while audio timing remains independent.
+  const MIN_RENDER_INTERVAL_MS = 15;
   const DON = 'rgb(235,69,44)';
   const KA = 'rgb(68,141,171)';
   const LANE = '#121214';
@@ -39,6 +43,8 @@
   let lastRenderedPositionMs = NaN;
   let lastRenderedSpanMs = NaN;
   let lastRenderedMap = null;
+  let lastAnimationPaint = -Infinity;
+  let timelineVisible = true;
   const viewportSize = { width: 0, height: 0 };
   const surfaceColor = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#0f1014';
 
@@ -167,7 +173,10 @@
 
   function drawBeatLines(ctx, map, leftTime, rightTime, xForTime, laneTop, laneBottom) {
     let safety = 0;
+    const measureLines = [];
+    const beatLines = [];
     const red = map.redTiming;
+    lineLoop:
     for (let r = 0; r < red.length; r++) {
       const tp = red[r];
       const sectionEnd = r + 1 < red.length ? red[r + 1].time : rightTime;
@@ -177,18 +186,27 @@
       let n = Math.ceil((a - tp.time) / tp.beat);
       if (!Number.isFinite(n)) continue;
       for (let time = tp.time + n * tp.beat; time <= b + 0.01; time += tp.beat, n++) {
-        if (++safety > 2500) return;
+        if (++safety > 2500) break lineLoop;
         const meter = Math.max(1, tp.meter || 4);
         const measure = ((n % meter) + meter) % meter === 0;
         const x = Math.round(xForTime(time)) + 0.5;
-        ctx.strokeStyle = measure ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.14)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, laneTop);
-        ctx.lineTo(x, laneBottom);
-        ctx.stroke();
+        (measure ? measureLines : beatLines).push(x);
       }
     }
+
+    const strokeLines = (lines, color) => {
+      if (!lines.length) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const x of lines) {
+        ctx.moveTo(x, laneTop);
+        ctx.lineTo(x, laneBottom);
+      }
+      ctx.stroke();
+    };
+    strokeLines(beatLines, 'rgba(255,255,255,.14)');
+    strokeLines(measureLines, 'rgba(255,255,255,.25)');
   }
 
   function render() {
@@ -264,7 +282,6 @@
       const y = postHit ? noteY - 12 * progress : noteY;
       const radius = baseRadius * scale;
 
-      ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = hit.kind === 'ka' ? KA : DON;
       ctx.strokeStyle = 'rgba(255,255,255,.96)';
@@ -280,7 +297,7 @@
         ctx.arc(x, y, radius + 2.6 * scale, 0, Math.PI * 2);
         ctx.stroke();
       }
-      ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
     // Front: keep the target compact while remaining distinct from the moving notes.
@@ -313,10 +330,23 @@
   window.addEventListener('orientationchange', measureViewport);
   const timelineResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(measureViewport) : null;
   timelineResizeObserver?.observe(viewport);
+  const timelineIntersectionObserver = typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver(entries => {
+        const entry = entries.find(item => item.target === viewport);
+        if (!entry) return;
+        timelineVisible = entry.isIntersecting;
+        if (timelineVisible) renderInvalidated = true;
+      })
+    : null;
+  timelineIntersectionObserver?.observe(viewport);
   measureViewport();
 
-  function frame() {
-    render();
+  function frame(now) {
+    const canPaint = timelineVisible && document.visibilityState !== 'hidden';
+    if (canPaint && (renderInvalidated || now - lastAnimationPaint >= MIN_RENDER_INTERVAL_MS)) {
+      lastAnimationPaint = now;
+      render();
+    }
     requestAnimationFrame(frame);
   }
 

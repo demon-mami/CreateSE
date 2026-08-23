@@ -69,7 +69,7 @@ test('candidate switching shares decoded audio and keeps only the latest rapid t
   assert.match(controller, /if \(serial === selectionSerial\) await applyPendingSelection\(serial\);\s+await previewTask;/);
   assert.match(controller, /function warmCurrentSelection\(\)/);
   assert.match(workbench, /window\.addEventListener\('hitsound-preview-state'/);
-  assert.match(html, /app-v4\.js\?v=3\.4-shared-hitsound-buffer/);
+  assert.match(html, /app-v4\.js\?v=3\.5-timeline-frame-budget/);
   assert.match(html, /hitsound-controller\.js\?v=4\.1-latest-switch-wins/);
 });
 
@@ -225,15 +225,28 @@ test('timeline notes are reduced in both visible and fallback renderers', () => 
   assert.match(timeline, /const targetRadius = 19\.5;/);
 });
 
-test('timeline clock stays frame-synchronous and the visible renderer avoids duplicate canvas work', () => {
-  assert.match(app, /if \(canSyncSeek\) el\.seek\.value = String\(p\);\s+if \(now - lastTransportUiPaint >= 33\)/);
+test('timeline playback stays audio-synchronous while iPad canvas and DOM paint work are bounded', () => {
+  assert.match(app, /const TRANSPORT_UI_INTERVAL_MS = 33;/);
+  assert.match(app, /now - lastTransportUiPaint >= TRANSPORT_UI_INTERVAL_MS/);
+  assert.match(app, /if \(el\.seek\.value !== position\) el\.seek\.value = position;/);
+  assert.match(app, /drawSongCursor\(p\);\s+lastTransportUiPaint = now;/);
+  assert.doesNotMatch(app, /if \(canSyncSeek\) el\.seek\.value = String\(p\);/);
+  assert.match(app, /copyTimeButtonWidth = Math\.max\(58, el\.copyTime\.offsetWidth \|\| 70\)/);
   assert.match(app, /positionSec: audiblePosition/);
   assert.match(app, /if \(externalTimelineRenderer\) return;/);
+  assert.match(timeline, /const MIN_RENDER_INTERVAL_MS = 15;/);
+  assert.match(timeline, /now - lastAnimationPaint >= MIN_RENDER_INTERVAL_MS/);
+  assert.match(timeline, /document\.visibilityState !== 'hidden'/);
+  assert.match(timeline, /new IntersectionObserver\(entries =>/);
+  assert.match(timeline, /const measureLines = \[\];/);
+  assert.match(timeline, /strokeLines\(beatLines/);
+  assert.doesNotMatch(timeline, /ctx\.save\(\)/);
   assert.match(timeline, /CreateSEViewer\?\.positionSec\?\.\(\)/);
   assert.match(timeline, /Math\.min\(MAX_CANVAS_DPR, window\.devicePixelRatio/);
   assert.match(timeline, /new ResizeObserver\(measureViewport\)/);
   assert.match(timeline, /lowerHit\(map\.hits, visibleLeftTime\)/);
   assert.doesNotMatch(timeline, /const nowMs = Number\(seek\.value\) \* 1000/);
+  assert.match(html, /object-timeline-v2\.js\?v=3\.1-ipad-frame-budget/);
 });
 
 test('Don and Kat preserve independent candidate scroll positions', () => {
