@@ -79,6 +79,31 @@ test('Favorite excludes mute and verifies My Sound fingerprints', () => {
   assert.match(favorites, /hitsound-favorite-applied/);
 });
 
+test('Phase7A Pair-12 is merged into existing Favorites exactly once', () => {
+  const expected = [
+    ['P01', 'SRC070', 'SRC084'],
+    ['P02', 'SRC015', 'SRC019'],
+    ['P03', 'SRC098', 'SRC101'],
+    ['P04', 'SRC098', 'SRC064'],
+    ['P05', 'SRC056', 'SRC084'],
+    ['P06', 'SRC070', 'SRC019'],
+    ['P07', 'SRC089', 'SRC064'],
+    ['P08', 'SRC089', 'SRC088'],
+    ['P09', 'SRC101', 'SRC090'],
+    ['P10', 'SRC056', 'SRC077'],
+    ['P11', 'SRC084', 'SRC090'],
+    ['P12', 'SRC079', 'SRC100'],
+  ];
+  for (const pair of expected) {
+    assert.ok(favorites.includes(`['${pair[0]}', '${pair[1]}', '${pair[2]}']`), `${pair[0]} is missing`);
+  }
+  assert.match(favorites, /FAVORITE_SEED_KEY = `\$\{STORAGE_KEY\}:seed:phase7a-pair12-v5`/);
+  assert.match(favorites, /if \(localStorage\.getItem\(FAVORITE_SEED_KEY\) === '1'\) return 0/);
+  assert.match(favorites, /const known = new Set\(sets\.map\(entryKey\)\)/);
+  assert.match(favorites, /mergeSeedFavoritePairs\(\);\s+renderSavedSets\(\);/);
+  assert.match(html, /hitsound-favorites\.js\?v=4\.1-phase7a-pair12-v5/);
+});
+
 test('responsive split and touch target tokens are present', () => {
   assert.match(css, /--tap-size:44px/);
   assert.match(css, /\.seek-bar\{width:100%;height:44px/);

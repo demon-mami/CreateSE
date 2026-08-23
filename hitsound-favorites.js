@@ -6,6 +6,21 @@
   if (!CANDIDATES.length || !controller) return;
 
   const STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5';
+  const FAVORITE_SEED_KEY = `${STORAGE_KEY}:seed:phase7a-pair12-v5`;
+  const FAVORITE_SEED_PAIRS = Object.freeze([
+    ['P01', 'SRC070', 'SRC084'],
+    ['P02', 'SRC015', 'SRC019'],
+    ['P03', 'SRC098', 'SRC101'],
+    ['P04', 'SRC098', 'SRC064'],
+    ['P05', 'SRC056', 'SRC084'],
+    ['P06', 'SRC070', 'SRC019'],
+    ['P07', 'SRC089', 'SRC064'],
+    ['P08', 'SRC089', 'SRC088'],
+    ['P09', 'SRC101', 'SRC090'],
+    ['P10', 'SRC056', 'SRC077'],
+    ['P11', 'SRC084', 'SRC090'],
+    ['P12', 'SRC079', 'SRC100'],
+  ]);
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
   const setButton = $('favSetButton');
@@ -101,6 +116,42 @@
 
   function entryKey(entry) {
     return `${descriptorKey(entry.don)}|${descriptorKey(entry.kat)}`;
+  }
+
+  function mergeSeedFavoritePairs() {
+    try {
+      if (localStorage.getItem(FAVORITE_SEED_KEY) === '1') return 0;
+    } catch {
+      return 0;
+    }
+
+    const sets = readSets();
+    const known = new Set(sets.map(entryKey));
+    const createdAt = new Date().toISOString();
+    let added = 0;
+
+    for (const [pairId, donId, katId] of FAVORITE_SEED_PAIRS) {
+      if (!controller.byId(donId) || !controller.byId(katId)) continue;
+      const entry = {
+        id: `phase7a-pair12-v5-${pairId.toLowerCase()}`,
+        don: describe(donId),
+        kat: describe(katId),
+        createdAt,
+      };
+      const key = entryKey(entry);
+      if (known.has(key)) continue;
+      sets.push(entry);
+      known.add(key);
+      added += 1;
+    }
+
+    try {
+      if (added > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, set: sets }));
+      localStorage.setItem(FAVORITE_SEED_KEY, '1');
+    } catch {
+      return 0;
+    }
+    return added;
   }
 
   function currentEntry() {
@@ -382,6 +433,7 @@
     recommendedFor,
   };
 
+  mergeSeedFavoritePairs();
   renderSavedSets();
   updateSetButton();
 })();
