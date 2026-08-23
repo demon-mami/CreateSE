@@ -7,7 +7,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 
 ## 判定
 
-指定されたCurrent111への全音源差し替え、A / B / C識別、cyber gradient、category packingをProduction `main`へ直接反映した。Cloud BrowserのiPad 13インチ横相当（1363 × 936）とiPhone縦（390 × 844）では、今回の変更に起因する未解決のP0 / P1 / P2は確認していない。
+指定されたCurrent111への全音源差し替え、A / B / C識別、cyber gradient、category packingに加え、pair-first Favoriteと2区間再生をProduction `main`へ直接反映した。Cloud BrowserのiPad 13インチ横相当（1363 × 936）とiPhone縦（390 × 844）では、今回の変更に起因する未解決のP0 / P1 / P2は確認していない。
 
 - built-in hitsoundを111音源へ全置換。旧packはProduction treeから削除。
 - visible source名は`SRC-nnn`のみ。candidate button本体は既存の高速比較性を優先して3桁番号表示を維持。
@@ -15,6 +15,41 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 - 1 categoryは最大12 slot、2 categoryは`X + Y + 1空白 = 12 slot`で同一行へ配置。
 - 候補面と再生面を、固定のdark cyber gradientで明確に分離。連続animationは使用していない。
 - 一般向けの説明文、凡例、追加titleはUIへ加えていない。
+- 旧「候補」評価、再生側Don / Kat、単音試聴、明示的な無音、zoom、常時進行する時刻表示を削除。
+- 固定12 pairをPresetへ変換し、♡ / ♥をお気に入り1、☆ / ★をお気に入り2として現在のpairを保存する。
+- A–B区間を2組へ拡張。両方を保持しつつ、loopは常にどちらか1組だけを有効にする。
+- object laneは内部固定±0.5秒。手動seek時だけ時刻を一時表示する。
+
+## Pair-first Favorite / dual range update — 2026-08-24
+
+Production commit: `9cc6c7c47fd2c7ea50d0348d5e82f11b1c13922d`
+
+- ♡ / ☆ / Preset 12を50〜52pxのcompact buttonとして中央均等配置。candidate選択面の主要group間には独立した余白を追加した。
+- Favorite 1 / 2はpair単位。current pairと一致すると♥ / ★、再tapで解除、別pairでtapするとそのslotを上書きする。
+- P01〜P12は削除不可の固定Preset。Preset適用後のpairもFavorite 1 / 2へ登録できる。
+- 旧Favoriteと旧削除候補localStorageは起動時にcleanupする。My Sound dataは維持する。
+- playback sideはlane → overview → seek → transport → range 1 → range 2。Don / Kat card、mute、side preview、zoom、常時time textを持たない。
+- range 1 / 2は各A、B、Aへ移動、Bへ移動、loop、clearを持つ。30秒上限を撤廃し、最小0.5秒のみ維持する。
+- rangeを切り替えても両登録値は保持し、loopの`aria-pressed`だけを排他的に切り替える。譜面変更時は2組ともresetする。
+
+### Production Cloud Browser QA
+
+| 確認 | iPad横相当 | iPhone 390 × 844 |
+|---|---|---|
+| compact Favorite | 52 × 48px、中央3点配置 | 50 × 46px、中央3点配置 |
+| 譜面読込 | `準備完了`、duration 164.441秒 | `準備完了`、play enabled |
+| 再生 / 一時停止 | seek 0.309秒まで進行後pause | play ON / OFF成功 |
+| seek feedback | ＋4秒で一時表示、900ms後hidden | ＋4秒で`00:04:317`を一時表示 |
+| range 1 | A 00:04:420 / B 00:08:420、4.000秒 | A 00:04:318 / B 00:08:318、4.000秒 |
+| range 2 | A 00:12:420 / B 00:16:420、4.000秒 | A 00:12:318 / B 00:16:318、4.000秒 |
+| exclusive loop | range 2 ON時にrange 1 OFF、両値保持 | range 2 ON時にrange 1 OFF、両値保持 |
+| seek / transport間隔 | overlapなし | 61.3px、overlapなし |
+| visible target | 44px未満なし | 44px未満なし |
+| Preset | 12件、delete controlなし | 12件、delete controlなし |
+| candidate再選択 | Kat 019 → 未選択 → 019 | 同一実装を確認 |
+| app console | error / warning 0 | error / warning 0 |
+
+Evidence: `createse-ipad-two-ranges-1787523985356.jpg`、`createse-iphone-expanded-two-ranges-1787524073841.jpg`、`createse-iphone-preset12-1787524143526.jpg`。
 
 ## Audio dataset / integrity
 
@@ -81,14 +116,15 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 | Don / Kat切替 | 成功、active sideとselected candidateが同期 |
 | A / B / C候補 | Cを含め表示・選択を確認 |
 | 再生 / 一時停止 | 成功、時刻とseek位置が進行 |
-| Favorite追加 | 成功 |
-| Favorite再適用 | Don 001 / Kat 002を登録後、Kat 003へ変更し、再適用でDon 001 / Kat 002へ復元 |
-| 削除候補 ON / OFF | `false → true → false`を確認 |
+| Favorite 1 / 2 | pair単位で登録・解除・上書き成功 |
+| Preset | 固定12件を表示・適用。P01適用後Don 070 / Kat 084へ同期 |
+| 旧候補評価 / 削除候補 | UI・操作・保存機能を削除し、legacy keyのみcleanup |
+| 2区間 | 両方を登録・移動・clear可能。loopは排他、登録値は保持 |
 | iPhone収納 / 展開 | mini / expandedの切替成功 |
 
 ## State / storage
 
-- built-in selection、Favorite、削除候補はCurrent111専用version keyへ移行し、旧datasetの番号状態を誤適用しない。
+- built-in selectionはCurrent111専用version keyを使用。Favoriteはpair slot 2件へ移行し、旧Favorite / 削除候補keyをcleanupする。
 - My SoundのIndexedDB dataと機能は削除・移行していない。
 - initial pairはCurrent111上のDon `SRC-093` / Kat `SRC-097`。
 - candidateのvisible labelは抑えた3桁番号と小さな静止dot、family groupingで構成。accessible nameは`SRC-nnn`、A / B / C、familyを保持。
@@ -96,7 +132,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 ## Automated checks
 
 - `node --check`: PASS。
-- `node --test tests/*.test.mjs`: 20 / 20 PASS。
+- `node --test tests/workbench-static.test.mjs`: 23 / 23 PASS。
 - final fresh Production tab: CreateSE由来のconsole error / warning 0。
 - final GitHub tree: new packのみ存在し、old packなし。
 
@@ -126,7 +162,8 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 - [x] responsive capacityと44px以上のtouch targetを維持。
 - [x] 候補面 / 再生面をcyber gradientで分離。
 - [x] iPhone / iPad Cloud Browserでrenderingと主要操作をQA。
-- [x] 20 / 20 tests PASS、final CreateSE由来console error / warning 0。
+- [x] pair Favorite 1 / 2、固定Preset 12、2区間・排他loopを実装。
+- [x] 23 / 23 tests PASS、final CreateSE由来console error / warning 0。
 
 ## Hitsound switching performance follow-up — 2026-08-24
 
@@ -168,6 +205,8 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 Cloud Browserの計測値にはremote input・iframe・rendering overheadが含まれ、純粋なaudio処理時間や実機Safariのlatencyではない。絶対値よりも、連打後に待ちqueueが積み上がらないこと、再生が継続すること、最後のtapが正しく残ることを合格条件とした。未cache候補の初回展開・decodeコストは端末性能に依存するため、実機iPhone / iPad Safariでの最終確認を残す。
 
 ## Phase7A Pair-12 Favorite seed — 2026-08-24
+
+> Historical QA record. Current Productionでは上記migration方式を廃止し、12件を削除不可の固定Presetとして扱う。既存Favoriteは引き継がず、Favorite 1 / 2の2 slotへ置換した。
 
 添付`Phase7A_Pair12_List_v5(1).md`の12ペアを、既存Favoriteを保持したまま一度だけ自動追加するmigrationとして実装した。
 
@@ -240,6 +279,8 @@ Cloud Browserの計測値にはremote input・iframe・rendering overheadが含�
 Cloud Browserによるviewport再現であり、実機iOS / iPadOS Safariの指サイズ、safe area、browser bar変動、長押しはこの変更後に再確認していない。
 
 ## iPad object timeline performance / final mix — 2026-08-24
+
+> Current Productionではzoom controlを削除し、object laneを固定±0.5秒へ変更した。以下のzoom QAは変更前のhistorical record。
 
 ### 観測した原因
 
