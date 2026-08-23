@@ -175,7 +175,21 @@
 #hitsoundSources{display:grid;gap:7px}
 #hitsoundSources.busy{pointer-events:none;opacity:.82}
 
-.hs-family{min-width:0}
+.hs-family-row{
+  display:grid;
+  grid-template-columns:repeat(var(--source-row-slots,12),minmax(0,1fr));
+  gap:6px;
+  min-width:0;
+}
+.hs-family{
+  grid-column:span var(--family-slots,1);
+  min-width:0;
+}
+.hs-family-spacer{
+  grid-column:span 1;
+  min-width:0;
+  pointer-events:none;
+}
 .hs-family-title{
   margin:0 0 4px 2px;
   color:rgba(255,255,255,.52);
@@ -186,7 +200,7 @@
 }
 .hs-family-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(39px,1fr));
+  grid-template-columns:repeat(var(--family-columns,1),minmax(0,1fr));
   gap:6px;
 }
 
@@ -273,6 +287,31 @@
   height:30px;
   color:rgba(255,255,255,.72);
   font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.hs-key[data-abc="A"]{--abc-accent:#4be8ff}
+.hs-key[data-abc="B"]{--abc-accent:#bd8cff}
+.hs-key[data-abc="C"]{--abc-accent:#ffc45e}
+.hs-key[data-abc]>span{
+  border-top-color:var(--abc-accent);
+  box-shadow:inset 0 2px 0 color-mix(in srgb,var(--abc-accent) 62%,transparent),inset 0 -1px 0 rgba(0,0,0,.16);
+}
+.hs-key[data-abc]>span::before{
+  content:attr(data-abc);
+  position:absolute;
+  top:4px;
+  left:4px;
+  width:13px;
+  height:13px;
+  display:grid;
+  place-items:center;
+  border:1px solid color-mix(in srgb,var(--abc-accent) 70%,transparent);
+  border-radius:4px;
+  background:rgba(5,15,22,.78);
+  color:var(--abc-accent);
+  font:900 8px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  box-shadow:0 0 7px color-mix(in srgb,var(--abc-accent) 30%,transparent);
+  pointer-events:none;
 }
 
 /* Deletion candidates are only notes: a small muted marker avoids implying immediate deletion. */
@@ -446,7 +485,7 @@
   .hs-role-button>span{height:36px}
   .hs-toolbar-actions{grid-template-columns:40px 40px repeat(3,minmax(52px,1fr));gap:5px}
   .hs-action-button>span{height:31px}
-  .hs-family-grid{grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:5px}
+  .hs-family-row,.hs-family-grid{gap:5px}
   .custom-sound-grid{gap:5px}
   .custom-sound-grid .custom-sound-delete{width:27px;min-width:27px}
   .custom-sound-key>span{padding-right:26px}

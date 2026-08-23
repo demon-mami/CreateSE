@@ -10,6 +10,8 @@ const controller = read('hitsound-controller.js');
 const favorites = read('hitsound-favorites.js');
 const workbench = read('workbench-ui.js');
 const css = read('workbench.css');
+const gridCss = read('hitsound-grid.css');
+const candidates = read('candidates.js');
 const timeline = read('object-timeline-v2.js');
 const pages = read('.github/workflows/pages.yml');
 
@@ -48,6 +50,8 @@ test('audio levels are fixed and preview ducking is fully removed', () => {
   assert.match(pages, /cp workbench\.css _site\//);
   assert.match(pages, /cp workbench-ui\.js _site\//);
   assert.match(pages, /cp qa-iphone\.html _site\//);
+  assert.match(pages, /cp hitsounds-current111-abc-v5\.zip _site\//);
+  assert.doesNotMatch(pages, /hitsounds-single-base-116\.zip/);
   assert.equal(existsSync(new URL('../audio-ducking-bridge.js', import.meta.url)), false);
 });
 
@@ -122,12 +126,38 @@ test('judgment actions live with candidate selection and timeline avoids repeate
   assert.match(app, /const timelineResizeObserver = new ResizeObserver\(redraw\);/);
 });
 
-test('candidate and playback panes use distinct requested base colors', () => {
-  assert.match(css, /--source-pane-base:#0ac6d7/);
-  assert.match(css, /--playback-pane-base:#ed7855/);
-  assert.match(css, /\.source-panel\{[\s\S]*?rgba\(10,198,215,\.30\)/);
-  assert.match(css, /\.audition-panel\{[\s\S]*?rgba\(237,120,85,\.30\)/);
-  assert.doesNotMatch(css, /rgba\(25,78,86,0\)/);
+test('candidate and playback panes use distinct static cyber gradients', () => {
+  assert.match(css, /--source-pane-base:#071721/);
+  assert.match(css, /--playback-pane-base:#1a1023/);
+  assert.match(css, /\.source-panel\{[\s\S]*?radial-gradient\(circle at 10% -8%,rgba\(75,232,255,\.18\)/);
+  assert.match(css, /\.audition-panel\{[\s\S]*?radial-gradient\(circle at 90% -10%,rgba\(255,112,200,\.17\)/);
+  assert.doesNotMatch(css, /--source-pane-base:#0ac6d7|--playback-pane-base:#ed7855/);
+});
+
+test('Current111 replaces the old pack and keeps ABC visible without source filenames', () => {
+  assert.match(candidates, /Current111 ABC Sorted v5/);
+  assert.match(candidates, /abcGrade/);
+  assert.match(candidates, /dataset: 'current111-abc-v5'/);
+  assert.doesNotMatch(candidates, /Annihilator 1\.wav|RnT_Timbale-02\.wav/);
+  assert.match(controller, /hitsounds-current111-abc-v5\.zip/);
+  assert.doesNotMatch(controller, /hitsounds-single-base-116\.zip/);
+  assert.match(controller, /selection:current111-abc-v5/);
+  assert.match(favorites, /favorites-current111-abc-v5/);
+  assert.match(grid, /deletion-candidates:current111-abc-v5/);
+  assert.match(grid, /data-abc="\$\{abcGrade\}"/);
+  assert.match(gridCss, /\.hs-key\[data-abc="A"\]/);
+  assert.match(gridCss, /content:attr\(data-abc\)/);
+  assert.equal(existsSync(new URL('../hitsounds-current111-abc-v5.zip', import.meta.url)), true);
+  assert.equal(existsSync(new URL('../hitsounds-single-base-116.zip', import.meta.url)), false);
+});
+
+test('candidate rows use twelve slots with one category boundary slot', () => {
+  assert.match(grid, /Math\.max\(4, Math\.min\(12,/);
+  assert.match(grid, /first\.count \+ candidate\.count \+ 1 > capacity/);
+  assert.match(grid, /class="hs-family-spacer"/);
+  assert.match(gridCss, /grid-template-columns:repeat\(var\(--source-row-slots,12\),minmax\(0,1fr\)\)/);
+  assert.match(gridCss, /\.hs-family-spacer\{[\s\S]*?grid-column:span 1/);
+  assert.match(grid, /new ResizeObserver\(\(\) => buildGrid\(\)\)/);
 });
 
 test('timeline notes are reduced in both visible and fallback renderers', () => {

@@ -5,7 +5,7 @@
   const controller = window.HitsoundController;
   if (!CANDIDATES.length || !controller) return;
 
-  const STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-v1';
+  const STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5';
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
   const setButton = $('favSetButton');

@@ -4,7 +4,7 @@
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   const SILENT_ID = '__SILENT__';
   const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-4]__$/;
-  const SELECTION_STORAGE_KEY = 'osutaiko-hitsound-lab:selection:v1';
+  const SELECTION_STORAGE_KEY = 'osutaiko-hitsound-lab:selection:current111-abc-v5';
   const $ = id => document.getElementById(id);
 
   const el = {
@@ -23,10 +23,10 @@
   const byId = id => customSources.get(id) || builtInById(id);
   const available = candidate => candidate && !candidate.excluded;
   const validSideId = id => id === null || id === SILENT_ID || customSources.has(id) || available(builtInById(id));
-  const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-02.wav')?.id
+  const initialDon = CANDIDATES.find(candidate => available(candidate) && candidate.id === 'SRC093')?.id
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
-  const initialKat = CANDIDATES.find(candidate => available(candidate) && candidate.originalName === 'RnT_Timbale-06.wav')?.id
+  const initialKat = CANDIDATES.find(candidate => available(candidate) && candidate.id === 'SRC097')?.id
     || CANDIDATES.find(available)?.id
     || SILENT_ID;
 
@@ -68,8 +68,8 @@
     if (!packPromise) {
       packPromise = (async () => {
         if (!window.JSZip) throw new Error('JSZipを読み込めません。');
-        const response = await fetch('./hitsounds-single-base-116.zip', { cache: 'force-cache' });
-        if (!response.ok) throw new Error('正式版116音パックを読み込めません。');
+        const response = await fetch('./hitsounds-current111-abc-v5.zip', { cache: 'force-cache' });
+        if (!response.ok) throw new Error('Current111音パックを読み込めません。');
         return JSZip.loadAsync(await response.arrayBuffer());
       })().catch(error => {
         packPromise = null;
@@ -119,7 +119,7 @@
     if (!available(candidate)) throw new Error('候補音源が見つかりません。');
     const pack = await hitsoundPack();
     const entry = pack.file(candidate.entry);
-    if (!entry) throw new Error(`正式版116音パック内にありません: ${candidate.entry}`);
+    if (!entry) throw new Error(`Current111音パック内にありません: ${candidate.entry}`);
     const bytes = await entry.async('arraybuffer');
     bytesCache.set(id, bytes);
     return bytes;
@@ -424,7 +424,7 @@
       pendingSides.clear();
     } catch (error) {
       console.warn(error);
-      if (el.status) el.status.textContent = '正式版116音パック待ち';
+      if (el.status) el.status.textContent = 'Current111音パック待ち';
     }
   });
 

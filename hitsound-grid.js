@@ -24,7 +24,7 @@
   if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton || !customInput || !customSlots || !customCount) return;
 
   const SILENT_ID = controller.SILENT_ID;
-  const DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:v1';
+  const DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5';
   const ACTIVE_SIDE_STORAGE_KEY = 'osutaiko-hitsound-lab:active-side:v1';
   const CUSTOM_SLOT_COUNT = 4;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
@@ -44,6 +44,7 @@
   let customReady = false;
   let customBusy = false;
   let uploadTargetSlot = null;
+  let renderedRowCapacity = 0;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
   const displayFamily = candidate => familyOf(candidate);
@@ -122,24 +123,75 @@
   }
 
   function candidateLabel(candidate) {
-    return `${candidate.sourceNumber} ${candidate.originalName || candidate.name || ''}`.trim();
+    return String(candidate.sourceLabel || `SRC-${candidate.sourceNumber}`);
   }
 
   function keyMarkup(candidate) {
-    const source = String(candidate.originalName || candidate.name || '');
-    const pitch = Number.isFinite(candidate.pitch) ? `${candidate.pitch.toFixed(1)} Hz` : '';
+    const source = candidateLabel(candidate);
     const family = displayFamily(candidate);
-    return `<button class="hs-key" type="button" data-hs-id="${candidate.id}" title="${source}${pitch ? ` · ${pitch}` : ''}" aria-label="${candidate.sourceNumber}、${source}、${family}" aria-pressed="false" data-base-label="${candidateLabel(candidate)}"><span>${candidate.sourceNumber}</span></button>`;
+    const abcGrade = String(candidate.abcGrade || '').toUpperCase();
+    return `<button class="hs-key" type="button" data-hs-id="${candidate.id}" data-abc="${abcGrade}" title="${source}" aria-label="${source}、${abcGrade}、${family}" aria-pressed="false" data-base-label="${source}"><span data-abc="${abcGrade}">${candidate.sourceNumber}</span></button>`;
   }
 
-  function buildGrid() {
-    const groups = groupedCandidates();
-    sources.innerHTML = groups.map(([family, candidates]) => `
-      <section class="hs-family" data-family="${family}">
+  function candidateRowCapacity() {
+    const width = Math.max(0, sources.clientWidth);
+    if (!width) return 12;
+    return Math.max(4, Math.min(12, Math.floor((width + 7) / 59)));
+  }
+
+  function packCandidateRows(groups, capacity) {
+    const indexed = groups.map((group, index) => ({ group, index, count: group[1].length }));
+    const rows = indexed.filter(item => item.count >= capacity).map(item => [item]);
+    const remaining = indexed
+      .filter(item => item.count < capacity)
+      .sort((a, b) => b.count - a.count || a.index - b.index);
+
+    while (remaining.length) {
+      const first = remaining.shift();
+      let partnerIndex = -1;
+      let partnerDistance = Number.POSITIVE_INFINITY;
+      for (let index = 0; index < remaining.length; index++) {
+        const candidate = remaining[index];
+        if (first.count + candidate.count + 1 > capacity) continue;
+        const distance = Math.abs(first.index - candidate.index);
+        if (distance < partnerDistance) {
+          partnerIndex = index;
+          partnerDistance = distance;
+        }
+      }
+      const row = [first];
+      if (partnerIndex >= 0) row.push(remaining.splice(partnerIndex, 1)[0]);
+      row.sort((a, b) => a.index - b.index);
+      rows.push(row);
+    }
+
+    rows.sort((a, b) => a[0].index - b[0].index);
+    return rows.map(row => row.map(item => item.group));
+  }
+
+  function familyMarkup([family, candidates], capacity) {
+    const slots = Math.min(capacity, candidates.length);
+    return `
+      <section class="hs-family" data-family="${family}" style="--family-slots:${slots};--family-columns:${slots}">
         <div class="hs-family-title">${family}</div>
         <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
-      </section>
+      </section>`;
+  }
+
+  function buildGrid({ force = false } = {}) {
+    const capacity = candidateRowCapacity();
+    if (!force && capacity === renderedRowCapacity) return;
+    renderedRowCapacity = capacity;
+    const groups = groupedCandidates();
+    const rows = packCandidateRows(groups, capacity);
+    sources.style.setProperty('--source-row-slots', String(capacity));
+    sources.innerHTML = rows.map(row => `
+      <div class="hs-family-row" data-family-count="${row.length}">
+        ${familyMarkup(row[0], capacity)}
+        ${row.length === 2 ? `<span class="hs-family-spacer" aria-hidden="true"></span>${familyMarkup(row[1], capacity)}` : ''}
+      </div>
     `).join('');
+    paint();
   }
 
   function openCustomDb() {
@@ -716,7 +768,12 @@
     paintDeleteCandidates();
   });
 
-  buildGrid();
+  buildGrid({ force: true });
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(() => buildGrid()).observe(sources);
+  } else {
+    window.addEventListener('resize', () => buildGrid());
+  }
   renderCustomSlots();
   paint();
   window.dispatchEvent(new CustomEvent('hitsound-active-side-change', { detail: { side: activeSide } }));

@@ -55,7 +55,7 @@ jobs:
           cp hitsound-grid.js _site/
           cp workbench-ui.js _site/
           cp object-timeline-v2.js _site/
-          cp hitsounds-single-base-116.zip _site/
+          cp hitsounds-current111-abc-v5.zip _site/
           cp maps.zip _site/
 
           # Rebuild the added map bundle, verify it, then publish each OSZ separately.

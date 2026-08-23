@@ -1474,7 +1474,7 @@
     if (ac) ac.close().catch(() => {});
   });
 
-  if (el.samplePolicy) el.samplePolicy.textContent = 'Hitsound: 単音ベース正式版116音';
+  if (el.samplePolicy) el.samplePolicy.textContent = 'Hitsound: Current111 ABC v5';
   if (el.debug) {
     el.debug.hidden = !DEBUG_MODE;
     if (DEBUG_MODE) {
