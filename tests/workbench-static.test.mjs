@@ -41,8 +41,8 @@ test('candidate tap toggles selection and previews once only when selecting', ()
   assert.match(grid, /preview: preview && !deselecting/);
 });
 
-test('audio levels are fixed at Music 0.75 and Effect 1.00 with preview ducking removed', () => {
-  assert.match(app, /const MUSIC_GAIN = 0\.75;/);
+test('audio levels are fixed at Music 0.70 and Effect 1.00 with preview ducking removed', () => {
+  assert.match(app, /const MUSIC_GAIN = 0\.70;/);
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
   assert.doesNotMatch(controller, /DuckingBridge|setPreviewDucking/);
   assert.doesNotMatch(html, /audio-ducking-bridge\.js/);
@@ -69,7 +69,7 @@ test('candidate switching shares decoded audio and keeps only the latest rapid t
   assert.match(controller, /if \(serial === selectionSerial\) await applyPendingSelection\(serial\);\s+await previewTask;/);
   assert.match(controller, /function warmCurrentSelection\(\)/);
   assert.match(workbench, /window\.addEventListener\('hitsound-preview-state'/);
-  assert.match(html, /app-v4\.js\?v=3\.6-music-075/);
+  assert.match(html, /app-v4\.js\?v=3\.7-music-070/);
   assert.match(html, /hitsound-controller\.js\?v=4\.1-latest-switch-wins/);
 });
 

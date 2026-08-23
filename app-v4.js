@@ -5,7 +5,7 @@
   const ZOOM_LABELS = ['±0.5s', '±0.4s', '±0.3s'];
   const OBJECT_NOTE_RADIUS = [14, 14, 13.5];
   const START_DELAY_SEC = 0.10;
-  const MUSIC_GAIN = 0.75;
+  const MUSIC_GAIN = 0.70;
   const EFFECT_GAIN = 1.00;
   const EFFECT_SCHEDULE_AHEAD_SEC = 0.50;
   const EFFECT_RESCHEDULE_LEAD_SEC = 0.03;

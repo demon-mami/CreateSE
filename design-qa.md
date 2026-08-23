@@ -147,7 +147,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 - rapid tapはselection serialでlatest-winsとし、古い処理が完了しても最後にtapした候補を上書きしない。
 - decoded buffer cacheを8件から32件へ拡張する。
 - My Sound等の互換経路として従来のfile input fallbackは保持する。
-- temporary volume controlは追加せず、最終mixはMusic `0.75` / Hitsound `1.00`とする。
+- temporary volume controlは追加せず、最終mixはMusic `0.70` / Hitsound `1.00`とする。
 - 表示、文言、layoutには変更を加えていない。
 
 ### Production QA
@@ -231,13 +231,13 @@ Cloud Browserの計測値にはremote input・iframe・rendering overheadが含�
 - time-copy button幅のlayout readをresize時へ移動。
 - beat / measure lineを2 pathへbatchし、noteごとの`save()` / `restore()`を廃止。
 - canvas DPR上限2とnoteの見た目は維持し、軽量化のための解像度低下は行っていない。
-- 最終固定mixをMusic `0.75` / Effect `1.00`へ変更。音量sliderや説明文は追加していない。
+- 最終固定mixをMusic `0.70` / Effect `1.00`へ変更。音量sliderや説明文は追加していない。
 
 ### Production QA
 
 | 確認 | 結果 |
 |---|---|
-| deploy | `object-timeline-v2.js?v=3.1-ipad-frame-budget`、最終`app-v4.js?v=3.6-music-075` |
+| deploy | `object-timeline-v2.js?v=3.1-ipad-frame-budget`、最終`app-v4.js?v=3.7-music-070` |
 | viewport | Cloud Browser 1363 × 936（iPad 13インチ横相当） |
 | stress chart | `Everytime We Touch [Fvrwvrd's 700 BPM Speedcore Edit]` |
 | sustained playback | 01:59まで再生を継続。object lane、全体cursor、seekが進行 |
