@@ -1,9 +1,8 @@
 (() => {
   'use strict';
 
-  const SPANS_MS = [1000, 800, 600];
-  const ZOOM_LABELS = ['±0.5s', '±0.4s', '±0.3s'];
-  const OBJECT_NOTE_RADIUS = [14, 14, 13.5];
+  const OBJECT_TIMELINE_SPAN_MS = 1000;
+  const OBJECT_NOTE_RADIUS = 14;
   const START_DELAY_SEC = 0.10;
   const MUSIC_GAIN = 0.70;
   const EFFECT_GAIN = 1.00;
@@ -15,7 +14,6 @@
   const MAX_DECODED_HITSOUND_CACHE = 32;
   const SKIP_SEC = 4;
   const LOOP_MIN_MS = 500;
-  const LOOP_MAX_MS = 30000;
   const TRANSPORT_UI_INTERVAL_MS = 33;
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
@@ -25,16 +23,26 @@
   const HS_FILES = {};
 
   const $ = id => document.getElementById(id);
+  const rangeElements = [
+    {
+      start: $('startMarkButton'), startValue: $('startMarkValue'),
+      end: $('endMarkButton'), endValue: $('endMarkValue'), length: $('rangeLength'),
+      jumpStart: $('jumpStartButton'), jumpEnd: $('jumpEndButton'),
+      loopToggle: $('loopToggleButton'), clear: $('clearLoopButton'), status: $('loopStatus'),
+    },
+    {
+      start: $('startMarkButton2'), startValue: $('startMarkValue2'),
+      end: $('endMarkButton2'), endValue: $('endMarkValue2'), length: $('rangeLength2'),
+      jumpStart: $('jumpStartButton2'), jumpEnd: $('jumpEndButton2'),
+      loopToggle: $('loopToggleButton2'), clear: $('clearLoopButton2'), status: $('loopStatus2'),
+    },
+  ];
   const el = {
     oszInput: $('oszInput'), fileName: $('fileName'), status: $('statusBadge'),
     diff: $('difficultySelect'), songTitle: $('songTitle'), songMeta: $('songMeta'), samplePolicy: $('samplePolicy'),
     donHsInput: $('donHitsoundInput'), kaHsInput: $('kaHitsoundInput'),
-    time: $('timeDisplay'), duration: $('durationDisplay'), copyTime: $('copyTimeButton'),
-    start: $('startMarkButton'), startValue: $('startMarkValue'),
-    end: $('endMarkButton'), endValue: $('endMarkValue'), length: $('rangeLength'),
-    loopToggle: $('loopToggleButton'), clearLoop: $('clearLoopButton'), loopStatus: $('loopStatus'),
+    seekTime: $('seekTimeFeedback'), copyTime: $('copyTimeButton'),
     back: $('backButton'), play: $('playButton'), fwd: $('forwardButton'), seek: $('seekBar'),
-    zoomOut: $('zoomOutButton'), zoomIn: $('zoomInButton'), zoomLabel: $('zoomLabel'),
     timelineViewport: $('timelineViewport'), timelineStatic: $('timelineStaticCanvas'), timelineCursor: $('timelineCursorCanvas'),
     overviewViewport: $('overviewViewport'), overviewStatic: $('overviewStaticCanvas'), overviewCursor: $('overviewCursorCanvas'),
     purpose: $('purposeSelect'), fade: $('fadeSelect'), preview: $('outputPreview'), copyOut: $('copyOutputButton'),
@@ -44,11 +52,12 @@
   let zip = null;
   let maps = [];
   let map = null;
-  let startMark = null;
-  let endMark = null;
-  let loopEnabled = false;
+  const ranges = [
+    { start: null, end: null },
+    { start: null, end: null },
+  ];
+  let activeLoopIndex = -1;
   let loopSeekPending = false;
-  let zoom = 0;
   let ready = false;
   let raf = 0;
 
@@ -89,6 +98,7 @@
   const timelineSize = { width: 0, height: 0 };
   const overviewSize = { width: 0, height: 0 };
   let copyTimeButtonWidth = 70;
+  let seekFeedbackTimer = 0;
 
   const setStatus = text => { if (el.status) el.status.textContent = text; };
   const clearError = () => {
@@ -103,12 +113,16 @@
 
   const durationSec = () => musicBuffer ? musicBuffer.duration : 0;
   const durationMs = () => durationSec() * 1000;
-  const spanMs = () => SPANS_MS[zoom];
-  const rangeDurationMs = () => startMark && endMark ? endMark.time - startMark.time : NaN;
-  const validRange = () => {
-    const length = rangeDurationMs();
-    return Number.isFinite(length) && length >= LOOP_MIN_MS && length <= LOOP_MAX_MS;
+  const spanMs = () => OBJECT_TIMELINE_SPAN_MS;
+  const rangeDurationMs = index => {
+    const range = ranges[index];
+    return range?.start && range?.end ? range.end.time - range.start.time : NaN;
   };
+  const validRange = index => {
+    const length = rangeDurationMs(index);
+    return Number.isFinite(length) && length >= LOOP_MIN_MS;
+  };
+  const activeRange = () => activeLoopIndex >= 0 && validRange(activeLoopIndex) ? ranges[activeLoopIndex] : null;
   const css = (name, fallback) => {
     if (!cssTokenCache.has(name)) {
       cssTokenCache.set(name, getComputedStyle(document.documentElement).getPropertyValue(name).trim());
@@ -146,6 +160,24 @@
 
   const fmtLen = ms => Number.isFinite(ms) && ms >= 0 ? `${(ms / 1000).toFixed(3)} s` : '—';
 
+  function showSeekFeedback(positionSec, { linger = true } = {}) {
+    if (!el.seekTime) return;
+    clearTimeout(seekFeedbackTimer);
+    el.seekTime.value = fmt(clampSec(positionSec) * 1000);
+    el.seekTime.textContent = el.seekTime.value;
+    const duration = durationSec();
+    const ratio = duration > 0 ? clampSec(positionSec) / duration : 0;
+    el.seekTime.style.left = `${Math.max(10, Math.min(90, ratio * 100))}%`;
+    el.seekTime.hidden = false;
+    el.seekTime.classList.add('visible');
+    if (linger) {
+      seekFeedbackTimer = window.setTimeout(() => {
+        el.seekTime.classList.remove('visible');
+        el.seekTime.hidden = true;
+      }, 900);
+    }
+  }
+
   function setPlayState(nextPlaying) {
     if (!el.play) return;
     el.play.textContent = nextPlaying ? 'Ⅱ' : '▶';
@@ -160,92 +192,108 @@
     const diff = map.metadata.Version || 'Unknown';
     const purpose = el.purpose?.value || '未選択';
     const fade = el.fade?.value || '含まない';
-    const range = validRange()
-      ? `${fmtOut(startMark.time)}～${fmtOut(endMark.time)}`
-      : (startMark && endMark ? 'ENDがSTARTより前です' : '未選択');
+    const primary = ranges[0];
+    const range = validRange(0)
+      ? `${fmtOut(primary.start.time)}～${fmtOut(primary.end.time)}`
+      : (primary.start && primary.end ? 'ENDがSTARTより前です' : '未選択');
     return `**曲名：${title}**\n用途：${purpose}\n難易度：**${diff}**\n区間：${range}（Fade-in/out：${fade}）`;
   }
 
   function updateOutput() {
     if (el.preview) el.preview.textContent = outputText();
-    if (el.copyOut) el.copyOut.disabled = !(map && el.purpose?.value && validRange());
+    if (el.copyOut) el.copyOut.disabled = !(map && el.purpose?.value && validRange(0));
   }
 
-  function updateRange() {
-    if (el.start) {
-      el.start.classList.toggle('marked', !!startMark);
-      el.start.textContent = 'A';
-      el.start.setAttribute('aria-label', startMark ? '現在位置でAを更新' : '現在位置をAに設定');
-    }
-    if (el.end) {
-      el.end.classList.toggle('marked', !!endMark);
-      el.end.textContent = 'B';
-      el.end.setAttribute('aria-label', endMark ? '現在位置でBを更新' : '現在位置をBに設定');
-      el.end.disabled = !ready || !startMark;
-    }
-    if (el.startValue) el.startValue.textContent = startMark ? `A ${fmt(startMark.time)}` : 'A 未設定';
-    if (el.endValue) el.endValue.textContent = endMark ? `B ${fmt(endMark.time)}` : 'B 未設定';
-    if (el.length) el.length.textContent = validRange() ? fmtLen(rangeDurationMs()) : '—';
-    if (!validRange()) loopEnabled = false;
-    if (el.loopToggle) {
-      el.loopToggle.disabled = !ready || !validRange();
-      el.loopToggle.setAttribute('aria-pressed', loopEnabled ? 'true' : 'false');
-      el.loopToggle.textContent = `↻ ${loopEnabled ? 'ON' : 'OFF'}`;
-      el.loopToggle.setAttribute('aria-label', loopEnabled ? 'A–Bリピートを停止' : 'A–Bリピートを開始');
-    }
-    if (el.clearLoop) el.clearLoop.disabled = !ready || (!startMark && !endMark);
-    if (el.loopStatus) {
-      const length = rangeDurationMs();
-      if (!startMark) el.loopStatus.textContent = 'Aを設定してください';
-      else if (!endMark) el.loopStatus.textContent = 'Bを設定してください（0.500〜30.000秒）';
-      else if (length < LOOP_MIN_MS) el.loopStatus.textContent = '区間は0.500秒以上にしてください';
-      else if (length > LOOP_MAX_MS) el.loopStatus.textContent = '区間は30.000秒以下にしてください';
-      else el.loopStatus.textContent = loopEnabled ? `${fmtLen(length)}を反復中` : `${fmtLen(length)}を反復できます`;
-    }
+  function updateRanges() {
+    if (activeLoopIndex >= 0 && !validRange(activeLoopIndex)) activeLoopIndex = -1;
+    rangeElements.forEach((nodes, index) => {
+      const range = ranges[index];
+      const enabled = activeLoopIndex === index;
+      if (nodes.start) {
+        nodes.start.classList.toggle('marked', !!range.start);
+        nodes.start.setAttribute('aria-label', range.start ? `現在位置で区間${index + 1}のAを更新` : `現在位置を区間${index + 1}のAに設定`);
+      }
+      if (nodes.end) {
+        nodes.end.classList.toggle('marked', !!range.end);
+        nodes.end.setAttribute('aria-label', range.end ? `現在位置で区間${index + 1}のBを更新` : `現在位置を区間${index + 1}のBに設定`);
+        nodes.end.disabled = !ready || !range.start;
+      }
+      if (nodes.startValue) nodes.startValue.textContent = range.start ? `A ${fmt(range.start.time)}` : 'A 未設定';
+      if (nodes.endValue) nodes.endValue.textContent = range.end ? `B ${fmt(range.end.time)}` : 'B 未設定';
+      if (nodes.length) nodes.length.textContent = validRange(index) ? fmtLen(rangeDurationMs(index)) : '—';
+      if (nodes.jumpStart) nodes.jumpStart.disabled = !ready || !range.start;
+      if (nodes.jumpEnd) nodes.jumpEnd.disabled = !ready || !range.end;
+      if (nodes.loopToggle) {
+        nodes.loopToggle.disabled = !ready || !validRange(index);
+        nodes.loopToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        nodes.loopToggle.setAttribute('aria-label', enabled ? `区間${index + 1}のリピートを停止` : `区間${index + 1}をリピート`);
+      }
+      if (nodes.clear) nodes.clear.disabled = !ready || (!range.start && !range.end);
+      if (nodes.status) {
+        const length = rangeDurationMs(index);
+        if (!range.start) nodes.status.textContent = 'Aを設定してください';
+        else if (!range.end) nodes.status.textContent = 'Bを設定してください';
+        else if (length < LOOP_MIN_MS) nodes.status.textContent = '区間は0.500秒以上にしてください';
+        else nodes.status.textContent = enabled ? `${fmtLen(length)}を反復中` : `${fmtLen(length)}を反復できます`;
+      }
+    });
     window.dispatchEvent(new CustomEvent('viewer-loop-change', {
       detail: {
-        startMs: startMark?.time ?? null,
-        endMs: endMark?.time ?? null,
-        durationMs: validRange() ? rangeDurationMs() : null,
-        valid: validRange(),
-        enabled: loopEnabled,
+        activeIndex: activeLoopIndex,
+        ranges: ranges.map((range, index) => ({
+          startMs: range.start?.time ?? null,
+          endMs: range.end?.time ?? null,
+          durationMs: validRange(index) ? rangeDurationMs(index) : null,
+          valid: validRange(index),
+          enabled: activeLoopIndex === index,
+        })),
       }
     }));
     updateOutput();
     if (map && musicBuffer) renderSongStatic();
   }
 
-  function resetRange() {
-    startMark = null;
-    endMark = null;
-    loopEnabled = false;
-    updateRange();
+  function resetRange(index = null) {
+    const indexes = index == null ? [0, 1] : [index];
+    for (const target of indexes) {
+      ranges[target].start = null;
+      ranges[target].end = null;
+      if (activeLoopIndex === target) activeLoopIndex = -1;
+    }
+    updateRanges();
   }
 
-  function toggleMark(which) {
+  function toggleMark(index, which) {
     if (!map || !musicBuffer) return;
+    const range = ranges[index];
     const point = { time: Math.round(audiblePosition() * 1000) };
     if (which === 'start') {
-      startMark = point;
-      endMark = null;
-      loopEnabled = false;
+      range.start = point;
+      range.end = null;
+      if (activeLoopIndex === index) activeLoopIndex = -1;
     } else {
-      if (!startMark) return;
-      const length = point.time - startMark.time;
-      if (length < LOOP_MIN_MS || length > LOOP_MAX_MS) {
-        endMark = null;
-        loopEnabled = false;
+      if (!range.start) return;
+      const length = point.time - range.start.time;
+      if (length < LOOP_MIN_MS) {
+        range.end = null;
+        if (activeLoopIndex === index) activeLoopIndex = -1;
       } else {
-        endMark = point;
+        range.end = point;
       }
     }
-    updateRange();
+    updateRanges();
   }
 
-  function toggleLoop() {
-    if (!validRange()) return;
-    loopEnabled = !loopEnabled;
-    updateRange();
+  function toggleLoop(index) {
+    if (!validRange(index)) return;
+    activeLoopIndex = activeLoopIndex === index ? -1 : index;
+    updateRanges();
+  }
+
+  function jumpToRangeMark(index, which) {
+    const mark = ranges[index]?.[which];
+    if (!mark) return;
+    seekTo(mark.time / 1000, { showFeedback: true }).catch(error => fail(error instanceof Error ? error.message : '再生位置を移動できませんでした。'));
   }
 
   async function copy(text, button) {
@@ -733,9 +781,10 @@
     if (!musicBuffer || !hitsoundsReady || !map) return;
     await ensureContext(true);
     const requested = clampSec(offset);
-    const loopStart = startMark ? startMark.time / 1000 : 0;
-    const loopEnd = endMark ? endMark.time / 1000 : 0;
-    const startAt = loopEnabled && validRange() && (requested < loopStart || requested >= loopEnd)
+    const loopRange = activeRange();
+    const loopStart = loopRange ? loopRange.start.time / 1000 : 0;
+    const loopEnd = loopRange ? loopRange.end.time / 1000 : 0;
+    const startAt = loopRange && (requested < loopStart || requested >= loopEnd)
       ? loopStart
       : requested;
     pausedOffset = startAt >= durationSec() - 0.001 ? 0 : startAt;
@@ -775,14 +824,15 @@
     stopSources();
   }
 
-  async function seekTo(target, { fromLoop = false } = {}) {
+  async function seekTo(target, { fromLoop = false, showFeedback = false } = {}) {
     const next = clampSec(target);
-    if (!fromLoop && loopEnabled && validRange()) {
-      const start = startMark.time / 1000;
-      const end = endMark.time / 1000;
+    const loopRange = activeRange();
+    if (!fromLoop && loopRange) {
+      const start = loopRange.start.time / 1000;
+      const end = loopRange.end.time / 1000;
       if (next < start || next >= end) {
-        loopEnabled = false;
-        updateRange();
+        activeLoopIndex = -1;
+        updateRanges();
       }
     }
     const wasPlaying = playing;
@@ -791,6 +841,7 @@
     pausedOffset = next;
     if (wasPlaying) await startPlayback(next);
     syncVisualToPosition();
+    if (showFeedback) showSeekFeedback(next);
   }
 
   async function loadMusic(activeMap) {
@@ -920,11 +971,10 @@
 
   function setControls(enabled) {
     ready = enabled;
-    [el.play, el.back, el.fwd, el.seek, el.copyTime, el.start].forEach(node => {
+    [el.play, el.back, el.fwd, el.seek, el.copyTime, ...rangeElements.map(nodes => nodes.start)].forEach(node => {
       if (node) node.disabled = !enabled;
     });
-    updateRange();
-    updateZoom();
+    updateRanges();
     updateOutput();
   }
 
@@ -951,8 +1001,6 @@
         el.seek.value = '0';
         el.seek.setAttribute('aria-valuetext', '00:00:000');
       }
-      if (el.time) el.time.textContent = '00:00:000';
-      if (el.duration) el.duration.textContent = fmt(durationMs());
       pausedOffset = 0;
       setControls(true);
       setStatus('準備完了');
@@ -979,7 +1027,6 @@
     setStatus('OSZ解析中');
     if (el.purpose) el.purpose.value = '';
     if (el.fade) el.fade.value = '含まない';
-    zoom = 0;
     stopSources();
     musicBuffer = null;
     hitsoundsReady = false;
@@ -987,7 +1034,6 @@
     map = null;
     maps = [];
     resetRange();
-    if (el.duration) el.duration.textContent = '00:00:000';
     setControls(false);
     if (el.diff) {
       el.diff.disabled = true;
@@ -1019,12 +1065,6 @@
       if (el.diff) el.diff.innerHTML = '<option>読み込み失敗</option>';
       fail(error instanceof Error ? error.message : String(error));
     }
-  }
-
-  function updateZoom() {
-    if (el.zoomLabel) el.zoomLabel.textContent = ZOOM_LABELS[zoom] || ZOOM_LABELS[0];
-    if (el.zoomIn) el.zoomIn.disabled = !ready || zoom >= SPANS_MS.length - 1;
-    if (el.zoomOut) el.zoomOut.disabled = !ready || zoom <= 0;
   }
 
   function sizeCanvas(canvas, cssWidth, cssHeight) {
@@ -1135,7 +1175,7 @@
     drawObjectTicks(ctx, left, right, xForTime, rect.width, rect.height);
 
     const noteY = Math.max(36, Math.min(rect.height - 44, rect.height * 0.48));
-    const normalRadius = OBJECT_NOTE_RADIUS[zoom] || OBJECT_NOTE_RADIUS[0];
+    const normalRadius = OBJECT_NOTE_RADIUS;
     const bigRadius = normalRadius * 1.22;
     const don = css('--don', '#ef6862');
     const ka = css('--ka', '#69bde0');
@@ -1161,14 +1201,14 @@
       }
     }
 
-    if (validRange()) {
-      const a = Math.max(left, startMark.time);
-      const b = Math.min(right, endMark.time);
-      if (b > a) {
-        ctx.fillStyle = 'rgba(104,211,154,.055)';
-        ctx.fillRect(xForTime(a), 0, xForTime(b) - xForTime(a), rect.height);
-      }
-    }
+    ranges.forEach((range, index) => {
+      if (!validRange(index)) return;
+      const a = Math.max(left, range.start.time);
+      const b = Math.min(right, range.end.time);
+      if (b <= a) return;
+      ctx.fillStyle = index === 0 ? 'rgba(104,211,154,.055)' : 'rgba(123,217,255,.05)';
+      ctx.fillRect(xForTime(a), 0, xForTime(b) - xForTime(a), rect.height);
+    });
 
     const drawMark = (mark, label, color) => {
       if (!mark || mark.time < left || mark.time > right) return;
@@ -1187,8 +1227,10 @@
       ctx.textBaseline = 'top';
       ctx.fillText(label, x + 3, 4);
     };
-    drawMark(startMark, 'START', css('--range-start', '#68d39a'));
-    drawMark(endMark, 'END', css('--range-end', '#f3b55d'));
+    drawMark(ranges[0].start, '1A', css('--range-start', '#68d39a'));
+    drawMark(ranges[0].end, '1B', css('--range-end', '#f3b55d'));
+    drawMark(ranges[1].start, '2A', css('--range2-start', '#7bd9ff'));
+    drawMark(ranges[1].end, '2B', css('--range2-end', '#d89aff'));
 
     if (el.timelineCursor) {
       const c = sizeCanvas(el.timelineCursor, rect.width, rect.height);
@@ -1253,10 +1295,11 @@
       ctx.fillRect(xForTime(range.start), 0, Math.max(1, xForTime(finish) - xForTime(range.start)), rect.height);
     }
 
-    if (validRange()) {
-      ctx.fillStyle = 'rgba(104,211,154,.065)';
-      ctx.fillRect(xForTime(startMark.time), 0, Math.max(1, xForTime(endMark.time) - xForTime(startMark.time)), rect.height);
-    }
+    ranges.forEach((range, index) => {
+      if (!validRange(index)) return;
+      ctx.fillStyle = index === 0 ? 'rgba(104,211,154,.065)' : 'rgba(123,217,255,.055)';
+      ctx.fillRect(xForTime(range.start.time), 0, Math.max(1, xForTime(range.end.time) - xForTime(range.start.time)), rect.height);
+    });
 
     drawSongDensity(ctx, rect, d);
 
@@ -1320,8 +1363,10 @@
       ctx.lineTo(x, rect.height);
       ctx.stroke();
     };
-    mark(startMark, css('--range-start', '#68d39a'));
-    mark(endMark, css('--range-end', '#f3b55d'));
+    mark(ranges[0].start, css('--range-start', '#68d39a'));
+    mark(ranges[0].end, css('--range-end', '#f3b55d'));
+    mark(ranges[1].start, css('--range2-start', '#7bd9ff'));
+    mark(ranges[1].end, css('--range2-end', '#d89aff'));
   }
 
   function drawSongCursor(positionSec) {
@@ -1355,7 +1400,6 @@
 
   function syncVisualToPosition() {
     const p = audiblePosition();
-    if (el.time) el.time.textContent = fmt(p * 1000);
     if (!seekScrub && el.seek) {
       el.seek.value = String(p);
       el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
@@ -1389,16 +1433,16 @@
 
   function frame(now) {
     const p = audiblePosition();
-    if (playing && loopEnabled && validRange() && !loopSeekPending && p >= endMark.time / 1000) {
+    const loopRange = activeRange();
+    if (playing && loopRange && !loopSeekPending && p >= loopRange.end.time / 1000) {
       loopSeekPending = true;
-      seekTo(startMark.time / 1000, { fromLoop: true })
+      seekTo(loopRange.start.time / 1000, { fromLoop: true })
         .catch(error => fail(error instanceof Error ? error.message : '区間を繰り返せませんでした。'))
         .finally(() => { loopSeekPending = false; });
     }
     const canSyncSeek = !seekScrub && !timelineScrub && !overviewScrub && el.seek;
     if (now - lastTransportUiPaint >= TRANSPORT_UI_INTERVAL_MS) {
       const formatted = fmt(p * 1000);
-      if (el.time && el.time.textContent !== formatted) el.time.textContent = formatted;
       if (canSyncSeek) {
         const position = String(p);
         if (el.seek.value !== position) el.seek.value = position;
@@ -1427,25 +1471,27 @@
 
   function scrubTo(targetSec) {
     pausedOffset = clampSec(targetSec);
-    if (loopEnabled && validRange()) {
-      const start = startMark.time / 1000;
-      const end = endMark.time / 1000;
+    const loopRange = activeRange();
+    if (loopRange) {
+      const start = loopRange.start.time / 1000;
+      const end = loopRange.end.time / 1000;
       if (pausedOffset < start || pausedOffset >= end) {
-        loopEnabled = false;
-        updateRange();
+        activeLoopIndex = -1;
+        updateRanges();
       }
     }
-    if (el.time) el.time.textContent = fmt(pausedOffset * 1000);
     if (el.seek) {
       el.seek.value = String(pausedOffset);
       el.seek.setAttribute('aria-valuetext', fmt(pausedOffset * 1000));
     }
     renderObjectAt(pausedOffset);
     drawSongCursor(pausedOffset);
+    showSeekFeedback(pausedOffset, { linger: false });
   }
 
   async function endScrub(state) {
     if (state?.wasPlaying) await startPlayback(pausedOffset);
+    showSeekFeedback(pausedOffset);
   }
 
   function timelineTargetFromEvent(event) {
@@ -1482,35 +1528,24 @@
       fail(error instanceof Error ? error.message : '再生できませんでした。');
     }
   });
-  el.back?.addEventListener('click', () => seekTo(audiblePosition() - SKIP_SEC));
-  el.fwd?.addEventListener('click', () => seekTo(audiblePosition() + SKIP_SEC));
+  el.back?.addEventListener('click', () => seekTo(audiblePosition() - SKIP_SEC, { showFeedback: true }));
+  el.fwd?.addEventListener('click', () => seekTo(audiblePosition() + SKIP_SEC, { showFeedback: true }));
   el.copyTime?.addEventListener('click', event => {
     event.stopPropagation();
     copy(fmt(audiblePosition() * 1000), el.copyTime);
   });
-  el.start?.addEventListener('click', () => toggleMark('start'));
-  el.end?.addEventListener('click', () => toggleMark('end'));
-  el.loopToggle?.addEventListener('click', toggleLoop);
-  el.clearLoop?.addEventListener('click', resetRange);
+  rangeElements.forEach((nodes, index) => {
+    nodes.start?.addEventListener('click', () => toggleMark(index, 'start'));
+    nodes.end?.addEventListener('click', () => toggleMark(index, 'end'));
+    nodes.jumpStart?.addEventListener('click', () => jumpToRangeMark(index, 'start'));
+    nodes.jumpEnd?.addEventListener('click', () => jumpToRangeMark(index, 'end'));
+    nodes.loopToggle?.addEventListener('click', () => toggleLoop(index));
+    nodes.clear?.addEventListener('click', () => resetRange(index));
+  });
   el.purpose?.addEventListener('change', updateOutput);
   el.fade?.addEventListener('change', updateOutput);
   el.copyOut?.addEventListener('click', () => {
     if (!el.copyOut.disabled) copy(outputText(), el.copyOut);
-  });
-
-  el.zoomIn?.addEventListener('click', () => {
-    if (zoom < SPANS_MS.length - 1) {
-      zoom++;
-      updateZoom();
-      renderObjectAt(audiblePosition());
-    }
-  });
-  el.zoomOut?.addEventListener('click', () => {
-    if (zoom > 0) {
-      zoom--;
-      updateZoom();
-      renderObjectAt(audiblePosition());
-    }
   });
 
   el.seek?.addEventListener('pointerdown', () => { seekScrub = beginScrub('seek'); });
@@ -1593,8 +1628,11 @@
       el.seek.value = '0';
       el.seek.setAttribute('aria-valuetext', '00:00:000');
     }
-    if (el.time) el.time.textContent = '00:00:000';
-    if (el.duration) el.duration.textContent = '00:00:000';
+    clearTimeout(seekFeedbackTimer);
+    if (el.seekTime) {
+      el.seekTime.classList.remove('visible');
+      el.seekTime.hidden = true;
+    }
     for (const canvas of [el.timelineStatic, el.timelineCursor, el.overviewStatic, el.overviewCursor]) {
       if (!canvas) continue;
       const context = canvas.getContext('2d');
@@ -1649,10 +1687,13 @@
     }),
     skipSeconds: SKIP_SEC,
     loopState: () => ({
-      startMs: startMark?.time ?? null,
-      endMs: endMark?.time ?? null,
-      valid: validRange(),
-      enabled: loopEnabled,
+      activeIndex: activeLoopIndex,
+      ranges: ranges.map((range, index) => ({
+        startMs: range.start?.time ?? null,
+        endMs: range.end?.time ?? null,
+        valid: validRange(index),
+        enabled: activeLoopIndex === index,
+      })),
     }),
   };
 
@@ -1667,15 +1708,17 @@
     applyHitsoundPairBytes,
     setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },
     loopState: () => ({
-      startMs: startMark?.time ?? null,
-      endMs: endMark?.time ?? null,
-      valid: validRange(),
-      enabled: loopEnabled,
+      activeIndex: activeLoopIndex,
+      ranges: ranges.map((range, index) => ({
+        startMs: range.start?.time ?? null,
+        endMs: range.end?.time ?? null,
+        valid: validRange(index),
+        enabled: activeLoopIndex === index,
+      })),
     }),
   };
 
-  updateRange();
-  updateZoom();
+  updateRanges();
   setPlayState(false);
   raf = requestAnimationFrame(frame);
 })();

@@ -9,10 +9,7 @@
   const sources = $('hitsoundSources');
   const roleDonButton = $('roleDonButton');
   const roleKatButton = $('roleKatButton');
-  const silentButton = $('silentButton');
-  const deleteCandidateButton = $('deleteCandidateButton');
   const recommendationLine = $('recommendationLine');
-  const deleteCandidateLine = $('deleteCandidateLine');
   const customInput = $('customHitsoundInput');
   const customSlots = $('customSoundSlots');
   const customCount = $('customSoundCount');
@@ -24,7 +21,7 @@
   if (!CANDIDATES.length || !controller || !favorites || !grid || !sources || !roleDonButton || !roleKatButton || !customInput || !customSlots || !customCount) return;
 
   const SILENT_ID = controller.SILENT_ID;
-  const DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5';
+  const LEGACY_DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5';
   const ACTIVE_SIDE_STORAGE_KEY = 'osutaiko-hitsound-lab:active-side:v1';
   const CUSTOM_SLOT_COUNT = 4;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
@@ -32,7 +29,6 @@
   const MAX_CUSTOM_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_CUSTOM_DURATION_SEC = 5;
   const MOVE_TOLERANCE_PX = 11;
-  const validCandidateIds = new Set(CANDIDATES.filter(candidate => !candidate.excluded).map(candidate => candidate.id));
   const customRecords = new Map();
   let activeSide = (() => {
     try { return localStorage.getItem(ACTIVE_SIDE_STORAGE_KEY) === 'kat' ? 'kat' : 'don'; }
@@ -50,23 +46,6 @@
   const displayFamily = candidate => familyOf(candidate) === 'Taiko Reference' ? 'Taiko' : familyOf(candidate);
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const customIdForSlot = slot => `__CUSTOM_${slot}__`;
-
-  function readDeleteCandidateIds() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(DELETE_CANDIDATE_STORAGE_KEY) || '[]');
-      return new Set(Array.isArray(saved) ? saved.filter(id => validCandidateIds.has(id)) : []);
-    } catch {
-      return new Set();
-    }
-  }
-
-  const deleteCandidateIds = readDeleteCandidateIds();
-
-  function saveDeleteCandidateIds() {
-    try {
-      localStorage.setItem(DELETE_CANDIDATE_STORAGE_KEY, JSON.stringify(Array.from(deleteCandidateIds)));
-    } catch {}
-  }
 
   const preferredOrder = [
     'Annihilator',
@@ -410,65 +389,6 @@
     recommendationLine.textContent = `推奨：${numbers.length ? numbers.join(' ') : '—'}`;
   }
 
-  function currentDeleteCandidateId() {
-    const id = controller.getSelection()[activeSide];
-    return validCandidateIds.has(id) ? id : null;
-  }
-
-  function paintDeleteCandidates() {
-    const currentId = currentDeleteCandidateId();
-    const currentCandidate = byId(currentId);
-    const marked = !!currentId && deleteCandidateIds.has(currentId);
-    const candidates = Array.from(deleteCandidateIds)
-      .map(byId)
-      .filter(candidate => candidate && !candidate.excluded)
-      .sort((a, b) => Number(a.sourceNumber) - Number(b.sourceNumber));
-
-    sources.querySelectorAll('.hs-key[data-hs-id]').forEach(button => {
-      const isMarked = deleteCandidateIds.has(button.dataset.hsId);
-      button.classList.toggle('delete-candidate', isMarked);
-      const candidate = byId(button.dataset.hsId);
-      const selection = controller.getSelection();
-      const states = [
-        button.dataset.hsId === selection.don ? '現在のDon' : '',
-        button.dataset.hsId === selection.kat ? '現在のKat' : '',
-        isMarked ? '削除候補として記録済み' : '',
-      ].filter(Boolean);
-      button.setAttribute('aria-description', states.join('。'));
-    });
-
-    if (deleteCandidateButton) {
-      deleteCandidateButton.disabled = !currentId;
-      deleteCandidateButton.classList.toggle('marked', marked);
-      deleteCandidateButton.setAttribute('aria-pressed', marked ? 'true' : 'false');
-      const number = currentCandidate?.sourceNumber || '';
-      const action = marked ? '削除候補から解除' : '削除候補に追加';
-      deleteCandidateButton.setAttribute('aria-label', currentId ? `${number}を${action}` : '削除候補にできる内蔵音源が未選択');
-      deleteCandidateButton.title = currentId ? `${number}を${action}` : '内蔵音源を選択してください';
-      deleteCandidateButton.textContent = marked ? '候補 ✓' : '候補';
-    }
-
-    if (deleteCandidateLine) {
-      const numbers = candidates.map(candidate => candidate.sourceNumber);
-      deleteCandidateLine.textContent = `削除候補（${numbers.length}）：${numbers.length ? numbers.join(' ') : '—'}`;
-      deleteCandidateLine.title = numbers.length ? `${numbers.length}音を記録中` : '削除候補はありません';
-    }
-  }
-
-  function toggleCurrentDeleteCandidate() {
-    const id = currentDeleteCandidateId();
-    if (!id) return;
-    const remove = deleteCandidateIds.has(id);
-    if (remove) deleteCandidateIds.delete(id);
-    else deleteCandidateIds.add(id);
-    saveDeleteCandidateIds();
-    paintDeleteCandidates();
-    const number = byId(id)?.sourceNumber || '';
-    if (workbenchStatus) workbenchStatus.textContent = remove
-      ? `${number} を削除候補から解除しました`
-      : `${number} を削除候補として記録しました`;
-  }
-
   function paint() {
     const selection = controller.getSelection();
     const donSource = controller.byId(selection.don);
@@ -505,13 +425,7 @@
       button.setAttribute('aria-description', states.join('。'));
     });
 
-    if (silentButton) {
-      silentButton.classList.toggle('selected-don', activeSide === 'don' && selection.don === SILENT_ID);
-      silentButton.classList.toggle('selected-kat', activeSide === 'kat' && selection.kat === SILENT_ID);
-    }
-
     paintRecommendation();
-    paintDeleteCandidates();
   }
 
   async function chooseSound(id, { preview = true } = {}) {
@@ -665,14 +579,6 @@
     window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
   }
 
-  async function chooseSilent() {
-    try {
-      await controller.setSide(activeSide, SILENT_ID);
-    } finally {
-      paint();
-    }
-  }
-
   function setActiveSide(side) {
     if (side !== 'don' && side !== 'kat') return;
     controller.stopPreview();
@@ -698,9 +604,6 @@
 
   roleDonButton.addEventListener('click', () => setActiveSide('don'));
   roleKatButton.addEventListener('click', () => setActiveSide('kat'));
-  silentButton?.addEventListener('click', () => chooseSilent().catch(reportActionError));
-  deleteCandidateButton?.addEventListener('click', toggleCurrentDeleteCandidate);
-
   sources.addEventListener('pointerdown', event => {
     const button = event.target.closest('.hs-key[data-hs-id]');
     if (!button || sources.classList.contains('busy')) return;
@@ -787,13 +690,7 @@
   });
 
   window.addEventListener('hitsound-selection-change', paint);
-  window.addEventListener('storage', event => {
-    if (event.key !== DELETE_CANDIDATE_STORAGE_KEY) return;
-    const saved = readDeleteCandidateIds();
-    deleteCandidateIds.clear();
-    saved.forEach(id => deleteCandidateIds.add(id));
-    paintDeleteCandidates();
-  });
+  try { localStorage.removeItem(LEGACY_DELETE_CANDIDATE_STORAGE_KEY); } catch {}
 
   buildGrid({ force: true });
   if ('ResizeObserver' in window) {

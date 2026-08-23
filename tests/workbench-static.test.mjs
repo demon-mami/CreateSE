@@ -19,18 +19,28 @@ test('required workbench controls have unique IDs', () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of [
-    'roleDonButton','roleKatButton','currentDonTarget','currentKatTarget','playButton',
-    'backButton','forwardButton','startMarkButton','endMarkButton','loopToggleButton',
-    'favSetButton','deleteCandidateButton','favoriteOpenButton','customHitsoundInput',
+    'roleDonButton','roleKatButton','playButton','backButton','forwardButton','seekBar','seekTimeFeedback',
+    'startMarkButton','endMarkButton','jumpStartButton','jumpEndButton','loopToggleButton','clearLoopButton',
+    'startMarkButton2','endMarkButton2','jumpStartButton2','jumpEndButton2','loopToggleButton2','clearLoopButton2',
+    'favoriteOneButton','favoriteTwoButton','favoriteOpenButton','customHitsoundInput',
   ]) assert.ok(ids.includes(id), `${id} is missing`);
+  for (const id of [
+    'currentDonTarget','currentKatTarget','previewDonButton','previewKatButton','muteDonButton','muteKatButton',
+    'deleteCandidateButton','timeDisplay','durationDisplay','zoomOutButton','zoomInButton','zoomLabel',
+  ]) assert.equal(ids.includes(id), false, `${id} must be removed`);
 });
 
-test('transport and A-B bounds match approved requirements', () => {
+test('transport and dual A-B ranges match approved requirements', () => {
   assert.match(app, /const SKIP_SEC = 4;/);
   assert.match(app, /const LOOP_MIN_MS = 500;/);
-  assert.match(app, /const LOOP_MAX_MS = 30000;/);
+  assert.doesNotMatch(app, /LOOP_MAX_MS/);
+  assert.match(app, /const ranges = \[\s*\{ start: null, end: null \},\s*\{ start: null, end: null \}/);
+  assert.match(app, /let activeLoopIndex = -1;/);
+  assert.match(app, /activeLoopIndex = activeLoopIndex === index \? -1 : index;/);
+  assert.match(app, /function jumpToRangeMark\(index, which\)/);
   assert.match(app, /audiblePosition\(\) - SKIP_SEC/);
   assert.match(app, /audiblePosition\(\) \+ SKIP_SEC/);
+  assert.match(app, /const OBJECT_TIMELINE_SPAN_MS = 1000;/);
 });
 
 test('candidate tap toggles selection and previews once only when selecting', () => {
@@ -68,18 +78,20 @@ test('candidate switching shares decoded audio and keeps only the latest rapid t
   assert.match(controller, /let previewTask = Promise\.resolve\(false\);/);
   assert.match(controller, /if \(serial === selectionSerial\) await applyPendingSelection\(serial\);\s+await previewTask;/);
   assert.match(controller, /function warmCurrentSelection\(\)/);
-  assert.match(workbench, /window\.addEventListener\('hitsound-preview-state'/);
-  assert.match(html, /app-v4\.js\?v=3\.7-music-070/);
+  assert.doesNotMatch(workbench, /hitsound-preview-state/);
+  assert.match(html, /app-v4\.js\?v=4\.0-dual-ranges/);
   assert.match(html, /hitsound-controller\.js\?v=4\.1-latest-switch-wins/);
 });
 
 test('Favorite excludes mute and verifies My Sound fingerprints', () => {
-  assert.match(favorites, /don === SILENT_ID \|\| kat === SILENT_ID/);
+  assert.match(favorites, /!don \|\| !kat \|\| don === SILENT_ID \|\| kat === SILENT_ID/);
   assert.match(favorites, /source\.fingerprint !== side\.fingerprint/);
-  assert.match(favorites, /hitsound-favorite-applied/);
+  assert.match(favorites, /hitsound-preset-applied/);
+  assert.match(favorites, /pair-favorite-slots:v1/);
+  assert.doesNotMatch(html, /muteDonButton|muteKatButton|previewDonButton|previewKatButton/);
 });
 
-test('Phase7A Pair-12 is merged into existing Favorites exactly once', () => {
+test('fixed Pair-12 presets are immutable and separated from two quick favorites', () => {
   const expected = [
     ['P01', 'SRC070', 'SRC084'],
     ['P02', 'SRC015', 'SRC019'],
@@ -97,16 +109,20 @@ test('Phase7A Pair-12 is merged into existing Favorites exactly once', () => {
   for (const pair of expected) {
     assert.ok(favorites.includes(`['${pair[0]}', '${pair[1]}', '${pair[2]}']`), `${pair[0]} is missing`);
   }
-  assert.match(favorites, /FAVORITE_SEED_KEY = `\$\{STORAGE_KEY\}:seed:phase7a-pair12-v5`/);
-  assert.match(favorites, /if \(localStorage\.getItem\(FAVORITE_SEED_KEY\) === '1'\) return 0/);
-  assert.match(favorites, /const known = new Set\(sets\.map\(entryKey\)\)/);
-  assert.match(favorites, /mergeSeedFavoritePairs\(\);\s+renderSavedSets\(\);/);
-  assert.match(html, /hitsound-favorites\.js\?v=4\.1-phase7a-pair12-v5/);
+  assert.match(favorites, /const PRESET_PAIRS = Object\.freeze\(/);
+  assert.match(favorites, /const SLOT_STORAGE_KEY = 'osutaiko-hitsound-lab:pair-favorite-slots:v1'/);
+  assert.match(favorites, /localStorage\.removeItem\(LEGACY_STORAGE_KEY\)/);
+  assert.match(favorites, /localStorage\.removeItem\(LEGACY_SEED_KEY\)/);
+  assert.match(favorites, /slotButtons\.favorite1\?\.addEventListener/);
+  assert.match(favorites, /slotButtons\.favorite2\?\.addEventListener/);
+  assert.doesNotMatch(favorites, /mergeSeedFavoritePairs|data-delete-set|favorite-set-delete/);
+  assert.match(html, /hitsound-favorites\.js\?v=5\.0-preset-slots/);
 });
 
 test('responsive split and touch target tokens are present', () => {
   assert.match(css, /--tap-size:44px/);
-  assert.match(css, /\.seek-bar\{width:100%;height:44px/);
+  assert.match(css, /\.seek-wrap\{position:relative;min-height:48px/);
+  assert.match(css, /\.seek-bar\{height:44px;margin:0/);
   assert.match(html, /id="seekBar"[^>]*aria-label="曲の位置"/);
   assert.match(css, /\.loop-controls\{display:grid;grid-template-columns:44px/);
   assert.doesNotMatch(css, /\.seek-bar\{height:(?:28|30)px/);
@@ -119,33 +135,36 @@ test('responsive split and touch target tokens are present', () => {
 test('compact visible copy keeps accessible labels and CSS-only dock icons', () => {
   assert.doesNotMatch(html, />試聴・判断</);
   assert.doesNotMatch(html, /<span>収納<\/span>|<span>展開<\/span>/);
-  assert.match(html, /id="dockToggleButton"[^>]*aria-label="試聴パネルを展開"/);
-  assert.match(html, /id="dockCollapseButton"[^>]*aria-label="試聴パネルを収納"/);
+  assert.match(html, /id="dockToggleButton"[^>]*aria-label="再生パネルを展開"/);
+  assert.match(html, /id="dockCollapseButton"[^>]*aria-label="再生パネルを収納"/);
   assert.match(html, /id="statusBadge" class="status-badge sr-only"/);
   assert.match(html, /id="recommendationLine" class="hs-recommendation sr-only"/);
-  assert.match(html, /id="deleteCandidateLine" class="hs-delete-candidate-line sr-only"/);
+  assert.doesNotMatch(html, /deleteCandidateLine/);
   assert.doesNotMatch(html, /currentDonMeta|currentKatMeta/);
   assert.doesNotMatch(workbench, /current\$\{cap\}Meta/);
   assert.doesNotMatch(workbench, /\$\{activeSide === 'don' \? 'Don' : 'Kat'\} 操作中/);
   assert.doesNotMatch(workbench, /A–B \$\{detail\.enabled \? '反復中' : '設定済み'\}/);
+  assert.doesNotMatch(html, /id="timeDisplay"|id="durationDisplay"/);
+  assert.match(html, /id="seekTimeFeedback"[^>]*hidden/);
   assert.match(css, /\.dock-toggle \.dock-icon\{[^}]*border:2px solid currentColor/);
   assert.match(css, /\.dock-collapse \.dock-icon\{[^}]*height:2px/);
 });
 
 test('transport spacing is relaxed and Dock transitions shield the candidate layer', () => {
-  assert.match(css, /\.transport-row\{display:grid;grid-template-columns:minmax\(0,1fr\) 92px minmax\(0,1fr\);gap:10px/);
-  assert.match(css, /\.transport-row\{grid-template-columns:minmax\(0,1fr\) 96px minmax\(0,1fr\);gap:10px/);
+  assert.match(css, /\.transport-row\{gap:16px;padding-inline:10px\}/);
+  assert.match(css, /\.transport-row\{grid-template-columns:minmax\(0,1fr\) 96px minmax\(0,1fr\);gap:14px/);
   assert.doesNotMatch(css, /\.audition-panel\.is-transitioning\{pointer-events:none\}/);
   assert.match(css, /\.audition-panel\.is-transitioning \.dock-mini,\.audition-panel\.is-transitioning \.dock-expanded\{pointer-events:none!important\}/);
-  assert.match(css, /\.seek-bar\{width:100%;height:44px;margin:2px 0 10px/);
+  assert.match(css, /\.seek-bar\{height:44px;margin:0/);
 });
 
-test('active Don or Kat has a static neon gradient without a continuous animation', () => {
-  assert.match(css, /background:conic-gradient\(from 215deg/);
+test('quick favorite states are compact, centered, and static', () => {
+  assert.doesNotMatch(html, /current-sound-card|mini-current/);
   assert.doesNotMatch(css, /active-border-orbit|--active-glow-angle|--active-border-loop/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
-  assert.match(css, /\.current-sound-card\.active::before/);
-  assert.match(css, /\.mini-current\[aria-pressed="true"\]::before/);
+  assert.match(css, /\.judgment-actions\{[\s\S]*?grid-template-columns:repeat\(3,52px\);[\s\S]*?justify-content:center/);
+  assert.match(css, /\.quick-favorite\[aria-pressed="true"\]/);
+  assert.match(css, /\.favorite-two\[aria-pressed="true"\]/);
 });
 
 test('iPhone Dock morphs between mini and expanded states without hiding controls abruptly', () => {
@@ -185,8 +204,10 @@ test('Current111 replaces the old pack and keeps ABC visible without source file
   assert.match(controller, /hitsounds-current111-abc-v5\.zip/);
   assert.doesNotMatch(controller, /hitsounds-single-base-116\.zip/);
   assert.match(controller, /selection:current111-abc-v5/);
-  assert.match(favorites, /favorites-current111-abc-v5/);
-  assert.match(grid, /deletion-candidates:current111-abc-v5/);
+  assert.match(favorites, /LEGACY_STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5'/);
+  assert.match(grid, /LEGACY_DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5'/);
+  assert.match(grid, /localStorage\.removeItem\(LEGACY_DELETE_CANDIDATE_STORAGE_KEY\)/);
+  assert.doesNotMatch(grid, /toggleDeleteCandidate|renderDeleteCandidate|deleteCandidateIds/);
   assert.match(grid, /data-abc="\$\{abcGrade\}"/);
   assert.match(gridCss, /\.hs-key\[data-abc="A"\]/);
   assert.doesNotMatch(gridCss, /content:attr\(data-abc\)/);
@@ -201,13 +222,14 @@ test('candidate keys use restrained numbers and subtle red-green-white ABC dots'
   assert.match(gridCss, /\.hs-key\[data-abc="C"\]\{--abc-dot:rgba\(245,247,248,.88\)\}/);
   assert.match(gridCss, /\.hs-key\[data-abc\]>span::before\{[\s\S]*?top:6px;[\s\S]*?left:7px;[\s\S]*?width:5px;[\s\S]*?height:5px;[\s\S]*?border-radius:50%/);
   assert.doesNotMatch(gridCss, /--abc-line|--abc-halo|content:attr\(data-abc\)/);
-  assert.match(gridCss, /\.hs-key\.delete-candidate>span::after\{[\s\S]*?border:1\.5px solid #d98f93;[\s\S]*?background:transparent/);
+  assert.doesNotMatch(gridCss, /delete-candidate/);
+  assert.doesNotMatch(grid, /delete-candidate/);
   assert.match(css, /#hitsoundSources \.hs-key>span\{[\s\S]*?font-size:11px!important;[\s\S]*?font-weight:520!important/);
   assert.doesNotMatch(css, /selected-don::after\{content:"D"\}|selected-kat::after\{content:"K"\}|content:"D\/K"/);
   assert.match(css, /selected-don\.selected-kat::after\{[\s\S]*?radial-gradient\(circle at 3\.5px[\s\S]*?radial-gradient\(circle at calc\(100% - 3\.5px\)/);
   assert.doesNotMatch(gridCss, /abc-line[^\n]*animation|@keyframes[^\{]*abc/i);
-  assert.match(html, /hitsound-grid\.css\?v=4\.2-subtle-abc-dots/);
-  assert.match(html, /workbench\.css\?v=1\.8-fixed-six-modules/);
+  assert.match(html, /hitsound-grid\.css\?v=4\.3-pair-presets/);
+  assert.match(html, /workbench\.css\?v=2\.0-pair-ranges/);
 });
 
 test('candidate rows use fixed six-slot modules and stable family placement', () => {
@@ -226,11 +248,11 @@ test('candidate rows use fixed six-slot modules and stable family placement', ()
   assert.match(gridCss, /\.hs-family-row\[data-layout="modules"\]\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);[\s\S]*?column-gap:10px/);
   assert.match(css, /#hitsoundSources \.hs-family-row\[data-layout="modules"\]\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);[\s\S]*?column-gap:10px!important/);
   assert.match(grid, /new ResizeObserver\(\(\) => buildGrid\(\)\)/);
-  assert.match(html, /hitsound-grid\.js\?v=4\.1-fixed-six-modules/);
+  assert.match(html, /hitsound-grid\.js\?v=4\.2-no-delete-rating/);
 });
 
 test('timeline notes are reduced in both visible and fallback renderers', () => {
-  assert.match(app, /const OBJECT_NOTE_RADIUS = \[14, 14, 13\.5\];/);
+  assert.match(app, /const OBJECT_NOTE_RADIUS = 14;/);
   assert.match(timeline, /const normalRadius = 14;/);
   assert.match(timeline, /const bigRadius = 17;/);
   assert.match(timeline, /const targetRadius = 19\.5;/);
@@ -257,12 +279,37 @@ test('timeline playback stays audio-synchronous while iPad canvas and DOM paint 
   assert.match(timeline, /new ResizeObserver\(measureViewport\)/);
   assert.match(timeline, /lowerHit\(map\.hits, visibleLeftTime\)/);
   assert.doesNotMatch(timeline, /const nowMs = Number\(seek\.value\) \* 1000/);
-  assert.match(html, /object-timeline-v2\.js\?v=3\.1-ipad-frame-budget/);
+  assert.match(timeline, /const FIXED_SPAN_MS = 1000;/);
+  assert.match(timeline, /drawRegisteredRanges\(ctx, leftTime, rightTime/);
+  assert.match(html, /object-timeline-v2\.js\?v=3\.2-fixed-span/);
 });
 
 test('Don and Kat preserve independent candidate scroll positions', () => {
   assert.match(workbench, /scrollTop: Math\.max\(0, sourcePanel\.scrollTop\)/);
   assert.match(workbench, /sourcePanel\.scrollTop = Math\.max\(0, saved\.scrollTop\)/);
   assert.match(workbench, /clearTimeout\(savePositionTimer\);\s+saveCandidatePosition\(activeSide\);/);
-  assert.match(workbench, /activeSide = nextSide;\s+syncActiveSide\(\);[\s\S]*?restoreCandidatePosition\(\);/);
+  assert.match(workbench, /activeSide = nextSide;[\s\S]*?restoreCandidatePosition\(\);/);
+});
+
+test('playback-side Don/Kat audition and explicit mute controls are fully removed', () => {
+  assert.doesNotMatch(html, /current-pair|current-sound-card|currentDonTarget|currentKatTarget/);
+  assert.doesNotMatch(html, /previewDonButton|previewKatButton|muteDonButton|muteKatButton/);
+  assert.doesNotMatch(workbench, /syncCurrentPair|previewDon|previewKat|muteDon|muteKat/);
+  assert.match(grid, /preview: preview && !deselecting/);
+});
+
+test('seek time is transient and shown only by manual movement paths', () => {
+  assert.match(app, /function showSeekFeedback\(positionSec/);
+  assert.match(app, /showSeekFeedback\(pausedOffset, \{ linger: false \}\)/);
+  assert.match(app, /seekTo\(audiblePosition\(\) - SKIP_SEC, \{ showFeedback: true \}\)/);
+  assert.match(app, /seekTo\(audiblePosition\(\) \+ SKIP_SEC, \{ showFeedback: true \}\)/);
+  assert.doesNotMatch(app, /el\.time\.|el\.duration\./);
+  assert.doesNotMatch(html, /class="time-row"|class="song-time"/);
+});
+
+test('only one of two stored ranges loops at once and both survive loop switching', () => {
+  assert.match(app, /function toggleLoop\(index\) \{\s+if \(!validRange\(index\)\) return;\s+activeLoopIndex = activeLoopIndex === index \? -1 : index;/);
+  assert.match(app, /const indexes = index == null \? \[0, 1\] : \[index\]/);
+  assert.match(app, /resetRange\(\);\s+setControls\(false\);/);
+  assert.match(app, /ranges: ranges\.map\(\(range, index\) =>/);
 });

@@ -5,32 +5,23 @@
   if (!controller) return;
 
   const $ = id => document.getElementById(id);
-  const SILENT_ID = controller.SILENT_ID;
   const POSITION_KEY = 'osutaiko-hitsound-lab:candidate-position:v1';
-  const LAST_SOUND_KEY = 'osutaiko-hitsound-lab:last-non-silent:v1';
   const sourcePanel = document.querySelector('.source-panel');
   const auditionPanel = $('auditionPanel');
   const dockMini = auditionPanel?.querySelector('.dock-mini');
   const dockToggle = $('dockToggleButton');
   const dockCollapse = $('dockCollapseButton');
-  const roleDon = $('roleDonButton');
-  const roleKat = $('roleKatButton');
   const favoriteSheet = $('favoriteSheet');
   const favoriteDialog = $('savedSetsPanel');
   const favoriteOpen = $('favoriteOpenButton');
   const favoriteClose = $('favoriteCloseButton');
-  const timeDisplay = $('timeDisplay');
-  const miniTime = $('miniTimeDisplay');
   const playButton = $('playButton');
   const miniPlay = $('previewButton');
-  const samplePreview = $('samplePreviewAudio');
   const workbenchStatus = $('workbenchStatus');
   let activeSide = 'don';
   let favoriteReturnFocus = null;
   let savePositionTimer = 0;
   let swipeStart = null;
-  let previewingSide = null;
-  let previewActive = !!controller.isPreviewing?.();
   let dockTransitionTimer = 0;
   let dockTransitionHandler = null;
   const DOCK_TRANSITION_MS = 480;
@@ -42,123 +33,15 @@
     catch { return fallback; }
   }
 
-  const lastNonSilent = readJson(LAST_SOUND_KEY, {});
-
-  function saveLastNonSilent() {
-    try { localStorage.setItem(LAST_SOUND_KEY, JSON.stringify(lastNonSilent)); } catch {}
-  }
-
-  function sourceLabel(id) {
-    if (!id || id === SILENT_ID) return { number: '無音', name: '無音', family: 'Silent' };
-    const source = controller.byId(id);
-    return {
-      number: String(source?.sourceNumber || '—'),
-      name: String(source?.originalName || source?.name || '音源未登録'),
-      family: String(source?.originalFamily || source?.family || ''),
-    };
-  }
-
   function setText(id, value) {
     const node = $(id);
     if (node) node.textContent = value;
   }
 
-  function syncSelection() {
-    const selection = controller.getSelection();
-    for (const side of ['don', 'kat']) {
-      const id = selection[side];
-      if (id && id !== SILENT_ID) lastNonSilent[side] = id;
-      const label = sourceLabel(id);
-      const cap = side === 'don' ? 'Don' : 'Kat';
-      setText(`mini${cap}Value`, label.number);
-      setText(`current${cap}Value`, label.number);
-      for (const targetId of [`mini${cap}Target`, `current${cap}Target`]) {
-        const target = $(targetId);
-        if (target) target.setAttribute('aria-label', `${cap}を操作対象にする。現在${label.number} ${label.name}`);
-      }
-      const muted = id === SILENT_ID;
-      const mute = $(`mute${cap}Button`);
-      if (mute) {
-        mute.setAttribute('aria-pressed', muted ? 'true' : 'false');
-        const canRestore = muted && lastNonSilent[side];
-        mute.textContent = canRestore ? '↺' : '—';
-        mute.setAttribute('aria-label', canRestore ? `${cap}の音源を戻す` : `${cap}を無音にする`);
-        mute.title = canRestore ? `${cap}を戻す` : `${cap}を無音`;
-      }
-      const preview = $(`preview${cap}Button`);
-      if (preview) {
-        preview.disabled = muted || !id;
-        preview.setAttribute('aria-label', muted ? `${cap}は無音です` : `${cap} ${label.number} を単音試聴`);
-      }
-    }
-    saveLastNonSilent();
-    syncActiveSide();
-  }
-
-  function syncActiveSide() {
-    const donActive = activeSide === 'don';
-    for (const [id, active] of [
-      ['miniDonTarget', donActive], ['miniKatTarget', !donActive],
-      ['currentDonTarget', donActive], ['currentKatTarget', !donActive],
-    ]) {
-      const button = $(id);
-      if (button) button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    $('currentDonCard')?.classList.toggle('active', donActive);
-    $('currentKatCard')?.classList.toggle('active', !donActive);
-  }
-
-  function chooseSide(side) {
-    (side === 'don' ? roleDon : roleKat)?.click();
-  }
-
-  async function toggleMute(side) {
-    const current = controller.getSelection()[side];
-    const next = current === SILENT_ID && lastNonSilent[side] ? lastNonSilent[side] : SILENT_ID;
-    try {
-      await controller.setSide(side, next);
-      if (workbenchStatus) workbenchStatus.textContent = next === SILENT_ID ? `${side === 'don' ? 'Don' : 'Kat'}を無音にしました` : `${side === 'don' ? 'Don' : 'Kat'}の音源を戻しました`;
-    } catch (error) {
-      if (workbenchStatus) workbenchStatus.textContent = error.message || '音源を切り替えられませんでした';
-    }
-  }
-
-  function syncSinglePreview() {
-    const fallbackActive = !!samplePreview && !samplePreview.paused && !samplePreview.ended;
-    const active = previewActive || fallbackActive;
-    for (const side of ['don', 'kat']) {
-      const cap = side === 'don' ? 'Don' : 'Kat';
-      const button = $(`preview${cap}Button`);
-      if (!button) continue;
-      const pressed = active && previewingSide === side;
-      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-      button.textContent = pressed ? '■' : '▶';
-      if (pressed) button.setAttribute('aria-label', `${cap}の単音試聴を停止`);
-      else {
-        const selectedId = controller.getSelection()[side];
-        const label = sourceLabel(selectedId);
-        button.setAttribute('aria-label', selectedId === SILENT_ID ? `${cap}は無音です` : `${cap} ${label.number} を単音試聴`);
-      }
-    }
-    if (!active) previewingSide = null;
-  }
-
-  async function toggleSinglePreview(side) {
-    const fallbackActive = !!samplePreview && !samplePreview.paused && !samplePreview.ended;
-    if (previewingSide === side && (previewActive || fallbackActive)) {
-      controller.stopPreview();
-      syncSinglePreview();
-      return;
-    }
-    previewingSide = side;
-    try {
-      await controller.togglePreview(side);
-      syncSinglePreview();
-    } catch (error) {
-      previewingSide = null;
-      syncSinglePreview();
-      if (workbenchStatus) workbenchStatus.textContent = error.message || '単音を試聴できませんでした';
-    }
+  function sourceLabel(id) {
+    if (!id || id === controller.SILENT_ID) return { number: '無音' };
+    const source = controller.byId(id);
+    return { number: String(source?.sourceNumber || '—') };
   }
 
   function syncPlay() {
@@ -167,14 +50,14 @@
     miniPlay.disabled = playButton.disabled;
     miniPlay.setAttribute('aria-pressed', playing ? 'true' : 'false');
     miniPlay.setAttribute('aria-label', playing ? '曲を一時停止' : '曲を再生');
-    miniPlay.querySelector('span').textContent = playing ? 'Ⅱ' : '▶';
+    const face = miniPlay.querySelector('span');
+    if (face) face.textContent = playing ? 'Ⅱ' : '▶';
   }
 
   function setDockExpanded(expanded, { moveFocus = false } = {}) {
     if (!auditionPanel || !dockToggle) return;
     const currentlyExpanded = auditionPanel.classList.contains('is-expanded');
-    if (currentlyExpanded === expanded) return;
-    if (auditionPanel.classList.contains('is-transitioning')) return;
+    if (currentlyExpanded === expanded || auditionPanel.classList.contains('is-transitioning')) return;
 
     clearTimeout(dockTransitionTimer);
     if (dockTransitionHandler) auditionPanel.removeEventListener('transitionend', dockTransitionHandler);
@@ -182,7 +65,7 @@
     auditionPanel.setAttribute('aria-busy', 'true');
     auditionPanel.classList.toggle('is-expanded', expanded);
     dockToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    dockToggle.setAttribute('aria-label', expanded ? '試聴パネルを収納' : '試聴パネルを展開');
+    dockToggle.setAttribute('aria-label', expanded ? '再生パネルを収納' : '再生パネルを展開');
     if (expanded && moveFocus) auditionPanel.focus({ preventScroll: true });
     if (!expanded && moveFocus) dockToggle.focus({ preventScroll: true });
 
@@ -202,24 +85,24 @@
     }
   }
 
-  function openFavorites() {
+  function openPresets() {
     if (!favoriteSheet || !favoriteDialog) return;
     favoriteReturnFocus = document.activeElement;
     favoriteSheet.hidden = false;
     requestAnimationFrame(() => favoriteClose?.focus());
   }
 
-  function closeFavorites() {
+  function closePresets() {
     if (!favoriteSheet || favoriteSheet.hidden) return;
     favoriteSheet.hidden = true;
     favoriteReturnFocus?.focus?.();
     favoriteReturnFocus = null;
   }
 
-  function trapFavoriteFocus(event) {
+  function trapPresetFocus(event) {
     if (event.key === 'Escape') {
       event.preventDefault();
-      closeFavorites();
+      closePresets();
       return;
     }
     if (event.key !== 'Tab' || !favoriteDialog || favoriteSheet?.hidden) return;
@@ -285,43 +168,13 @@
     sourcePanel.scrollTop += target.getBoundingClientRect().top - sourcePanel.getBoundingClientRect().top - toolbarHeight - 8;
   }
 
-  $('miniDonTarget')?.addEventListener('click', () => chooseSide('don'));
-  $('miniKatTarget')?.addEventListener('click', () => chooseSide('kat'));
-  $('currentDonTarget')?.addEventListener('click', () => chooseSide('don'));
-  $('currentKatTarget')?.addEventListener('click', () => chooseSide('kat'));
-  $('previewDonButton')?.addEventListener('click', () => toggleSinglePreview('don'));
-  $('previewKatButton')?.addEventListener('click', () => toggleSinglePreview('kat'));
-  $('muteDonButton')?.addEventListener('click', () => toggleMute('don'));
-  $('muteKatButton')?.addEventListener('click', () => toggleMute('kat'));
   miniPlay?.addEventListener('click', () => { if (!playButton?.disabled) playButton.click(); });
   dockToggle?.addEventListener('click', () => setDockExpanded(!auditionPanel?.classList.contains('is-expanded'), { moveFocus: true }));
   dockCollapse?.addEventListener('click', () => setDockExpanded(false, { moveFocus: true }));
-  favoriteOpen?.addEventListener('click', openFavorites);
-  favoriteSheet?.addEventListener('click', event => { if (event.target.closest('[data-close-favorites]')) closeFavorites(); });
-  favoriteSheet?.addEventListener('keydown', trapFavoriteFocus);
+  favoriteOpen?.addEventListener('click', openPresets);
+  favoriteSheet?.addEventListener('click', event => { if (event.target.closest('[data-close-favorites]')) closePresets(); });
+  favoriteSheet?.addEventListener('keydown', trapPresetFocus);
   sourcePanel?.addEventListener('scroll', schedulePositionSave, { passive: true });
-  samplePreview?.addEventListener('play', () => {
-    previewActive = true;
-    syncSinglePreview();
-  });
-  samplePreview?.addEventListener('pause', () => {
-    if (!controller.isPreviewing?.()) previewActive = false;
-    syncSinglePreview();
-  });
-  samplePreview?.addEventListener('ended', () => {
-    if (!controller.isPreviewing?.()) previewActive = false;
-    syncSinglePreview();
-  });
-  window.addEventListener('hitsound-preview-state', event => {
-    const detail = event.detail || {};
-    previewActive = !!detail.playing;
-    if (!detail.playing && detail.replacing) return;
-    if (detail.playing && detail.meta?.origin === 'manual') {
-      previewingSide = detail.meta.side === 'kat' ? 'kat' : 'don';
-    }
-    if (!detail.playing) previewingSide = null;
-    syncSinglePreview();
-  });
 
   dockMini?.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse') return;
@@ -347,7 +200,6 @@
   });
 
   window.addEventListener('hitsound-selection-change', event => {
-    syncSelection();
     if (workbenchStatus) {
       const side = activeSide === 'don' ? 'Don' : 'Kat';
       const selected = sourceLabel(event.detail?.[activeSide]);
@@ -361,29 +213,21 @@
       saveCandidatePosition(activeSide);
     }
     activeSide = nextSide;
-    syncActiveSide();
     if (workbenchStatus) workbenchStatus.textContent = '';
     restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);
   window.addEventListener('viewer-loop-change', event => {
-    const detail = event.detail || {};
-    setText('miniLoopState', detail.valid ? (detail.enabled ? 'A–B 反復中' : '') : 'A–B 未設定');
+    const activeIndex = Number(event.detail?.activeIndex);
+    setText('miniLoopState', Number.isInteger(activeIndex) && activeIndex >= 0 ? `↻ ${activeIndex + 1}` : '');
   });
-  window.addEventListener('hitsound-saved-sets-change', () => {
-    const length = window.HitsoundFavorites?.readSets?.().length || 0;
-    setText('favoriteCount', String(length));
-  });
-  window.addEventListener('hitsound-favorite-applied', event => {
-    closeFavorites();
-    if (workbenchStatus) workbenchStatus.textContent = `${event.detail?.label || 'Favorite'} を適用しました`;
+  window.addEventListener('hitsound-preset-applied', event => {
+    closePresets();
+    if (workbenchStatus) workbenchStatus.textContent = `${event.detail?.label || 'Preset'} を適用しました`;
   });
 
   if (playButton) {
     new MutationObserver(syncPlay).observe(playButton, { attributes: true, attributeFilter: ['disabled', 'aria-pressed'], childList: true, subtree: true });
-  }
-  if (timeDisplay && miniTime) {
-    new MutationObserver(() => { miniTime.textContent = timeDisplay.textContent; }).observe(timeDisplay, { childList: true, characterData: true, subtree: true });
   }
 
   window.addEventListener('resize', () => {
@@ -392,8 +236,7 @@
   });
 
   try { activeSide = localStorage.getItem('osutaiko-hitsound-lab:active-side:v1') === 'kat' ? 'kat' : 'don'; } catch {}
-  syncSelection();
   syncPlay();
-  setText('favoriteCount', String(window.HitsoundFavorites?.readSets?.().length || 0));
+  setText('favoriteCount', String(window.HitsoundFavorites?.readPresets?.().length || 12));
   requestAnimationFrame(restoreCandidatePosition);
 })();

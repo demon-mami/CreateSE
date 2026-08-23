@@ -5,9 +5,10 @@
   const controller = window.HitsoundController;
   if (!CANDIDATES.length || !controller) return;
 
-  const STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5';
-  const FAVORITE_SEED_KEY = `${STORAGE_KEY}:seed:phase7a-pair12-v5`;
-  const FAVORITE_SEED_PAIRS = Object.freeze([
+  const LEGACY_STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5';
+  const LEGACY_SEED_KEY = `${LEGACY_STORAGE_KEY}:seed:phase7a-pair12-v5`;
+  const SLOT_STORAGE_KEY = 'osutaiko-hitsound-lab:pair-favorite-slots:v1';
+  const PRESET_PAIRS = Object.freeze([
     ['P01', 'SRC070', 'SRC084'],
     ['P02', 'SRC015', 'SRC019'],
     ['P03', 'SRC098', 'SRC101'],
@@ -23,26 +24,30 @@
   ]);
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
-  const setButton = $('favSetButton');
+  const slotButtons = {
+    favorite1: $('favoriteOneButton'),
+    favorite2: $('favoriteTwoButton'),
+  };
   const exportButton = $('exportFavoritesButton');
   const list = $('savedSetsList');
-  const empty = $('favoriteEmpty');
   const count = $('favoriteCount');
   const feedback = $('setFeedback');
   const sheetStatus = $('favoriteSheetStatus');
   const workbenchStatus = $('workbenchStatus');
-
   const byId = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const valid = candidate => candidate && !candidate.excluded;
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || '';
   const GOOD_CROSS = new Map();
   let feedbackTimer = 0;
-  let undoTimer = 0;
-  let pendingUndo = null;
 
-  function makeId() {
-    if (crypto?.randomUUID) return crypto.randomUUID();
-    return `favorite-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  for (const [, donId, katId] of PRESET_PAIRS) {
+    if (!GOOD_CROSS.has(donId)) GOOD_CROSS.set(donId, new Set());
+    GOOD_CROSS.get(donId).add(katId);
+  }
+
+  function makeId(prefix = 'favorite') {
+    if (crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }
 
   function describe(id) {
@@ -79,35 +84,14 @@
     };
   }
 
-  function normalizeEntry(value, index) {
-    if (typeof value === 'string') {
-      const [donId, katId] = value.split('|');
-      return { id: `legacy-${index}-${donId}-${katId}`, don: describe(donId), kat: describe(katId), legacy: true };
-    }
+  function normalizeEntry(value, fallbackId = makeId()) {
     if (!value || typeof value !== 'object') return null;
     return {
-      id: String(value.id || `favorite-${index}-${Date.now()}`),
+      id: String(value.id || fallbackId),
       don: normalizeDescriptor(value.don),
       kat: normalizeDescriptor(value.kat),
       createdAt: String(value.createdAt || ''),
-      legacy: !!value.legacy,
     };
-  }
-
-  function readSets() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {};
-      return (Array.isArray(parsed.set) ? parsed.set : []).map(normalizeEntry).filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-
-  function writeSets(sets) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, set: sets })); } catch {}
-    renderSavedSets();
-    updateSetButton();
-    window.dispatchEvent(new CustomEvent('hitsound-saved-sets-change', { detail: sets.map(entry => entry.id) }));
   }
 
   function descriptorKey(side) {
@@ -115,61 +99,69 @@
   }
 
   function entryKey(entry) {
-    return `${descriptorKey(entry.don)}|${descriptorKey(entry.kat)}`;
+    return entry ? `${descriptorKey(entry.don)}|${descriptorKey(entry.kat)}` : '';
   }
 
-  function mergeSeedFavoritePairs() {
+  function presetEntries() {
+    return PRESET_PAIRS.map(([pairId, donId, katId]) => ({
+      id: pairId,
+      don: describe(donId),
+      kat: describe(katId),
+      createdAt: '',
+      fixed: true,
+    }));
+  }
+
+  function readSlots() {
     try {
-      if (localStorage.getItem(FAVORITE_SEED_KEY) === '1') return 0;
-    } catch {
-      return 0;
-    }
-
-    const sets = readSets();
-    const known = new Set(sets.map(entryKey));
-    const createdAt = new Date().toISOString();
-    let added = 0;
-
-    for (const [pairId, donId, katId] of FAVORITE_SEED_PAIRS) {
-      if (!controller.byId(donId) || !controller.byId(katId)) continue;
-      const entry = {
-        id: `phase7a-pair12-v5-${pairId.toLowerCase()}`,
-        don: describe(donId),
-        kat: describe(katId),
-        createdAt,
+      const parsed = JSON.parse(localStorage.getItem(SLOT_STORAGE_KEY) || 'null') || {};
+      return {
+        favorite1: normalizeEntry(parsed.favorite1, 'favorite-1'),
+        favorite2: normalizeEntry(parsed.favorite2, 'favorite-2'),
       };
-      const key = entryKey(entry);
-      if (known.has(key)) continue;
-      sets.push(entry);
-      known.add(key);
-      added += 1;
-    }
-
-    try {
-      if (added > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, set: sets }));
-      localStorage.setItem(FAVORITE_SEED_KEY, '1');
     } catch {
-      return 0;
+      return { favorite1: null, favorite2: null };
     }
-    return added;
   }
 
-  function currentEntry() {
+  function writeSlots(slots) {
+    try {
+      localStorage.setItem(SLOT_STORAGE_KEY, JSON.stringify({
+        version: 1,
+        favorite1: slots.favorite1 || null,
+        favorite2: slots.favorite2 || null,
+      }));
+    } catch {}
+    updateQuickButtons();
+    window.dispatchEvent(new CustomEvent('hitsound-quick-favorites-change', {
+      detail: {
+        favorite1: entryKey(slots.favorite1),
+        favorite2: entryKey(slots.favorite2),
+      },
+    }));
+  }
+
+  function currentEntry(prefix = 'favorite') {
     const { don, kat } = controller.getSelection();
     const donDescriptor = describe(don);
     const katDescriptor = describe(kat);
     if (!don || !kat || don === SILENT_ID || kat === SILENT_ID) return null;
     if (!controller.byId(don) || !controller.byId(kat)) return null;
     if ((donDescriptor.custom && !donDescriptor.fingerprint) || (katDescriptor.custom && !katDescriptor.fingerprint)) return null;
-    return { id: makeId(), don: donDescriptor, kat: katDescriptor, createdAt: new Date().toISOString() };
+    return {
+      id: makeId(prefix),
+      don: donDescriptor,
+      kat: katDescriptor,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   function availability(side) {
-    if (!side?.id || side.id === SILENT_ID || side.silent) return { ok: false, reason: '無音を含むFavoriteは適用できません' };
+    if (!side?.id || side.id === SILENT_ID || side.silent) return { ok: false, reason: '無音を含む組み合わせは使用できません' };
     const source = controller.byId(side.id);
     if (!source) return { ok: false, reason: `${side.sourceNumber} ${side.name} を再登録してください` };
     if (side.custom || source.custom) {
-      if (!side.fingerprint) return { ok: false, reason: '旧My Sound Favoriteは音源を再登録して保存し直してください' };
+      if (!side.fingerprint) return { ok: false, reason: 'My Soundを再登録してください' };
       if (!source.custom || source.fingerprint !== side.fingerprint) {
         return { ok: false, reason: `${side.sourceNumber} ${side.name} と同じMy Soundを再登録してください` };
       }
@@ -183,6 +175,10 @@
     return don.ok && kat.ok ? { ok: true, reason: '' } : { ok: false, reason: don.reason || kat.reason };
   }
 
+  function pairLabel(entry) {
+    return `Don ${entry.don.sourceNumber} + Kat ${entry.kat.sourceNumber}`;
+  }
+
   function setFeedback(message, { error = false } = {}) {
     if (workbenchStatus) workbenchStatus.textContent = message;
     if (!feedback) return;
@@ -192,64 +188,51 @@
     feedbackTimer = window.setTimeout(() => {
       feedback.textContent = '';
       feedback.classList.remove('error');
-    }, 3200);
+    }, 2400);
   }
 
-  function setSheetStatus(message, undo = null) {
-    if (!sheetStatus) return;
-    sheetStatus.replaceChildren(document.createTextNode(message));
-    if (!undo) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'favorite-undo';
-    button.textContent = '元に戻す';
-    button.addEventListener('click', restoreDeletedSet, { once: true });
-    sheetStatus.append(document.createTextNode(' '), button);
+  function setSheetStatus(message) {
+    if (sheetStatus) sheetStatus.textContent = message;
   }
 
-  function recordCurrentSet() {
-    const entry = currentEntry();
+  function toggleSlot(slotName) {
+    const entry = currentEntry(slotName);
     if (!entry) {
-      setFeedback('DonとKatの両方に音源を選択してください。無音はFavoriteに登録できません。', { error: true });
+      setFeedback('DonとKatの両方を選択してください', { error: true });
       return;
     }
-    const sets = readSets();
-    if (sets.some(saved => entryKey(saved) === entryKey(entry))) {
-      setFeedback('この組み合わせは登録済みです');
-      return;
+    const slots = readSlots();
+    const same = entryKey(slots[slotName]) === entryKey(entry);
+    slots[slotName] = same ? null : entry;
+    writeSlots(slots);
+    const label = slotName === 'favorite1' ? 'お気に入り1' : 'お気に入り2';
+    setFeedback(same ? `${label}を解除しました` : `${label}へ登録しました`);
+  }
+
+  function updateQuickButtons() {
+    const slots = readSlots();
+    const current = currentEntry('current');
+    for (const [slotName, button] of Object.entries(slotButtons)) {
+      if (!button) continue;
+      const saved = slots[slotName];
+      const matches = !!current && entryKey(saved) === entryKey(current);
+      const number = slotName === 'favorite1' ? '1' : '2';
+      button.disabled = !current;
+      button.classList.toggle('has-saved-pair', !!saved);
+      button.setAttribute('aria-pressed', matches ? 'true' : 'false');
+      button.textContent = slotName === 'favorite1' ? (matches ? '♥' : '♡') : (matches ? '★' : '☆');
+      button.setAttribute('aria-label', !current
+        ? `お気に入り${number}へ登録できる組み合わせがありません`
+        : matches
+          ? `現在の組み合わせをお気に入り${number}から解除`
+          : saved
+            ? `お気に入り${number}を現在の組み合わせで上書き`
+            : `現在の組み合わせをお気に入り${number}へ登録`);
     }
-    sets.push(entry);
-    writeSets(sets);
-    setFeedback('Favoriteへ追加しました');
   }
 
-  function removeSet(id) {
-    const sets = readSets();
-    const index = sets.findIndex(entry => entry.id === id);
-    if (index < 0) return;
-    clearTimeout(undoTimer);
-    pendingUndo = { entry: sets[index], index };
-    sets.splice(index, 1);
-    writeSets(sets);
-    setSheetStatus('Favoriteを削除しました。', pendingUndo);
-    undoTimer = window.setTimeout(() => {
-      pendingUndo = null;
-      setSheetStatus('');
-    }, 6000);
-  }
-
-  function restoreDeletedSet() {
-    if (!pendingUndo) return;
-    clearTimeout(undoTimer);
-    const sets = readSets();
-    sets.splice(Math.min(pendingUndo.index, sets.length), 0, pendingUndo.entry);
-    pendingUndo = null;
-    writeSets(sets);
-    setSheetStatus('Favoriteを元に戻しました');
-  }
-
-  async function applySet(id) {
-    const entry = readSets().find(item => item.id === id);
+  async function applyPreset(id) {
+    const entry = presetEntries().find(item => item.id === id);
     if (!entry) return;
     const state = entryAvailability(entry);
     if (!state.ok) {
@@ -257,67 +240,35 @@
       return;
     }
     const applied = await controller.setPair(entry.don.id, entry.kat.id);
-    setSheetStatus(applied ? `${pairLabel(entry)} を適用しました` : 'Favoriteを適用できませんでした');
-    if (applied) window.dispatchEvent(new CustomEvent('hitsound-favorite-applied', { detail: { label: pairLabel(entry) } }));
+    setSheetStatus(applied ? `${pairLabel(entry)} を適用しました` : 'プリセットを適用できませんでした');
+    if (applied) window.dispatchEvent(new CustomEvent('hitsound-preset-applied', { detail: { label: pairLabel(entry) } }));
   }
 
-  function updateSetButton() {
-    if (!setButton) return;
-    const entry = currentEntry();
-    const saved = entry && readSets().some(item => entryKey(item) === entryKey(entry));
-    setButton.disabled = !entry;
-    setButton.setAttribute('aria-pressed', saved ? 'true' : 'false');
-    setButton.textContent = saved ? '♥' : '♡';
-    setButton.setAttribute('aria-label', saved ? '現在のDonとKatはFavorite登録済み' : '現在のDonとKatをFavoriteへ追加');
-    setButton.title = entry ? (saved ? 'この組み合わせは登録済みです' : '現在の組み合わせをFavoriteへ追加') : 'DonとKatの両方に音源を選択してください。無音は登録できません';
-  }
-
-  function pairLabel(entry) {
-    return `Don ${entry.don.sourceNumber} + Kat ${entry.kat.sourceNumber}`;
-  }
-
-  function renderSavedSets() {
+  function renderPresets() {
     if (!list) return;
-    const sets = readSets();
+    const entries = presetEntries();
     list.replaceChildren();
-    for (const entry of sets) {
+    for (const entry of entries) {
       const item = document.createElement('div');
-      item.className = 'favorite-set-item';
+      item.className = 'favorite-set-item preset-set-item';
       const state = entryAvailability(entry);
       item.classList.toggle('unavailable', !state.ok);
 
       const applyButton = document.createElement('button');
       applyButton.type = 'button';
       applyButton.className = 'hs-key favorite-set-apply';
-      applyButton.dataset.applySet = entry.id;
+      applyButton.dataset.applyPreset = entry.id;
       applyButton.disabled = !state.ok;
-      applyButton.setAttribute('aria-label', state.ok ? `${pairLabel(entry)} を適用` : `${pairLabel(entry)} は適用不可。${state.reason}`);
+      applyButton.setAttribute('aria-label', state.ok ? `${entry.id} ${pairLabel(entry)} を適用` : `${entry.id} は適用不可。${state.reason}`);
       applyButton.title = state.ok ? `${entry.don.name} + ${entry.kat.name}` : state.reason;
       const face = document.createElement('span');
-      face.textContent = pairLabel(entry);
+      face.textContent = `${entry.id}　${pairLabel(entry)}`;
       applyButton.append(face);
-
-      const deleteButton = document.createElement('button');
-      deleteButton.type = 'button';
-      deleteButton.className = 'hs-key favorite-set-delete';
-      deleteButton.dataset.deleteSet = entry.id;
-      deleteButton.setAttribute('aria-label', `${pairLabel(entry)} をFavoriteから削除`);
-      const deleteFace = document.createElement('span');
-      deleteFace.textContent = '×';
-      deleteButton.append(deleteFace);
-
-      item.append(applyButton, deleteButton);
-      if (!state.ok) {
-        const reason = document.createElement('small');
-        reason.className = 'favorite-set-reason';
-        reason.textContent = state.reason;
-        item.append(reason);
-      }
+      item.append(applyButton);
       list.append(item);
     }
-    if (empty) empty.hidden = sets.length > 0;
-    if (count) count.textContent = String(sets.length);
-    if (exportButton) exportButton.disabled = sets.length === 0;
+    if (count) count.textContent = String(entries.length);
+    if (exportButton) exportButton.disabled = false;
   }
 
   function isRecommendedPair(donId, katId) {
@@ -360,14 +311,25 @@
 
   function makeCsv() {
     const rows = [[
-      'FavoriteType',
+      'PairType',
       'DonNo','DonID','DonName','DonFamily','DonPitchHz','DonUserLabel','DonMySound','DonFingerprint',
       'KatNo','KatID','KatName','KatFamily','KatPitchHz','KatUserLabel','KatMySound','KatFingerprint',
       'Available','CreatedAt'
     ]];
-    for (const entry of readSets()) {
+    for (const entry of presetEntries()) {
       rows.push([
-        'SET',
+        `PRESET_${entry.id}`,
+        ...descriptorCsv(entry.don),
+        ...descriptorCsv(entry.kat),
+        entryAvailability(entry).ok ? 'YES' : 'NO',
+        '',
+      ]);
+    }
+    const slots = readSlots();
+    for (const [slotName, entry] of Object.entries(slots)) {
+      if (!entry) continue;
+      rows.push([
+        slotName === 'favorite1' ? 'FAVORITE_1' : 'FAVORITE_2',
         ...descriptorCsv(entry.don),
         ...descriptorCsv(entry.kat),
         entryAvailability(entry).ok ? 'YES' : 'NO',
@@ -378,10 +340,10 @@
   }
 
   async function exportCsv() {
-    const file = new File([makeCsv()], 'osu_taiko_hitsound_lab_favorites.csv', { type: 'text/csv;charset=utf-8' });
+    const file = new File([makeCsv()], 'osu_taiko_hitsound_lab_pairs.csv', { type: 'text/csv;charset=utf-8' });
     try {
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ files: [file], title: 'osu!taiko Hitsound Lab Favorites' });
+        await navigator.share({ files: [file], title: 'osu!taiko Hitsound Lab Pairs' });
         setSheetStatus('CSVを共有しました');
         return;
       }
@@ -402,38 +364,36 @@
     setSheetStatus('CSVを出力しました');
   }
 
-  setButton?.addEventListener('click', recordCurrentSet);
+  slotButtons.favorite1?.addEventListener('click', () => toggleSlot('favorite1'));
+  slotButtons.favorite2?.addEventListener('click', () => toggleSlot('favorite2'));
   exportButton?.addEventListener('click', () => exportCsv().catch(error => setSheetStatus(error.message || 'CSVを出力できませんでした')));
   list?.addEventListener('click', event => {
-    const applyButton = event.target.closest('[data-apply-set]');
-    if (applyButton) {
-      applySet(applyButton.dataset.applySet).catch(error => setSheetStatus(error.message || 'Favoriteを適用できませんでした'));
-      return;
-    }
-    const deleteButton = event.target.closest('[data-delete-set]');
-    if (deleteButton) removeSet(deleteButton.dataset.deleteSet);
+    const applyButton = event.target.closest('[data-apply-preset]');
+    if (applyButton) applyPreset(applyButton.dataset.applyPreset).catch(error => setSheetStatus(error.message || 'プリセットを適用できませんでした'));
   });
 
-  window.addEventListener('hitsound-selection-change', updateSetButton);
+  window.addEventListener('hitsound-selection-change', updateQuickButtons);
   window.addEventListener('hitsound-custom-sources-change', () => {
-    renderSavedSets();
-    updateSetButton();
+    renderPresets();
+    updateQuickButtons();
   });
   window.addEventListener('storage', event => {
-    if (event.key === STORAGE_KEY) {
-      renderSavedSets();
-      updateSetButton();
-    }
+    if (event.key === SLOT_STORAGE_KEY) updateQuickButtons();
   });
 
   window.HitsoundFavorites = {
-    KEY: STORAGE_KEY,
-    readSets,
+    KEY: SLOT_STORAGE_KEY,
+    readSets: presetEntries,
+    readPresets: presetEntries,
+    readSlots,
     isRecommendedPair,
     recommendedFor,
   };
 
-  mergeSeedFavoritePairs();
-  renderSavedSets();
-  updateSetButton();
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_SEED_KEY);
+  } catch {}
+  renderPresets();
+  updateQuickButtons();
 })();

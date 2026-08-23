@@ -4,9 +4,8 @@
   const input = document.getElementById('oszInput');
   const diff = document.getElementById('difficultySelect');
   const viewport = document.getElementById('timelineViewport');
-  const zoomLabel = document.getElementById('zoomLabel');
   const seek = document.getElementById('seekBar');
-  if (!input || !diff || !viewport || !zoomLabel || !seek || !window.JSZip) return;
+  if (!input || !diff || !viewport || !seek || !window.JSZip) return;
 
   const oldOverlay = document.getElementById('objectHitLaneCanvas');
   if (oldOverlay) oldOverlay.style.visibility = 'hidden';
@@ -28,6 +27,7 @@
   window.CreateSEViewer?.setExternalTimelineRenderer?.(true);
 
   const POST_HIT_FADE_MS = 110;
+  const FIXED_SPAN_MS = 1000;
   const MAX_CANVAS_DPR = 2;
   // ProMotion iPads can schedule requestAnimationFrame at 120Hz. The lane is
   // intentionally capped near 60fps so canvas work cannot consume two frames
@@ -123,10 +123,7 @@
   }
 
   function zoomSpanMs() {
-    const text = zoomLabel.textContent || '±0.5s';
-    if (text.includes('0.3')) return 600;
-    if (text.includes('0.4')) return 800;
-    return 1000;
+    return FIXED_SPAN_MS;
   }
 
   function measureViewport() {
@@ -209,6 +206,50 @@
     strokeLines(measureLines, 'rgba(255,255,255,.25)');
   }
 
+  function drawRegisteredRanges(ctx, leftTime, rightTime, xForTime, laneTop, laneBottom) {
+    const state = window.CreateSEViewer?.loopState?.();
+    const ranges = Array.isArray(state?.ranges) ? state.ranges : [];
+    const palette = [
+      { start: '#68d39a', end: '#f3b55d', fill: 'rgba(104,211,154,.055)' },
+      { start: '#7bd9ff', end: '#d89aff', fill: 'rgba(123,217,255,.05)' },
+    ];
+
+    for (let index = 0; index < Math.min(2, ranges.length); index++) {
+      const range = ranges[index] || {};
+      const colors = palette[index];
+      const start = range.startMs == null ? NaN : Number(range.startMs);
+      const end = range.endMs == null ? NaN : Number(range.endMs);
+      if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+        const visibleStart = Math.max(leftTime, start);
+        const visibleEnd = Math.min(rightTime, end);
+        if (visibleEnd > visibleStart) {
+          ctx.fillStyle = colors.fill;
+          ctx.fillRect(xForTime(visibleStart), laneTop, xForTime(visibleEnd) - xForTime(visibleStart), laneBottom - laneTop);
+        }
+      }
+
+      const drawMark = (time, label, color) => {
+        if (!Number.isFinite(time) || time < leftTime || time > rightTime) return;
+        const x = Math.round(xForTime(time)) + 0.5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, laneTop);
+        ctx.lineTo(x, laneBottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.font = '800 9px -apple-system,BlinkMacSystemFont,sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(label, x + 3, laneTop + 3);
+      };
+      drawMark(start, `${index + 1}A`, colors.start);
+      drawMark(end, `${index + 1}B`, colors.end);
+    }
+  }
+
   function render() {
     const rect = viewportSize;
     if (!(rect.width > 0 && rect.height > 0)) measureViewport();
@@ -260,8 +301,9 @@
     ctx.lineTo(rect.width, laneBottom + 0.5);
     ctx.stroke();
 
-    // Behind notes: beat / measure lines, 1px wide and full lane height.
+    // Behind notes: beat / measure lines and both registered ranges.
     drawBeatLines(ctx, map, leftTime, rightTime, xForTime, laneTop, laneBottom);
+    drawRegisteredRanges(ctx, leftTime, rightTime, xForTime, laneTop, laneBottom);
 
     // Notes.
     const visibleLeftTime = nowMs - POST_HIT_FADE_MS;
@@ -326,6 +368,7 @@
     renderInvalidated = true;
     setTimeout(render, 0);
   });
+  window.addEventListener('viewer-loop-change', () => { renderInvalidated = true; });
   window.addEventListener('resize', measureViewport);
   window.addEventListener('orientationchange', measureViewport);
   const timelineResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(measureViewport) : null;
