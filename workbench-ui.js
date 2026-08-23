@@ -30,6 +30,7 @@
   let savePositionTimer = 0;
   let swipeStart = null;
   let previewingSide = null;
+  let previewActive = !!controller.isPreviewing?.();
   let dockTransitionTimer = 0;
   let dockTransitionHandler = null;
   const DOCK_TRANSITION_MS = 480;
@@ -123,7 +124,8 @@
   }
 
   function syncSinglePreview() {
-    const active = !!samplePreview && !samplePreview.paused && !samplePreview.ended;
+    const fallbackActive = !!samplePreview && !samplePreview.paused && !samplePreview.ended;
+    const active = previewActive || fallbackActive;
     for (const side of ['don', 'kat']) {
       const cap = side === 'don' ? 'Don' : 'Kat';
       const button = $(`preview${cap}Button`);
@@ -142,7 +144,8 @@
   }
 
   async function toggleSinglePreview(side) {
-    if (previewingSide === side && samplePreview && !samplePreview.paused) {
+    const fallbackActive = !!samplePreview && !samplePreview.paused && !samplePreview.ended;
+    if (previewingSide === side && (previewActive || fallbackActive)) {
       controller.stopPreview();
       syncSinglePreview();
       return;
@@ -297,9 +300,28 @@
   favoriteSheet?.addEventListener('click', event => { if (event.target.closest('[data-close-favorites]')) closeFavorites(); });
   favoriteSheet?.addEventListener('keydown', trapFavoriteFocus);
   sourcePanel?.addEventListener('scroll', schedulePositionSave, { passive: true });
-  samplePreview?.addEventListener('play', syncSinglePreview);
-  samplePreview?.addEventListener('pause', syncSinglePreview);
-  samplePreview?.addEventListener('ended', syncSinglePreview);
+  samplePreview?.addEventListener('play', () => {
+    previewActive = true;
+    syncSinglePreview();
+  });
+  samplePreview?.addEventListener('pause', () => {
+    if (!controller.isPreviewing?.()) previewActive = false;
+    syncSinglePreview();
+  });
+  samplePreview?.addEventListener('ended', () => {
+    if (!controller.isPreviewing?.()) previewActive = false;
+    syncSinglePreview();
+  });
+  window.addEventListener('hitsound-preview-state', event => {
+    const detail = event.detail || {};
+    previewActive = !!detail.playing;
+    if (!detail.playing && detail.replacing) return;
+    if (detail.playing && detail.meta?.origin === 'manual') {
+      previewingSide = detail.meta.side === 'kat' ? 'kat' : 'don';
+    }
+    if (!detail.playing) previewingSide = null;
+    syncSinglePreview();
+  });
 
   dockMini?.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse') return;

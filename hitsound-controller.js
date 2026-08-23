@@ -47,10 +47,12 @@
   };
   let packPromise = null;
   const bytesCache = new Map();
+  const bytesPromises = new Map();
   let applySerial = 0;
   let selectionSerial = 0;
   let previewSerial = 0;
   let previewUrl = '';
+  let previewActive = false;
   const pendingSides = new Set();
   const silentBytes = makeSilentWav();
 
@@ -114,15 +116,30 @@
     const custom = customSources.get(id);
     if (custom) return custom.bytes;
     if (bytesCache.has(id)) return bytesCache.get(id);
+    if (bytesPromises.has(id)) return bytesPromises.get(id);
 
     const candidate = builtInById(id);
     if (!available(candidate)) throw new Error('候補音源が見つかりません。');
-    const pack = await hitsoundPack();
-    const entry = pack.file(candidate.entry);
-    if (!entry) throw new Error(`Current111音パック内にありません: ${candidate.entry}`);
-    const bytes = await entry.async('arraybuffer');
-    bytesCache.set(id, bytes);
-    return bytes;
+    const promise = (async () => {
+      const pack = await hitsoundPack();
+      const entry = pack.file(candidate.entry);
+      if (!entry) throw new Error(`Current111音パック内にありません: ${candidate.entry}`);
+      const bytes = await entry.async('arraybuffer');
+      bytesCache.set(id, bytes);
+      return bytes;
+    })().finally(() => bytesPromises.delete(id));
+    bytesPromises.set(id, promise);
+    return promise;
+  }
+
+  function audioCacheKey(id) {
+    if (id === null || id === SILENT_ID) return 'silent';
+    const source = byId(id);
+    if (!customSources.has(id)) return `builtin:${id}`;
+    return [
+      'custom', id, source?.fingerprint || '', source?.lastModified || 0,
+      source?.size || source?.bytes?.byteLength || 0,
+    ].join(':');
   }
 
   function fileFor(id, bytes) {
@@ -210,6 +227,12 @@
     return (el.status?.textContent || '') === '準備完了' && !!el.play && !el.play.disabled;
   }
 
+  function directViewerReady() {
+    return !!el.play && !el.play.disabled
+      && typeof window.CreateSEViewer?.applyHitsoundBytes === 'function'
+      && typeof window.CreateSEViewer?.applyHitsoundPairBytes === 'function';
+  }
+
   function viewerRebuilding() {
     return /Hitsound(?:生成|反映)中/.test(el.status?.textContent || '');
   }
@@ -238,13 +261,17 @@
   }
 
   async function applyOne(side, id, { resume = true } = {}) {
-    if (!viewerReady()) return false;
+    if (!viewerReady() && !directViewerReady()) return false;
 
     const input = side === 'don' ? el.donInput : el.katInput;
     const serial = ++applySerial;
     const resumeAfter = resume && wasPlaying();
     const bytes = await candidateBytes(id);
     if (serial !== applySerial) return false;
+
+    if (directViewerReady()) {
+      return window.CreateSEViewer.applyHitsoundBytes(side, bytes, audioCacheKey(id));
+    }
 
     setInputFile(input, fileFor(id, bytes));
     input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -257,21 +284,30 @@
   }
 
   async function applyPair({ resume = false } = {}) {
-    if (!viewerReady()) return false;
+    if (!viewerReady() && !directViewerReady()) return false;
 
     const serial = ++applySerial;
     const resumeAfter = resume && wasPlaying();
+    const donId = selection.don;
+    const katId = selection.kat;
     const [donBytes, katBytes] = await Promise.all([
-      candidateBytes(selection.don),
-      candidateBytes(selection.kat),
+      candidateBytes(donId),
+      candidateBytes(katId),
     ]);
     if (serial !== applySerial) return false;
 
-    setInputFile(el.donInput, fileFor(selection.don, donBytes));
+    if (directViewerReady()) {
+      return window.CreateSEViewer.applyHitsoundPairBytes({
+        don: { bytes: donBytes, cacheKey: audioCacheKey(donId) },
+        kat: { bytes: katBytes, cacheKey: audioCacheKey(katId) },
+      });
+    }
+
+    setInputFile(el.donInput, fileFor(donId, donBytes));
     el.donInput.dispatchEvent(new Event('change', { bubbles: true }));
     if (!(await waitForRebuild(serial))) return false;
 
-    setInputFile(el.katInput, fileFor(selection.kat, katBytes));
+    setInputFile(el.katInput, fileFor(katId, katBytes));
     el.katInput.dispatchEvent(new Event('change', { bubbles: true }));
     if (!(await waitForRebuild(serial))) return false;
 
@@ -296,16 +332,46 @@
 
   function stopPreview({ reset = true } = {}) {
     previewSerial++;
+    window.CreateSEViewer?.stopHitsoundPreview?.();
     clearPreview({ reset });
   }
 
-  async function previewCandidate(id, { waitUntilEnded = false } = {}) {
-    if (!el.previewAudio || id === null || id === SILENT_ID || !validSideId(id)) return false;
+  async function previewCandidate(id, { waitUntilEnded = false, meta = null } = {}) {
+    const directPreview = typeof window.CreateSEViewer?.previewHitsoundBytes === 'function';
+    if ((!el.previewAudio && !directPreview) || id === null || id === SILENT_ID || !validSideId(id)) return false;
 
     const serial = ++previewSerial;
+    const preparePromise = directPreview
+      ? Promise.resolve(window.CreateSEViewer.prepareHitsoundAudio?.()).catch(() => null)
+      : Promise.resolve();
+    window.CreateSEViewer?.stopHitsoundPreview?.({ notify: false });
     clearPreview();
     const bytes = await candidateBytes(id);
     if (serial !== previewSerial) return false;
+
+    if (directPreview) {
+      await preparePromise;
+      if (serial !== previewSerial) return false;
+      const cacheKey = audioCacheKey(id);
+      const started = await window.CreateSEViewer.previewHitsoundBytes(bytes, cacheKey, meta);
+      if (!started || !waitUntilEnded) return !!started;
+      await new Promise(resolve => {
+        let timer = 0;
+        const finish = event => {
+          const detail = event?.detail || {};
+          if (detail.playing || (detail.cacheKey && detail.cacheKey !== cacheKey)) return;
+          clearTimeout(timer);
+          window.removeEventListener('hitsound-preview-state', finish);
+          resolve();
+        };
+        window.addEventListener('hitsound-preview-state', finish);
+        timer = window.setTimeout(() => {
+          window.removeEventListener('hitsound-preview-state', finish);
+          resolve();
+        }, 6000);
+      });
+      return true;
+    }
 
     const source = byId(id);
     const type = customSources.has(id) ? (source?.type || '') : 'audio/wav';
@@ -332,13 +398,13 @@
 
   async function togglePreview(side) {
     if (side !== 'don' && side !== 'kat') return false;
-    return previewCandidate(selection[side]);
+    return previewCandidate(selection[side], { meta: { origin: 'manual', side } });
   }
 
   async function applyPendingSelection(serial) {
     if (serial !== selectionSerial || !pendingSides.size) return false;
 
-    if (!viewerReady()) {
+    if (!viewerReady() && !directViewerReady()) {
       if (!viewerRebuilding()) return false;
       if (!(await waitForViewerReady()) || serial !== selectionSerial) return false;
     }
@@ -372,15 +438,16 @@
     emitSelection();
 
     try {
+      let previewTask = Promise.resolve(false);
       if (preview && id !== null && id !== SILENT_ID) {
-        try {
-          await previewCandidate(id);
-        } catch (previewError) {
-          stopPreview();
+        previewTask = previewCandidate(id, { meta: { origin: 'candidate', side } }).catch(previewError => {
+          if (serial === selectionSerial) stopPreview();
           console.warn('音源の試聴は開始できませんでしたが、選択は反映します。', previewError);
-        }
+          return false;
+        });
       }
       if (serial === selectionSerial) await applyPendingSelection(serial);
+      await previewTask;
       return true;
     } catch (error) {
       if (serial === selectionSerial) {
@@ -412,9 +479,17 @@
   }
 
   el.previewAudio?.addEventListener('ended', () => {
+    previewActive = false;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
     el.previewAudio.removeAttribute('src');
+  });
+  el.previewAudio?.addEventListener('play', () => { previewActive = true; });
+  el.previewAudio?.addEventListener('pause', () => {
+    if (!window.CreateSEViewer?.previewHitsoundBytes) previewActive = false;
+  });
+  window.addEventListener('hitsound-preview-state', event => {
+    previewActive = !!event.detail?.playing;
   });
 
   el.oszInput?.addEventListener('change', async () => {
@@ -432,6 +507,15 @@
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   });
 
+  function warmCurrentSelection() {
+    hitsoundPack()
+      .then(() => Promise.allSettled([
+        candidateBytes(selection.don),
+        candidateBytes(selection.kat),
+      ]))
+      .catch(() => {});
+  }
+
   window.HitsoundController = {
     SILENT_ID,
     SELECTION_STORAGE_KEY,
@@ -446,7 +530,10 @@
     previewCandidate,
     togglePreview,
     stopPreview,
+    isPreviewing: () => previewActive,
   };
 
   emitSelection();
+  if (document.readyState === 'complete') window.setTimeout(warmCurrentSelection, 0);
+  else window.addEventListener('load', () => window.setTimeout(warmCurrentSelection, 0), { once: true });
 })();

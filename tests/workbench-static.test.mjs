@@ -55,6 +55,24 @@ test('audio levels are fixed and preview ducking is fully removed', () => {
   assert.equal(existsSync(new URL('../audio-ducking-bridge.js', import.meta.url)), false);
 });
 
+test('candidate switching shares decoded audio and keeps only the latest rapid tap', () => {
+  assert.match(app, /const MAX_DECODED_HITSOUND_CACHE = 32;/);
+  assert.match(app, /const decodedHitsoundPromises = new Map\(\);/);
+  assert.match(app, /async function decodeHitsoundBytes\(value, cacheKey\)/);
+  assert.match(app, /if \(decodedHitsoundPromises\.has\(key\)\) return decodedHitsoundPromises\.get\(key\);/);
+  assert.match(app, /previewHitsoundBytes,/);
+  assert.match(app, /applyHitsoundBytes,/);
+  assert.match(app, /applyHitsoundPairBytes,/);
+  assert.match(controller, /const bytesPromises = new Map\(\);/);
+  assert.match(controller, /if \(bytesPromises\.has\(id\)\) return bytesPromises\.get\(id\);/);
+  assert.match(controller, /let previewTask = Promise\.resolve\(false\);/);
+  assert.match(controller, /if \(serial === selectionSerial\) await applyPendingSelection\(serial\);\s+await previewTask;/);
+  assert.match(controller, /function warmCurrentSelection\(\)/);
+  assert.match(workbench, /window\.addEventListener\('hitsound-preview-state'/);
+  assert.match(html, /app-v4\.js\?v=3\.4-shared-hitsound-buffer/);
+  assert.match(html, /hitsound-controller\.js\?v=4\.1-latest-switch-wins/);
+});
+
 test('Favorite excludes mute and verifies My Sound fingerprints', () => {
   assert.match(favorites, /don === SILENT_ID \|\| kat === SILENT_ID/);
   assert.match(favorites, /source\.fingerprint !== side\.fingerprint/);

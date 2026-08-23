@@ -12,7 +12,7 @@
   const EFFECT_SCHEDULER_INTERVAL_MS = 40;
   const MAX_HITSOUND_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_HITSOUND_DURATION_SEC = 5;
-  const MAX_DECODED_HITSOUND_CACHE = 8;
+  const MAX_DECODED_HITSOUND_CACHE = 32;
   const SKIP_SEC = 4;
   const LOOP_MIN_MS = 500;
   const LOOP_MAX_MS = 30000;
@@ -58,12 +58,15 @@
   let hsBuffers = new Map();
   let customHsBuffers = new Map();
   const decodedHitsoundCache = new Map();
+  const decodedHitsoundPromises = new Map();
   let hsLoadPromise = null;
   let musicGain = null;
   let effectGain = null;
   let masterGain = null;
   let musicSource = null;
   const effectVoices = new Set();
+  let previewVoice = null;
+  let previewGeneration = 0;
   let nextEffectHitIndex = 0;
   let effectSchedulerTimer = 0;
   const hitsoundApplySerial = { don: 0, ka: 0 };
@@ -538,28 +541,52 @@
     }
   }
 
-  async function decodeHitsoundFile(file) {
-    if (file.size > MAX_HITSOUND_FILE_BYTES) {
-      throw new Error('音源は8MB以下にしてください。');
+  function hitsoundBytes(value) {
+    if (value instanceof ArrayBuffer) return value;
+    if (ArrayBuffer.isView(value)) {
+      return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
     }
+    return null;
+  }
 
-    const key = hitsoundFileKey(file);
-    if (decodedHitsoundCache.has(key)) {
-      const cached = decodedHitsoundCache.get(key);
-      rememberDecodedHitsound(key, cached);
-      return cached;
-    }
-
-    const raw = await file.arrayBuffer();
-    const decoded = await ac.decodeAudioData(raw);
+  function validateDecodedHitsound(decoded) {
     if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
       throw new Error('音源の長さを確認できません。');
     }
     if (decoded.duration > MAX_HITSOUND_DURATION_SEC + 0.01) {
       throw new Error('ヒットサウンドは5秒以下にしてください。');
     }
-    rememberDecodedHitsound(key, decoded);
     return decoded;
+  }
+
+  async function decodeHitsoundBytes(value, cacheKey) {
+    const bytes = hitsoundBytes(value);
+    if (!bytes?.byteLength) throw new Error('空の音源ファイルは追加できません。');
+    if (bytes.byteLength > MAX_HITSOUND_FILE_BYTES) {
+      throw new Error('音源は8MB以下にしてください。');
+    }
+
+    const key = `${String(cacheKey || 'anonymous')}\u0000${bytes.byteLength}`;
+    if (decodedHitsoundCache.has(key)) {
+      const cached = decodedHitsoundCache.get(key);
+      rememberDecodedHitsound(key, cached);
+      return cached;
+    }
+    if (decodedHitsoundPromises.has(key)) return decodedHitsoundPromises.get(key);
+
+    const promise = (async () => {
+      await ensureContext(false);
+      const decoded = validateDecodedHitsound(await ac.decodeAudioData(bytes.slice(0)));
+      rememberDecodedHitsound(key, decoded);
+      return decoded;
+    })().finally(() => decodedHitsoundPromises.delete(key));
+    decodedHitsoundPromises.set(key, promise);
+    return promise;
+  }
+
+  async function decodeHitsoundFile(file) {
+    const raw = await file.arrayBuffer();
+    return decodeHitsoundBytes(raw, `file:${hitsoundFileKey(file)}`);
   }
 
   async function ensureContext(resume = false) {
@@ -579,6 +606,57 @@
     }
     if (resume && ac.state === 'suspended') await ac.resume();
     return ac;
+  }
+
+  function dispatchPreviewState(playing, { cacheKey = '', meta = null, replacing = false } = {}) {
+    window.dispatchEvent(new CustomEvent('hitsound-preview-state', {
+      detail: { playing: !!playing, cacheKey: String(cacheKey || ''), meta, replacing: !!replacing },
+    }));
+  }
+
+  function releasePreviewVoice({ notify = true, replacing = false } = {}) {
+    const voice = previewVoice;
+    previewVoice = null;
+    if (voice) {
+      try { voice.node.onended = null; } catch {}
+      try { voice.node.stop(); } catch {}
+      try { voice.node.disconnect(); } catch {}
+    }
+    if (notify) dispatchPreviewState(false, {
+      cacheKey: voice?.cacheKey || '',
+      meta: voice?.meta || null,
+      replacing,
+    });
+  }
+
+  function stopHitsoundPreview({ notify = true } = {}) {
+    previewGeneration++;
+    releasePreviewVoice({ notify });
+  }
+
+  async function previewHitsoundBytes(value, cacheKey, meta = null) {
+    const generation = ++previewGeneration;
+    releasePreviewVoice({ notify: true, replacing: true });
+    await ensureContext(true);
+    const decoded = await decodeHitsoundBytes(value, cacheKey);
+    if (generation !== previewGeneration) return false;
+    await ensureContext(true);
+    if (generation !== previewGeneration) return false;
+
+    const node = ac.createBufferSource();
+    node.buffer = decoded;
+    node.connect(effectGain);
+    const voice = { node, cacheKey: String(cacheKey || ''), meta };
+    previewVoice = voice;
+    node.onended = () => {
+      if (previewVoice !== voice || generation !== previewGeneration) return;
+      try { node.disconnect(); } catch {}
+      previewVoice = null;
+      dispatchPreviewState(false, { cacheKey: voice.cacheKey, meta: voice.meta });
+    };
+    node.start();
+    dispatchPreviewState(true, { cacheKey: voice.cacheKey, meta: voice.meta });
+    return true;
   }
 
   async function loadHitsounds() {
@@ -741,6 +819,72 @@
     hitsoundsReady = false;
     await loadHitsounds();
     hitsoundsReady = true;
+  }
+
+  function viewerHitsoundKind(kind) {
+    return kind === 'ka' || kind === 'kat' ? 'ka' : 'don';
+  }
+
+  async function applyHitsoundBytes(kind, value, cacheKey) {
+    const target = viewerHitsoundKind(kind);
+    const label = target === 'ka' ? 'Ka' : 'Don';
+    const serial = ++hitsoundApplySerial[target];
+    let failed = false;
+    hitsoundLoadsInFlight++;
+    clearError();
+    setStatus(`${label} Hitsound反映中`);
+    try {
+      const decoded = await decodeHitsoundBytes(value, cacheKey);
+      if (serial !== hitsoundApplySerial[target]) return false;
+      const nextCustom = new Map(customHsBuffers);
+      nextCustom.set(target, decoded);
+      customHsBuffers = nextCustom;
+      refreshScheduledHitsounds();
+      return true;
+    } catch (error) {
+      if (serial !== hitsoundApplySerial[target]) return false;
+      failed = true;
+      if (map && musicBuffer && hitsoundsReady) setControls(true);
+      fail(error instanceof Error ? `${label} Hitsoundを読み込めません: ${error.message}` : `${label} Hitsoundを読み込めませんでした。`);
+      throw error;
+    } finally {
+      hitsoundLoadsInFlight = Math.max(0, hitsoundLoadsInFlight - 1);
+      if (!failed && hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
+    }
+  }
+
+  async function applyHitsoundPairBytes(pair) {
+    const don = pair?.don;
+    const kat = pair?.kat;
+    if (!don?.bytes || !kat?.bytes) return false;
+    const donSerial = ++hitsoundApplySerial.don;
+    const kaSerial = ++hitsoundApplySerial.ka;
+    let failed = false;
+    hitsoundLoadsInFlight++;
+    clearError();
+    setStatus('Hitsound反映中');
+    try {
+      const [donDecoded, kaDecoded] = await Promise.all([
+        decodeHitsoundBytes(don.bytes, don.cacheKey),
+        decodeHitsoundBytes(kat.bytes, kat.cacheKey),
+      ]);
+      if (donSerial !== hitsoundApplySerial.don || kaSerial !== hitsoundApplySerial.ka) return false;
+      const nextCustom = new Map(customHsBuffers);
+      nextCustom.set('don', donDecoded);
+      nextCustom.set('ka', kaDecoded);
+      customHsBuffers = nextCustom;
+      refreshScheduledHitsounds();
+      return true;
+    } catch (error) {
+      if (donSerial !== hitsoundApplySerial.don || kaSerial !== hitsoundApplySerial.ka) return false;
+      failed = true;
+      if (map && musicBuffer && hitsoundsReady) setControls(true);
+      fail(error instanceof Error ? `Hitsoundを読み込めません: ${error.message}` : 'Hitsoundを読み込めませんでした。');
+      throw error;
+    } finally {
+      hitsoundLoadsInFlight = Math.max(0, hitsoundLoadsInFlight - 1);
+      if (!failed && hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
+    }
   }
 
   async function loadCustomHitsound(kind, file) {
@@ -1470,6 +1614,7 @@
   }
   window.addEventListener('beforeunload', () => {
     cancelAnimationFrame(raf);
+    stopHitsoundPreview({ notify: false });
     stopSources();
     if (ac) ac.close().catch(() => {});
   });
@@ -1493,6 +1638,7 @@
       scheduledVoices: effectVoices.size,
       schedulerActive: !!effectSchedulerTimer,
       decodedHitsounds: decodedHitsoundCache.size,
+      previewing: !!previewVoice,
       nextHitIndex: nextEffectHitIndex,
     }),
     skipSeconds: SKIP_SEC,
@@ -1508,6 +1654,11 @@
     resetChart,
     reportError: message => fail(String(message || '読み込みに失敗しました。')),
     positionSec: audiblePosition,
+    prepareHitsoundAudio: () => ensureContext(true),
+    previewHitsoundBytes,
+    stopHitsoundPreview,
+    applyHitsoundBytes,
+    applyHitsoundPairBytes,
     setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },
     loopState: () => ({
       startMs: startMark?.time ?? null,
