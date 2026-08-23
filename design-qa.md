@@ -1,7 +1,7 @@
 # CreateSE Current111 / mobile workbench — Design QA
 
 実施日: 2026-08-23（JST）  
-対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670`  
+対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670` / performance commit `50e993c95c251917c3f14029db3deb3e37e0a773`  
 Production: https://demon-mami.github.io/CreateSE/?qa=1071e91  
 iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=1071e91
 
@@ -96,7 +96,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=1071e91
 ## Automated checks
 
 - `node --check`: PASS。
-- `node --test tests/*.test.mjs`: 17 / 17 PASS。
+- `node --test tests/*.test.mjs`: 18 / 18 PASS。
 - final fresh Production tab: CreateSE由来のconsole error / warning 0。
 - final GitHub tree: new packのみ存在し、old packなし。
 
@@ -126,6 +126,45 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=1071e91
 - [x] responsive capacityと44px以上のtouch targetを維持。
 - [x] 候補面 / 再生面をcyber gradientで分離。
 - [x] iPhone / iPad Cloud Browserでrenderingと主要操作をQA。
-- [x] 17 / 17 tests PASS、final console error / warning 0。
+- [x] 18 / 18 tests PASS、final console error / warning 0。
+
+## Hitsound switching performance follow-up — 2026-08-24
+
+### 観測した原因
+
+- 初回候補tapまで15.4MBのCurrent111 ZIP取得を開始せず、そのtapにnetwork待ちが集中していた。
+- 候補変更時に単音preview完了を待ってから実譜面用Hitsoundを反映しており、比較loopが直列化していた。
+- 同じWAVを`HTMLAudio`のpreviewと、hidden file input経由のWeb Audio反映で別々にdecodeしていた。
+- decoded buffer cacheが8件で、同じ候補へ戻る比較でも再decodeが発生しやすかった。
+- 連打時は過去の選択処理がqueueとして残り、最後のtapまでの待ち時間が積み上がる場合があった。
+
+### 対策
+
+- Current111 ZIPをpage load後にbackground warm-upし、現在のDon / Kat entryを先に展開する。
+- ZIP entry展開とWeb Audio decodeにin-flight promiseを持たせ、同じ音源の同時処理を1回へ集約する。
+- 単音previewと実譜面反映で同じdecoded `AudioBuffer`を共有し、hidden file input経由の二重decodeをbuilt-in音源では廃止する。
+- previewと実譜面反映を並行開始し、候補選択処理からpreview終了待ちを外す。
+- rapid tapはselection serialでlatest-winsとし、古い処理が完了しても最後にtapした候補を上書きしない。
+- decoded buffer cacheを8件から32件へ拡張する。
+- My Sound等の互換経路として従来のfile input fallbackは保持する。
+- temporary volume controlは追加せず、Music `0.85` / Hitsound `1.00`の既定mixを維持する。
+- 表示、文言、layoutには変更を加えていない。
+
+### Production QA
+
+| 確認 | 結果 |
+|---|---|
+| deploy | Productionが`app-v4.js?v=3.4-shared-hitsound-buffer`、`hitsound-controller.js?v=4.1-latest-switch-wins`、`workbench-ui.js?v=1.5.1-preview-state`を配信 |
+| 通常表示・native tap相当 | `SRC-035 → 036 → 037`で819 / 255 / 263ms。最終Don 037、status `準備完了` |
+| iPhone 390×844 harness・native tap相当 | `SRC-014 → 015 → 016`で505 / 999 / 998ms。最終Kat 016、status `準備完了` |
+| 再生中の連続切替 | 通常表示・iPhone harnessとも再生が停止せず、最終tapの候補が残る |
+| iPhone再生位置 | `SRC-011 → 012 → 013`の切替中に0.158秒から9.309秒へ進行、最終Kat 013 |
+| Don / Kat | Katを維持したままDonのみ001 → 014へ変更できた |
+| 無音 / 復帰 | Don 014 → 無音 → 015を確認 |
+| Favorite再適用 | Don 001 + Kat 002を再適用し、両sideとstatusが同期 |
+| errors | CreateSE由来のconsole error / warning 0 |
+| automated | `node --check` PASS、`node --test tests/*.test.mjs` 18 / 18 PASS |
+
+Cloud Browserの計測値にはremote input・iframe・rendering overheadが含まれ、純粋なaudio処理時間や実機Safariのlatencyではない。絶対値よりも、連打後に待ちqueueが積み上がらないこと、再生が継続すること、最後のtapが正しく残ることを合格条件とした。未cache候補の初回展開・decodeコストは端末性能に依存するため、実機iPhone / iPad Safariでの最終確認を残す。
 
 final result: passed
