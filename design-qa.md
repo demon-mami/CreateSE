@@ -220,6 +220,25 @@ Cloud Browserの計測値にはremote input・iframe・rendering overheadが含�
 - 44px touch target、番号のみのvisible label、Don / Kat選択dot、静止selected outlineは維持する。
 - 連続animation、凡例、追加説明文は導入していない。
 
+### Production QA
+
+| 確認 | iPad横相当 | iPhone縦 |
+|---|---:|---:|
+| viewport | 1363 × 936 | 390 × 844 |
+| candidate | 111 | 111 |
+| family row | 13 | 18 |
+| 最小candidate button | 56.55 × 48px | 49.83 × 48px |
+| document横overflow | なし | なし |
+
+- iPadは全rowが6-slot module × 2として描画され、固定pairと全幅familyが計画どおりの順序になった。
+- iPhoneは6列を維持し、`Doom Pulse + Taiko`と`Bass Drum / Kick + Snare`だけを1-slot境界付きで同じrowへ配置した。
+- A / B / Cのpseudo-elementはすべて5 × 5px・左上固定。実computed colorはA `rgb(216, 106, 112)`、B `rgb(121, 173, 131)`、C `rgba(245, 247, 248, 0.88)`。
+- iPhoneで`SRC-011`を選択→解除→`SRC-012`を選択し、`aria-pressed`とDon選択classが即時同期した。
+- 配信assetは`hitsound-grid.js?v=4.1-fixed-six-modules`、`hitsound-grid.css?v=4.2-subtle-abc-dots`、`workbench.css?v=1.8-fixed-six-modules`。
+- automated testは20 / 20 PASS。
+
+Cloud Browserによるviewport再現であり、実機iOS / iPadOS Safariの指サイズ、safe area、browser bar変動、長押しはこの変更後に再確認していない。
+
 ## iPad object timeline performance / final mix — 2026-08-24
 
 ### 観測した原因
