@@ -130,7 +130,7 @@
     const source = candidateLabel(candidate);
     const family = displayFamily(candidate);
     const abcGrade = String(candidate.abcGrade || '').toUpperCase();
-    return `<button class="hs-key" type="button" data-hs-id="${candidate.id}" data-abc="${abcGrade}" title="${source}" aria-label="${source}、${abcGrade}、${family}" aria-pressed="false" data-base-label="${source}"><span data-abc="${abcGrade}">${candidate.sourceNumber}</span></button>`;
+    return `<button class="hs-key" type="button" data-hs-id="${candidate.id}" data-abc="${abcGrade}" title="${source}" aria-label="${source}、${abcGrade}、${family}" aria-pressed="false" data-base-label="${source}"><span>${candidate.sourceNumber}</span></button>`;
   }
 
   function candidateRowCapacity() {

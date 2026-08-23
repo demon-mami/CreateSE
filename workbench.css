@@ -77,16 +77,41 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
     linear-gradient(145deg,rgba(7,28,40,.78),rgba(15,20,43,.72))
 }
 .hs-family-title{font-size:13px!important;margin-bottom:6px!important}
+#hitsoundSources .hs-family-title{
+  margin:0 0 5px 2px!important;color:rgba(255,255,255,.46);font-size:10px!important;font-weight:650;letter-spacing:.015em
+}
 .hs-family-row,.hs-family-grid{gap:7px!important}
 .hs-family-grid{grid-template-columns:repeat(var(--family-columns,1),minmax(44px,1fr))!important}
 .hs-key{min-width:44px!important}
 .hs-key>span{height:44px!important;font-size:14px!important}
-.hs-key.selected-don::after,.hs-key.selected-kat::after{
-  position:absolute;right:3px;bottom:2px;z-index:5;min-width:16px;height:16px;padding:0 3px;
-  display:grid;place-items:center;border-radius:8px;background:#17252b;color:#fff;
-  font:900 9px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:none
+#hitsoundSources .hs-key>span{
+  box-sizing:border-box;padding-top:5px;color:rgba(235,244,248,.48);font-size:11px!important;font-weight:520!important;
+  letter-spacing:.035em;text-shadow:none
 }
-.hs-key.selected-don::after{content:"D"}.hs-key.selected-kat::after{content:"K"}.hs-key.selected-don.selected-kat::after{content:"D/K"}
+#hitsoundSources .hs-key.selected-don>span{color:rgba(92,38,47,.72)}
+#hitsoundSources .hs-key.selected-kat>span{color:rgba(34,80,98,.72)}
+#hitsoundSources .hs-key.selected-don.selected-kat>span{color:rgba(69,62,68,.72)}
+.hs-key.selected-don::after,.hs-key.selected-kat::after{
+  content:"";position:absolute;left:4px;right:4px;bottom:4px;z-index:5;width:auto;min-width:0;height:7px;padding:0;
+  border:0;border-radius:0;box-shadow:none;transform:none;pointer-events:none
+}
+.hs-key.selected-don::after{
+  background:radial-gradient(circle at 3.5px 50%,#f2b3b9 0 3px,transparent 3.5px)
+}
+.hs-key.selected-kat::after{
+  background:radial-gradient(circle at calc(100% - 3.5px) 50%,#acd7e9 0 3px,transparent 3.5px)
+}
+.hs-key.selected-don.selected-kat::after{
+  background:
+    radial-gradient(circle at 3.5px 50%,#f2b3b9 0 3px,transparent 3.5px),
+    radial-gradient(circle at calc(100% - 3.5px) 50%,#acd7e9 0 3px,transparent 3.5px)
+}
+#hitsoundGrid[data-active-side="don"] #hitsoundSources .hs-key.selected-don{
+  box-shadow:0 0 0 1px rgba(245,170,178,.38),0 0 10px rgba(231,126,139,.22)
+}
+#hitsoundGrid[data-active-side="kat"] #hitsoundSources .hs-key.selected-kat{
+  box-shadow:0 0 0 1px rgba(176,211,226,.40),0 0 10px rgba(110,179,207,.22)
+}
 .hs-key.delete-candidate>span::after{
   content:"×"!important;top:3px!important;right:3px!important;width:15px!important;height:15px!important;
   display:grid;place-items:center;border-radius:50%;color:#24161a;font:950 11px/1 sans-serif

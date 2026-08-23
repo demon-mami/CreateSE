@@ -189,9 +189,23 @@ test('Current111 replaces the old pack and keeps ABC visible without source file
   assert.match(grid, /deletion-candidates:current111-abc-v5/);
   assert.match(grid, /data-abc="\$\{abcGrade\}"/);
   assert.match(gridCss, /\.hs-key\[data-abc="A"\]/);
-  assert.match(gridCss, /content:attr\(data-abc\)/);
+  assert.doesNotMatch(gridCss, /content:attr\(data-abc\)/);
   assert.equal(existsSync(new URL('../hitsounds-current111-abc-v5.zip', import.meta.url)), true);
   assert.equal(existsSync(new URL('../hitsounds-single-base-116.zip', import.meta.url)), false);
+});
+
+test('candidate keys use restrained numbers and static heat colors instead of ABC or D-K text', () => {
+  assert.doesNotMatch(grid, /<span data-abc=/);
+  assert.match(gridCss, /\.hs-key\[data-abc="A"\]\{[\s\S]*?linear-gradient\(90deg,#ef687d/);
+  assert.match(gridCss, /\.hs-key\[data-abc="B"\]\{[\s\S]*?linear-gradient\(90deg,#b88122/);
+  assert.match(gridCss, /\.hs-key\[data-abc="C"\]\{[\s\S]*?linear-gradient\(90deg,#9d2f3d/);
+  assert.match(gridCss, /\.hs-key\[data-abc\]>span::before\{[\s\S]*?content:"";[\s\S]*?height:2px/);
+  assert.match(css, /#hitsoundSources \.hs-key>span\{[\s\S]*?font-size:11px!important;[\s\S]*?font-weight:520!important/);
+  assert.doesNotMatch(css, /selected-don::after\{content:"D"\}|selected-kat::after\{content:"K"\}|content:"D\/K"/);
+  assert.match(css, /selected-don\.selected-kat::after\{[\s\S]*?radial-gradient\(circle at 3\.5px[\s\S]*?radial-gradient\(circle at calc\(100% - 3\.5px\)/);
+  assert.doesNotMatch(gridCss, /abc-line[^\n]*animation|@keyframes[^\{]*abc/i);
+  assert.match(html, /hitsound-grid\.css\?v=4\.1-static-heat-strip/);
+  assert.match(html, /workbench\.css\?v=1\.7-minimal-source-keys/);
 });
 
 test('candidate rows use twelve slots with one category boundary slot', () => {
