@@ -1,9 +1,9 @@
 # CreateSE Current111 / mobile workbench — Design QA
 
-実施日: 2026-08-23（JST）  
-対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670` / performance commit `50e993c95c251917c3f14029db3deb3e37e0a773` / Favorite seed commit `a8208a7fe1e742b9595dd5bb66440bb4ab00e1e6`  
-Production: https://demon-mami.github.io/CreateSE/?qa=50e993c  
-iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
+実施日: 2026-08-23〜24（JST）  
+対象: Production `demon-mami/CreateSE` / `main`  
+Production: https://demon-mami.github.io/CreateSE/  
+iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 
 ## 判定
 
@@ -11,7 +11,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 
 - built-in hitsoundを111音源へ全置換。旧packはProduction treeから削除。
 - visible source名は`SRC-nnn`のみ。candidate button本体は既存の高速比較性を優先して3桁番号表示を維持。
-- drum familyに加え、各buttonへA / B / Cを文字と色で常時表示。
+- drum familyに加え、各button上端の静止heat stripでA / B / Cを識別。A＝虹、B＝金、C＝赤。文字はaccessible nameのみに保持。
 - 1 categoryは最大12 slot、2 categoryは`X + Y + 1空白 = 12 slot`で同一行へ配置。
 - 候補面と再生面を、固定のdark cyber gradientで明確に分離。連続animationは使用していない。
 - 一般向けの説明文、凡例、追加titleはUIへ加えていない。
@@ -69,7 +69,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 | 最小candidate target | 56.80 × 48 px |
 | horizontal overflow | 0 px |
 
-両viewportで候補面と再生面のgradient差、A / B / Cの文字識別、Don / Kat選択状態、category spacerを視認できた。`Taiko Reference`はbutton配列内のみ`Taiko`へ短縮し、1-slot categoryでの不自然な折返しを防いでいる。
+両viewportで候補面と再生面のgradient差、A / B / Cの静止heat strip、Don / Kat選択状態、category spacerを視認できた。`Taiko Reference`はbutton配列内のみ`Taiko`へ短縮し、1-slot categoryでの不自然な折返しを防いでいる。
 
 ## Functional QA
 
@@ -91,19 +91,19 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 - built-in selection、Favorite、削除候補はCurrent111専用version keyへ移行し、旧datasetの番号状態を誤適用しない。
 - My SoundのIndexedDB dataと機能は削除・移行していない。
 - initial pairはCurrent111上のDon `SRC-093` / Kat `SRC-097`。
-- candidateのvisible labelは番号、A / B / C文字、family groupingで構成。accessible nameは`SRC-nnn`を保持。
+- candidateのvisible labelは抑えた3桁番号と静止heat strip、family groupingで構成。accessible nameは`SRC-nnn`、A / B / C、familyを保持。
 
 ## Automated checks
 
 - `node --check`: PASS。
-- `node --test tests/*.test.mjs`: 19 / 19 PASS。
+- `node --test tests/*.test.mjs`: 20 / 20 PASS。
 - final fresh Production tab: CreateSE由来のconsole error / warning 0。
 - final GitHub tree: new packのみ存在し、old packなし。
 
 ## Accessibility / interaction checks
 
 - candidateは両viewportとも44 × 44px以上。
-- ABCは色だけでなくA / B / C文字を併用。
+- visible ABC識別は静止heat stripのみ。個人用toolとして凡例と文字を追加しない方針を優先し、accessible nameにはA / B / Cを保持。
 - Don / Kat selected stateは色、border、`aria-pressed`を併用。
 - static cyber gradientのため、今回追加箇所に継続motionはない。
 - category spacerは非interactiveで、Tab stopを増やさない。
@@ -121,12 +121,12 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 
 - [x] 111 WAVへ全置換し、旧built-in packを削除。
 - [x] visible source名を`SRC-nnn`へ統一。
-- [x] drum familyとA / B / Cを同時識別可能にした。
+- [x] drum familyとA / B / C heat stripを同時識別可能にした。
 - [x] `X = 12` / `X + Y + 1空白 = 12`のpacking ruleを実装。
 - [x] responsive capacityと44px以上のtouch targetを維持。
 - [x] 候補面 / 再生面をcyber gradientで分離。
 - [x] iPhone / iPad Cloud Browserでrenderingと主要操作をQA。
-- [x] 19 / 19 tests PASS、final console error / warning 0。
+- [x] 20 / 20 tests PASS、final CreateSE由来console error / warning 0。
 
 ## Hitsound switching performance follow-up — 2026-08-24
 
@@ -147,7 +147,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 - rapid tapはselection serialでlatest-winsとし、古い処理が完了しても最後にtapした候補を上書きしない。
 - decoded buffer cacheを8件から32件へ拡張する。
 - My Sound等の互換経路として従来のfile input fallbackは保持する。
-- temporary volume controlは追加せず、Music `0.85` / Hitsound `1.00`の既定mixを維持する。
+- temporary volume controlは追加せず、最終mixはMusic `0.75` / Hitsound `1.00`とする。
 - 表示、文言、layoutには変更を加えていない。
 
 ### Production QA
@@ -203,5 +203,52 @@ Cloud Browserの計測値にはremote input・iframe・rendering overheadが含�
 | reapply | P12を適用しDon 079 / Kat 100へ同期 |
 | errors | CreateSE由来のconsole error / warning 0 |
 | automated | `node --check hitsound-favorites.js` PASS、19 / 19 tests PASS |
+
+## Minimal candidate keys / heat hierarchy — 2026-08-24
+
+- visible ABC文字とD / K文字badgeを削除。
+- Aは2pxの静止rainbow、Bは静止gold、Cは静止redの上端stripで識別する。
+- 3桁番号は11px・低contrast・中weightへ下げ、音の比較より先に読ませない。
+- 選択状態はDon＝左下pink dot、Kat＝右下blue dot、active sideは静止outline / glowで補う。
+- 44px以上のtouch targetと、`SRC-nnn・ABC・family`のaccessible nameは維持する。
+- 連続animation、凡例、追加説明文は導入していない。
+
+## iPad object timeline performance / final mix — 2026-08-24
+
+### 観測した原因
+
+- visible object rendererが独立した`requestAnimationFrame`で、再生位置が動く間はlane全体をdisplay refreshごとに再描画していた。
+- 120HzのProMotion iPadでは、60Hz端末の約2倍のcanvas workが発生し得た。
+- main transport loopも同時にrange inputと曲全体cursor canvasをdisplay refreshごとに更新していた。
+- beat / measure lineを1本ずつstrokeし、各noteでcanvas stateをsave / restoreしていた。
+
+### 対策
+
+- audio clock、Hitsound scheduler、A–B判定は描画から分離したまま維持。
+- object laneのvisual paintを最大約60fpsへ制限し、120Hz時の重複workを抑制。
+- document hiddenまたはlaneがviewport外の場合はobject laneのpaintを停止し、復帰時にinvalidateする。
+- seek range、time text、曲全体cursorを約30fpsへまとめ、毎display frameのDOM / canvas更新を廃止。
+- time-copy button幅のlayout readをresize時へ移動。
+- beat / measure lineを2 pathへbatchし、noteごとの`save()` / `restore()`を廃止。
+- canvas DPR上限2とnoteの見た目は維持し、軽量化のための解像度低下は行っていない。
+- 最終固定mixをMusic `0.75` / Effect `1.00`へ変更。音量sliderや説明文は追加していない。
+
+### Production QA
+
+| 確認 | 結果 |
+|---|---|
+| deploy | `object-timeline-v2.js?v=3.1-ipad-frame-budget`、最終`app-v4.js?v=3.6-music-075` |
+| viewport | Cloud Browser 1363 × 936（iPad 13インチ横相当） |
+| stress chart | `Everytime We Touch [Fvrwvrd's 700 BPM Speedcore Edit]` |
+| sustained playback | 01:59まで再生を継続。object lane、全体cursor、seekが進行 |
+| switching during playback | Kat 003→004、Don 001→002。再生を停止せず最終選択を維持 |
+| pause | settle後1.2秒でseek差0ms |
+| ±4秒 | +4.000秒 / -4.000秒 |
+| zoom | ±0.5秒→±0.4秒、laneを再描画 |
+| A–B repeat | A 02:05:079 / B 02:09:079。7.5秒後02:06:974で区間内、再生・loopともON |
+| errors | CreateSE由来のconsole error / warning 0。Cloud Browser extension由来logは対象外 |
+| automated | `node --check` PASS、`node --test tests/*.test.mjs` 20 / 20 PASS |
+
+Cloud Browserは実機iPadOS SafariのProMotion、thermal throttling、実audio output、Safari固有のcanvas schedulingを再現しない。したがって実機の体感改善は未確認であり、Production更新後に同じ高密度譜面を長時間再生して最終確認する。
 
 final result: passed
