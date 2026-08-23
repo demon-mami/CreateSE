@@ -81,6 +81,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
   margin:0 0 5px 2px!important;color:rgba(255,255,255,.46);font-size:10px!important;font-weight:650;letter-spacing:.015em
 }
 .hs-family-row,.hs-family-grid{gap:7px!important}
+#hitsoundSources .hs-family-row[data-layout="modules"]{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:10px!important}
 .hs-family-grid{grid-template-columns:repeat(var(--family-columns,1),minmax(44px,1fr))!important}
 .hs-key{min-width:44px!important}
 .hs-key>span{height:44px!important;font-size:14px!important}

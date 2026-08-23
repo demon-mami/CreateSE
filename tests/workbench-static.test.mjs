@@ -194,28 +194,39 @@ test('Current111 replaces the old pack and keeps ABC visible without source file
   assert.equal(existsSync(new URL('../hitsounds-single-base-116.zip', import.meta.url)), false);
 });
 
-test('candidate keys use restrained numbers and static heat colors instead of ABC or D-K text', () => {
+test('candidate keys use restrained numbers and subtle red-green-white ABC dots', () => {
   assert.doesNotMatch(grid, /<span data-abc=/);
-  assert.match(gridCss, /\.hs-key\[data-abc="A"\]\{[\s\S]*?linear-gradient\(90deg,#ef687d/);
-  assert.match(gridCss, /\.hs-key\[data-abc="B"\]\{[\s\S]*?linear-gradient\(90deg,#b88122/);
-  assert.match(gridCss, /\.hs-key\[data-abc="C"\]\{[\s\S]*?linear-gradient\(90deg,#9d2f3d/);
-  assert.match(gridCss, /\.hs-key\[data-abc\]>span::before\{[\s\S]*?content:"";[\s\S]*?height:2px/);
+  assert.match(gridCss, /\.hs-key\[data-abc="A"\]\{--abc-dot:#d86a70\}/);
+  assert.match(gridCss, /\.hs-key\[data-abc="B"\]\{--abc-dot:#79ad83\}/);
+  assert.match(gridCss, /\.hs-key\[data-abc="C"\]\{--abc-dot:rgba\(245,247,248,.88\)\}/);
+  assert.match(gridCss, /\.hs-key\[data-abc\]>span::before\{[\s\S]*?top:6px;[\s\S]*?left:7px;[\s\S]*?width:5px;[\s\S]*?height:5px;[\s\S]*?border-radius:50%/);
+  assert.doesNotMatch(gridCss, /--abc-line|--abc-halo|content:attr\(data-abc\)/);
+  assert.match(gridCss, /\.hs-key\.delete-candidate>span::after\{[\s\S]*?border:1\.5px solid #d98f93;[\s\S]*?background:transparent/);
   assert.match(css, /#hitsoundSources \.hs-key>span\{[\s\S]*?font-size:11px!important;[\s\S]*?font-weight:520!important/);
   assert.doesNotMatch(css, /selected-don::after\{content:"D"\}|selected-kat::after\{content:"K"\}|content:"D\/K"/);
   assert.match(css, /selected-don\.selected-kat::after\{[\s\S]*?radial-gradient\(circle at 3\.5px[\s\S]*?radial-gradient\(circle at calc\(100% - 3\.5px\)/);
   assert.doesNotMatch(gridCss, /abc-line[^\n]*animation|@keyframes[^\{]*abc/i);
-  assert.match(html, /hitsound-grid\.css\?v=4\.1-static-heat-strip/);
-  assert.match(html, /workbench\.css\?v=1\.7-minimal-source-keys/);
+  assert.match(html, /hitsound-grid\.css\?v=4\.2-subtle-abc-dots/);
+  assert.match(html, /workbench\.css\?v=1\.8-fixed-six-modules/);
 });
 
-test('candidate rows use twelve slots with one category boundary slot', () => {
+test('candidate rows use fixed six-slot modules and stable family placement', () => {
+  assert.match(grid, /const FAMILY_ROW_PLAN = \[/);
+  assert.match(grid, /\['Doom Pulse', 'Taiko'\]/);
+  assert.match(grid, /\['Bass Drum \/ Kick', 'Snare'\]/);
+  assert.match(grid, /\['Forest Perc C', 'Forest Perc D'\]/);
   assert.match(grid, /Math\.max\(4, Math\.min\(12,/);
   assert.match(grid, /\(width \+ 7\) \/ 51/);
-  assert.match(grid, /first\.count \+ candidate\.count \+ 1 > capacity/);
+  assert.match(grid, /const moduleLayout = capacity >= 12;/);
+  assert.match(grid, /columns = fullWidth \? 12 : 6;/);
+  assert.match(grid, /data-layout="\$\{moduleLayout \? 'modules' : 'slots'\}"/);
+  assert.match(grid, /requiredSlots > capacity/);
+  assert.doesNotMatch(grid, /\.sort\(\(a, b\) => b\.count - a\.count/);
   assert.match(grid, /class="hs-family-spacer"/);
-  assert.match(gridCss, /grid-template-columns:repeat\(var\(--source-row-slots,12\),minmax\(0,1fr\)\)/);
-  assert.match(gridCss, /\.hs-family-spacer\{[\s\S]*?grid-column:span 1/);
+  assert.match(gridCss, /\.hs-family-row\[data-layout="modules"\]\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);[\s\S]*?column-gap:10px/);
+  assert.match(css, /#hitsoundSources \.hs-family-row\[data-layout="modules"\]\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\);[\s\S]*?column-gap:10px!important/);
   assert.match(grid, /new ResizeObserver\(\(\) => buildGrid\(\)\)/);
+  assert.match(html, /hitsound-grid\.js\?v=4\.1-fixed-six-modules/);
 });
 
 test('timeline notes are reduced in both visible and fallback renderers', () => {

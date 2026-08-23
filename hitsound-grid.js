@@ -92,6 +92,25 @@
     'Taiko',
   ];
 
+  // Fixed placement preserves the user's spatial memory. Wide layouts use two
+  // six-key modules; narrow layouts keep the same order and only share a row
+  // when the fixed pair still fits without shrinking a touch target.
+  const FAMILY_ROW_PLAN = [
+    ['Annihilator'],
+    ['Doom Pulse', 'Taiko'],
+    ['Bass Drum / Kick', 'Snare'],
+    ['Clave / Claves'],
+    ['Forest Perc A'],
+    ['Forest Perc B'],
+    ['Forest Perc C', 'Forest Perc D'],
+    ['Forest Perc E', 'Forest Perc F'],
+    ['Hi-Hat', 'Snap'],
+    ['Rimshot'],
+    ['Agogo', 'Cowbell'],
+    ['Timbale', 'Woodblock'],
+    ['Tom'],
+  ];
+
   function groupedCandidates() {
     const groups = new Map();
     for (const candidate of CANDIDATES) {
@@ -139,40 +158,48 @@
     return Math.max(4, Math.min(12, Math.floor((width + 7) / 51)));
   }
 
-  function packCandidateRows(groups, capacity) {
-    const indexed = groups.map((group, index) => ({ group, index, count: group[1].length }));
-    const rows = indexed.filter(item => item.count >= capacity).map(item => [item]);
-    const remaining = indexed
-      .filter(item => item.count < capacity)
-      .sort((a, b) => b.count - a.count || a.index - b.index);
+  function plannedCandidateRows(groups, capacity) {
+    const byFamily = new Map(groups);
+    const used = new Set();
+    const rows = [];
 
-    while (remaining.length) {
-      const first = remaining.shift();
-      let partnerIndex = -1;
-      let partnerDistance = Number.POSITIVE_INFINITY;
-      for (let index = 0; index < remaining.length; index++) {
-        const candidate = remaining[index];
-        if (first.count + candidate.count + 1 > capacity) continue;
-        const distance = Math.abs(first.index - candidate.index);
-        if (distance < partnerDistance) {
-          partnerIndex = index;
-          partnerDistance = distance;
-        }
+    for (const plannedFamilies of FAMILY_ROW_PLAN) {
+      const row = plannedFamilies.map(family => byFamily.get(family)).filter(Boolean).map(list => {
+        const family = displayFamily(list[0]);
+        used.add(family);
+        return [family, list];
+      });
+      if (!row.length) continue;
+      const requiredSlots = row.reduce((sum, group) => sum + group[1].length, 0) + row.length - 1;
+      if (row.length === 2 && capacity < 12 && requiredSlots > capacity) {
+        rows.push([row[0]], [row[1]]);
+      } else {
+        rows.push(row);
       }
-      const row = [first];
-      if (partnerIndex >= 0) row.push(remaining.splice(partnerIndex, 1)[0]);
-      row.sort((a, b) => a.index - b.index);
-      rows.push(row);
     }
 
-    rows.sort((a, b) => a[0].index - b[0].index);
-    return rows.map(row => row.map(item => item.group));
+    for (const group of groups) {
+      if (!used.has(group[0])) rows.push([group]);
+    }
+    return rows;
   }
 
-  function familyMarkup([family, candidates], capacity) {
-    const slots = Math.min(capacity, candidates.length);
+  function familyMarkup([family, candidates], capacity, { moduleLayout, paired }) {
+    let slots;
+    let columns;
+    if (moduleLayout) {
+      const fullWidth = candidates.length > 6;
+      slots = fullWidth ? 2 : 1;
+      columns = fullWidth ? 12 : 6;
+    } else if (paired) {
+      slots = Math.min(capacity, candidates.length);
+      columns = slots;
+    } else {
+      slots = capacity;
+      columns = capacity;
+    }
     return `
-      <section class="hs-family" data-family="${family}" style="--family-slots:${slots};--family-columns:${slots}">
+      <section class="hs-family" data-family="${family}" style="--family-slots:${slots};--family-columns:${columns}">
         <div class="hs-family-title">${family}</div>
         <div class="hs-family-grid">${candidates.map(keyMarkup).join('')}</div>
       </section>`;
@@ -183,12 +210,12 @@
     if (!force && capacity === renderedRowCapacity) return;
     renderedRowCapacity = capacity;
     const groups = groupedCandidates();
-    const rows = packCandidateRows(groups, capacity);
+    const rows = plannedCandidateRows(groups, capacity);
+    const moduleLayout = capacity >= 12;
     sources.style.setProperty('--source-row-slots', String(capacity));
     sources.innerHTML = rows.map(row => `
-      <div class="hs-family-row" data-family-count="${row.length}">
-        ${familyMarkup(row[0], capacity)}
-        ${row.length === 2 ? `<span class="hs-family-spacer" aria-hidden="true"></span>${familyMarkup(row[1], capacity)}` : ''}
+      <div class="hs-family-row" data-family-count="${row.length}" data-layout="${moduleLayout ? 'modules' : 'slots'}">
+        ${row.map((group, index) => `${index > 0 && !moduleLayout ? '<span class="hs-family-spacer" aria-hidden="true"></span>' : ''}${familyMarkup(group, capacity, { moduleLayout, paired: row.length === 2 })}`).join('')}
       </div>
     `).join('');
     paint();

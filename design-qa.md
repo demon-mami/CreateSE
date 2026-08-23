@@ -11,7 +11,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 
 - built-in hitsoundを111音源へ全置換。旧packはProduction treeから削除。
 - visible source名は`SRC-nnn`のみ。candidate button本体は既存の高速比較性を優先して3桁番号表示を維持。
-- drum familyに加え、各button上端の静止heat stripでA / B / Cを識別。A＝虹、B＝金、C＝赤。文字はaccessible nameのみに保持。
+- drum familyに加え、各button左上の小さな静止dotでA / B / Cを識別。A＝赤、B＝緑、C＝白。文字はaccessible nameのみに保持。
 - 1 categoryは最大12 slot、2 categoryは`X + Y + 1空白 = 12 slot`で同一行へ配置。
 - 候補面と再生面を、固定のdark cyber gradientで明確に分離。連続animationは使用していない。
 - 一般向けの説明文、凡例、追加titleはUIへ加えていない。
@@ -69,7 +69,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 | 最小candidate target | 56.80 × 48 px |
 | horizontal overflow | 0 px |
 
-両viewportで候補面と再生面のgradient差、A / B / Cの静止heat strip、Don / Kat選択状態、category spacerを視認できた。`Taiko Reference`はbutton配列内のみ`Taiko`へ短縮し、1-slot categoryでの不自然な折返しを防いでいる。
+両viewportで候補面と再生面のgradient差、A / B / C識別、Don / Kat選択状態を視認できた。`Taiko Reference`はbutton配列内のみ`Taiko`へ短縮し、1-slot categoryでの不自然な折返しを防いでいる。
 
 ## Functional QA
 
@@ -91,7 +91,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 - built-in selection、Favorite、削除候補はCurrent111専用version keyへ移行し、旧datasetの番号状態を誤適用しない。
 - My SoundのIndexedDB dataと機能は削除・移行していない。
 - initial pairはCurrent111上のDon `SRC-093` / Kat `SRC-097`。
-- candidateのvisible labelは抑えた3桁番号と静止heat strip、family groupingで構成。accessible nameは`SRC-nnn`、A / B / C、familyを保持。
+- candidateのvisible labelは抑えた3桁番号と小さな静止dot、family groupingで構成。accessible nameは`SRC-nnn`、A / B / C、familyを保持。
 
 ## Automated checks
 
@@ -103,7 +103,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 ## Accessibility / interaction checks
 
 - candidateは両viewportとも44 × 44px以上。
-- visible ABC識別は静止heat stripのみ。個人用toolとして凡例と文字を追加しない方針を優先し、accessible nameにはA / B / Cを保持。
+- visible ABC識別は左上の小さな静止dotのみ。個人用toolとして凡例と文字を追加しない方針を優先し、accessible nameにはA / B / Cを保持。
 - Don / Kat selected stateは色、border、`aria-pressed`を併用。
 - static cyber gradientのため、今回追加箇所に継続motionはない。
 - category spacerは非interactiveで、Tab stopを増やさない。
@@ -121,7 +121,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html
 
 - [x] 111 WAVへ全置換し、旧built-in packを削除。
 - [x] visible source名を`SRC-nnn`へ統一。
-- [x] drum familyとA / B / C heat stripを同時識別可能にした。
+- [x] drum familyとA / B / Cの小さな色dotを同時識別可能にした。
 - [x] `X = 12` / `X + Y + 1空白 = 12`のpacking ruleを実装。
 - [x] responsive capacityと44px以上のtouch targetを維持。
 - [x] 候補面 / 再生面をcyber gradientで分離。
@@ -204,13 +204,20 @@ Cloud Browserの計測値にはremote input・iframe・rendering overheadが含�
 | errors | CreateSE由来のconsole error / warning 0 |
 | automated | `node --check hitsound-favorites.js` PASS、19 / 19 tests PASS |
 
-## Minimal candidate keys / heat hierarchy — 2026-08-24
+## Minimal candidate keys / subtle ABC dots — 2026-08-24
 
 - visible ABC文字とD / K文字badgeを削除。
-- Aは2pxの静止rainbow、Bは静止gold、Cは静止redの上端stripで識別する。
+- Aは赤、Bは緑、Cは白の5px静止dotをbutton左上に置き、棒状の強い装飾は使わない。
 - 3桁番号は11px・低contrast・中weightへ下げ、音の比較より先に読ませない。
 - 選択状態はDon＝左下pink dot、Kat＝右下blue dot、active sideは静止outline / glowで補う。
 - 44px以上のtouch targetと、`SRC-nnn・ABC・family`のaccessible nameは維持する。
+
+## Fixed six-slot modules — 2026-08-24
+
+- iPadは1行を6-slot module × 2に固定。1〜6個のfamilyは半行、7〜12個のfamilyは全行を使う。
+- iPhoneは6列を固定し、7個以上は同じfamily内で折り返す。合計数＋境界1-slotが6以内の固定pairだけを同じ行に置く。
+- family配置は候補数による自動並べ替えをやめ、端末間でも比較位置を記憶しやすい固定順とする。
+- 44px touch target、番号のみのvisible label、Don / Kat選択dot、静止selected outlineは維持する。
 - 連続animation、凡例、追加説明文は導入していない。
 
 ## iPad object timeline performance / final mix — 2026-08-24
