@@ -2,8 +2,8 @@
 
 実施日: 2026-08-23（JST）  
 対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670` / performance commit `50e993c95c251917c3f14029db3deb3e37e0a773`  
-Production: https://demon-mami.github.io/CreateSE/?qa=1071e91  
-iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=1071e91
+Production: https://demon-mami.github.io/CreateSE/?qa=50e993c  
+iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 
 ## 判定
 
