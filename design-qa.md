@@ -1,7 +1,7 @@
 # CreateSE Current111 / mobile workbench — Design QA
 
 実施日: 2026-08-23（JST）  
-対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670` / performance commit `50e993c95c251917c3f14029db3deb3e37e0a773`  
+対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670` / performance commit `50e993c95c251917c3f14029db3deb3e37e0a773` / Favorite seed commit `a8208a7fe1e742b9595dd5bb66440bb4ab00e1e6`  
 Production: https://demon-mami.github.io/CreateSE/?qa=50e993c  
 iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 
@@ -96,7 +96,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 ## Automated checks
 
 - `node --check`: PASS。
-- `node --test tests/*.test.mjs`: 18 / 18 PASS。
+- `node --test tests/*.test.mjs`: 19 / 19 PASS。
 - final fresh Production tab: CreateSE由来のconsole error / warning 0。
 - final GitHub tree: new packのみ存在し、old packなし。
 
@@ -126,7 +126,7 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 - [x] responsive capacityと44px以上のtouch targetを維持。
 - [x] 候補面 / 再生面をcyber gradientで分離。
 - [x] iPhone / iPad Cloud Browserでrenderingと主要操作をQA。
-- [x] 18 / 18 tests PASS、final console error / warning 0。
+- [x] 19 / 19 tests PASS、final console error / warning 0。
 
 ## Hitsound switching performance follow-up — 2026-08-24
 
@@ -163,8 +163,45 @@ iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=50e993c
 | 無音 / 復帰 | Don 014 → 無音 → 015を確認 |
 | Favorite再適用 | Don 001 + Kat 002を再適用し、両sideとstatusが同期 |
 | errors | CreateSE由来のconsole error / warning 0 |
-| automated | `node --check` PASS、`node --test tests/*.test.mjs` 18 / 18 PASS |
+| automated | `node --check` PASS、`node --test tests/*.test.mjs` 19 / 19 PASS |
 
 Cloud Browserの計測値にはremote input・iframe・rendering overheadが含まれ、純粋なaudio処理時間や実機Safariのlatencyではない。絶対値よりも、連打後に待ちqueueが積み上がらないこと、再生が継続すること、最後のtapが正しく残ることを合格条件とした。未cache候補の初回展開・decodeコストは端末性能に依存するため、実機iPhone / iPad Safariでの最終確認を残す。
+
+## Phase7A Pair-12 Favorite seed — 2026-08-24
+
+添付`Phase7A_Pair12_List_v5(1).md`の12ペアを、既存Favoriteを保持したまま一度だけ自動追加するmigrationとして実装した。
+
+- P01: Don 070 + Kat 084
+- P02: Don 015 + Kat 019
+- P03: Don 098 + Kat 101
+- P04: Don 098 + Kat 064
+- P05: Don 056 + Kat 084
+- P06: Don 070 + Kat 019
+- P07: Don 089 + Kat 064
+- P08: Don 089 + Kat 088
+- P09: Don 101 + Kat 090
+- P10: Don 056 + Kat 077
+- P11: Don 084 + Kat 090
+- P12: Don 079 + Kat 100
+
+### Migration behavior
+
+- 既存Favoriteは削除・上書きしない。
+- Don / Katが同一の既存ペアは`entryKey`で重複追加しない。
+- `phase7a-pair12-v5`専用migration keyにより、通常の再読込では再追加しない。
+- 追加後にユーザーが削除したseed pairは、次回起動で自動復活しない。
+- Favorite表示、削除、CSV、再適用の既存操作と表示形式は変更しない。
+
+### Production QA
+
+| 確認 | 結果 |
+|---|---|
+| deploy | `hitsound-favorites.js?v=4.1-phase7a-pair12-v5`を配信 |
+| existing data | Cloud Browser内の既存2件を保持 |
+| merge | 12件を追加し合計14件、添付の全ペアと一致 |
+| reload | 再読込後も14件で、重複追加なし |
+| reapply | P12を適用しDon 079 / Kat 100へ同期 |
+| errors | CreateSE由来のconsole error / warning 0 |
+| automated | `node --check hitsound-favorites.js` PASS、19 / 19 tests PASS |
 
 final result: passed
