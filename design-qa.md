@@ -1,146 +1,131 @@
-# CreateSE mobile comparison workbench — Design QA
+# CreateSE Current111 / mobile workbench — Design QA
 
-実施日: 2026-08-22（JST）  
-対象: Production `demon-mami/CreateSE` / UI commit `05bbd8f566609efff45ce9785e26a6090d9e143b`  
-Production: https://demon-mami.github.io/CreateSE/?qa=05bbd8f  
-iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=05bbd8f
+実施日: 2026-08-23（JST）  
+対象: Production `demon-mami/CreateSE` / UI・data commit `1071e911e1268ff10e90538088ec8fc15485f670`  
+Production: https://demon-mami.github.io/CreateSE/?qa=1071e91  
+iPhone QA: https://demon-mami.github.io/CreateSE/qa-iphone.html?qa=1071e91
 
 ## 判定
 
-今回指定された4点はProduction `main`へ直接反映済みです。Cloud BrowserのiPad 13インチ横相当（1363 × 936）と、Production本体を読み込むiPhone縦QA viewport（390 × 844）では、変更に起因する未解決のP0 / P1 / P2を確認していません。
+指定されたCurrent111への全音源差し替え、A / B / C識別、cyber gradient、category packingをProduction `main`へ直接反映した。Cloud BrowserのiPad 13インチ横相当（1363 × 936）とiPhone縦（390 × 844）では、今回の変更に起因する未解決のP0 / P1 / P2は確認していない。
 
-- Don / Katの現在ペアから可視音源名を削除し、表示をside名と候補番号に限定。
-- timeline noteをnormal 19px → 14px、big 22.5px → 17px、target 24.5px → 19.5pxへ縮小。fallback rendererも同じ方向へ調整。
-- `♡ / 候補 / ♡ n`を再生面から候補選択面のsticky toolbarへ移動。seek直下から判断buttonを除去。
-- 候補選択面を`#0AC6D7`、再生面を`#ED7855`を基準にした低彩度gradientで分離。
+- built-in hitsoundを111音源へ全置換。旧packはProduction treeから削除。
+- visible source名は`SRC-nnn`のみ。candidate button本体は既存の高速比較性を優先して3桁番号表示を維持。
+- drum familyに加え、各buttonへA / B / Cを文字と色で常時表示。
+- 1 categoryは最大12 slot、2 categoryは`X + Y + 1空白 = 12 slot`で同一行へ配置。
+- 候補面と再生面を、固定のdark cyber gradientで明確に分離。連続animationは使用していない。
+- 一般向けの説明文、凡例、追加titleはUIへ加えていない。
 
-ユーザー指定の`#AC6D7`はCSSで無効な5桁hexのため、今回は先頭0省略と解釈して`#0AC6D7`を使用しています。
+## Audio dataset / integrity
 
-## Source visual truth
+| 項目 | 結果 |
+|---|---|
+| source archive | `osu_taiko_Current111_ABC_Sorted_v5(3).zip` |
+| built-in WAV | 111 files |
+| ABC内訳 | A 83 / B 26 / C 2 |
+| audio format | 全件 48 kHz / 24-bit / stereo PCM |
+| source ID | `SRC-001`〜`SRC-116`、欠番 018 / 044 / 075 / 103 / 104 |
+| deployed pack | `hitsounds-current111-abc-v5.zip` |
+| SHA-256 | `64eb71441e5362a4a0293fd616cb3becc663097e49673c970603f0a1c684889c` |
+| Git blob / size | `17fc04a68a4fca7a1dd810f85773328d97102188` / 15,392,553 bytes |
+| integrity | ZIP CRC clean、0-byteなし、重複なし、source WAVとbyte-identical |
 
-- 誤タップ証拠: `/workspace/scratch/534ae2b2b179/upload/IMG_7217.jpeg`（1290 × 224 px）。
-  - seek thumbと直下の`♡ / 候補 / ♡ 0`が視覚的・操作的に競合している状態。
-- 変更前iPhone: `/workspace/scratch/createse-preview-iphone-compact-controls-8a614e6-20260822.jpg`（390 × 844 px）。
-- 変更前iPad: `/workspace/scratch/createse-preview-ipad-compact-controls-8a614e6-20260822.jpg`（1363 × 936 px）。
-- 変更前／変更後比較:
-  - iPhone: `/workspace/scratch/qa-compare-iphone-8a614e6-vs-0972ac3.jpg`。
-  - iPad: `/workspace/scratch/qa-compare-ipad-8a614e6-vs-05bbd8f.jpg`。
-  - 添付と移動後のfocused比較: `/workspace/scratch/qa-reference-overlap-vs-production-0972ac3.jpg`。
+旧`hitsounds-single-base-116.zip`は最終Production treeに存在しない。初回転送時の破損はCloud Browserの実読込で検出し、再転送後に期待するGit blob SHAとの一致を確認した。
 
-## Browser-rendered implementation evidence
+## Category packing rule
+
+- row capacityは利用可能幅から最大12、最小4で算出。
+- 1 category row: `X = capacity`。
+- 2 category row: `X + 1 explicit spacer + Y = capacity`。
+- 同一行へ入る2 categoryは、合計button数が`capacity - 1`以下の場合のみ組み合わせる。
+- category境界の1 slotはDOM上の明示的spacerであり、buttonではない。
+- iPad 12-slot時は11 rows、うち9 rowsが2 category。20 categoryで奇数余りと12件categoryがあるため、2 rowsは単独表示。
+- iPhone 6-slot時は18 rows。狭幅でも48px高と約50px幅を維持し、横overflowを発生させない。
+
+## Browser-rendered evidence
 
 ### iPhone縦
 
-- CSS viewport: 390 × 844 px、outer Cloud Browser 1363 × 936 px、deviceScaleFactor 1。
-- Production QA harnessはsame-origin iframeでProduction本体を読み込み、`noindex,nofollow`を指定。
-- 展開・notes表示: `/workspace/scratch/createse-production-iphone-expanded-notes-0972ac3-20260822.jpg`。
-- 収納状態: `/workspace/scratch/createse-production-iphone-mini-0972ac3-20260822.jpg`。
-- Final UI commit `05bbd8f`ではsticky headerの透明fadeだけを除去。`workbench.css?v=1.5.1-pane-identity`の反映と同じgeometryをCloud Browserで再確認。
-- State: 譜面読込済み、Don 026 / Kat 027、Kat active、Dock展開／収納、再生／一時停止、seek実行、Favorite open / close、削除候補ON / OFFを確認。
+| 項目 | 観測値 |
+|---|---:|
+| CSS viewport | 390 × 844 px |
+| candidate数 | 111 |
+| ABC | A 83 / B 26 / C 2 |
+| row capacity | 6 slots |
+| family rows | 18 |
+| 最小candidate target | 49.83 × 48 px |
+| horizontal overflow | 0 px |
+| comparison dock | mini / expandedとも表示・操作可 |
 
 ### iPad 13インチ横相当
 
-- CSS viewport: 1363 × 936 px、deviceScaleFactor 1、Cloud Browser Chrome。
-- Final implementation: `/workspace/scratch/createse-production-ipad-pane-identity-05bbd8f-20260822.jpg`。
-- State: 譜面読込済み、Don 026 / Kat 027、Kat active、再生／一時停止、Favorite open / close、削除候補ON / OFFを確認。
+| 項目 | 観測値 |
+|---|---:|
+| CSS viewport | 1363 × 936 px |
+| candidate数 | 111 |
+| ABC | A 83 / B 26 / C 2 |
+| row capacity | 12 slots |
+| family rows | 11（2 category row: 9） |
+| 最小candidate target | 56.80 × 48 px |
+| horizontal overflow | 0 px |
 
-## Geometry / overlap verification
+両viewportで候補面と再生面のgradient差、A / B / Cの文字識別、Don / Kat選択状態、category spacerを視認できた。`Taiko Reference`はbutton配列内のみ`Taiko`へ短縮し、1-slot categoryでの不自然な折返しを防いでいる。
 
-| 項目 | iPhone 390 × 844 | iPad 1363 × 936 |
-|---|---:|---:|
-| 判断button region | 345 × 44 px、候補側 | 778.56 × 44 px、候補側 |
-| seek hit area | 341 × 44 px | 464.44 × 44 px |
-| seek → zoom gap | 14 px | 16 px |
-| 判断region → 再生panel gap | 5.33 px、非重複 | 別column、非重複 |
-| 44 × 44px未満の可視操作対象 | 0 | 0 |
-| horizontal overflow | 0 px | 0 px |
-
-`favoriteOpenButton`は両端末とも`.hs-toolbar`内にあり、seekとのbounding-box交差はありません。iPhoneでは判断region下端226px、再生panel上端231.33pxでした。
-
-## Required fidelity surfaces
-
-### Typography / copy
-
-- Don / Katの3組（候補側、iPhone mini Dock、展開中current pair）はside名と候補番号だけを表示。
-- `currentDonMeta` / `currentKatMeta`はDOMから削除。
-- 音源名はvisible copyから除去した一方、操作buttonのaccessible nameには現在番号と音源名を保持。
-
-### Colors
-
-- 候補側token: `--source-pane-base:#0ac6d7`。
-- 再生側token: `--playback-pane-base:#ed7855`。
-- gradientは既存のdark UI、Don / Kat色、white text contrastを維持するため低opacityで適用。
-- sticky候補toolbarは最終QAで透明fadeを除去し、背後候補番号の透けを防止。
-
-### Notes / timeline
-
-- visible renderer: normal 14px、big 17px、target 19.5px。
-- fallback renderer: `[14, 14, 13.5]`、big倍率1.22。
-- 既存のframe-synchronous transport clock、visible renderer直結、legacy重複Canvas停止、DPR上限2は維持。
-- iPhone / iPadともseek後も再生位置・timeline・overviewが更新。
-
-## Primary interactions tested
+## Functional QA
 
 | 操作 | 結果 |
 |---|---|
-| Production公開 | GitHub Pages Run #104、UI commit `05bbd8f`でsuccess（33秒）。 |
-| 譜面選択・読み込み | 両端末でplay enabled、`#errorCard` hidden。 |
-| 候補選択 | Don 026 / Kat 027、side number、candidate marker、static neon、`aria-pressed`が同期。 |
-| 再生 / 一時停止 | 両端末で`aria-pressed` true / false、時刻、timeline、overviewが同期。 |
-| seek | iPhoneで中央tap後`01:22:220`へ移動し、再生状態を維持。 |
-| iPhone収納 / 展開 | 96px収納 / 607.67px展開、CSS icon、accessible nameを確認。 |
-| Favorite | 移動後のbuttonからsheet open / close成功。既存count 2を表示。 |
-| 削除候補 | 両端末で`false → true → false`を確認し、元状態へ復帰。 |
-| Touch target / overflow | 44px未満0件、horizontal overflow 0px。 |
+| 譜面選択・読込 | play enabled、error card hidden |
+| pack読込 | Current111を解凍・candidate再生可能、最終fresh tabのconsole error / warning 0 |
+| 候補選択→解除→再選択 | 成功 |
+| Don / Kat切替 | 成功、active sideとselected candidateが同期 |
+| A / B / C候補 | Cを含め表示・選択を確認 |
+| 再生 / 一時停止 | 成功、時刻とseek位置が進行 |
+| Favorite追加 | 成功 |
+| Favorite再適用 | Don 001 / Kat 002を登録後、Kat 003へ変更し、再適用でDon 001 / Kat 002へ復元 |
+| 削除候補 ON / OFF | `false → true → false`を確認 |
+| iPhone収納 / 展開 | mini / expandedの切替成功 |
 
-## Pages workflow
+## State / storage
 
-Productionへ直接反映するため、Pages artifactに`workbench.css` / `workbench-ui.js` / `qa-iphone.html`を含め、削除済み`audio-ducking-bridge.js`のcopyを除去しました。
+- built-in selection、Favorite、削除候補はCurrent111専用version keyへ移行し、旧datasetの番号状態を誤適用しない。
+- My SoundのIndexedDB dataと機能は削除・移行していない。
+- initial pairはCurrent111上のDon `SRC-093` / Kat `SRC-097`。
+- candidateのvisible labelは番号、A / B / C文字、family groupingで構成。accessible nameは`SRC-nnn`を保持。
 
-- Run #101: 旧workflowが削除済みファイルをcopyして失敗。
-- Run #102: workflow整合後success。
-- Run #103: Production iPhone QA viewport追加後success。
-- Run #104: sticky toolbar opacity polish後success。
+## Automated checks
 
-Productionの音源、譜面data、既存map asset、audio processingには今回追加変更なし。
-
-## Console / automated checks
-
-- CreateSE URL / script由来のconsole error / warning: iPhone / iPadとも0件。
-- Cloud Browser拡張のmetadata送信errorのみ観測し、CreateSE由来ではない。
 - `node --check`: PASS。
-- `node --test tests/*.test.mjs`: 15 / 15 PASS。
+- `node --test tests/*.test.mjs`: 17 / 17 PASS。
+- final fresh Production tab: CreateSE由来のconsole error / warning 0。
+- final GitHub tree: new packのみ存在し、old packなし。
 
-## Findings
+## Accessibility / interaction checks
 
-- P0 / P1 / P2: Cloud Browser範囲ではなし。
-- P3: iPhoneでは判断regionと展開Dockの間隔が5.33px。hit boxは非重複で全操作44px以上だが、実指での境界tapは実機Safariで継続確認する。
+- candidateは両viewportとも44 × 44px以上。
+- ABCは色だけでなくA / B / C文字を併用。
+- Don / Kat selected stateは色、border、`aria-pressed`を併用。
+- static cyber gradientのため、今回追加箇所に継続motionはない。
+- category spacerは非interactiveで、Tab stopを増やさない。
+- visible source表記を短縮してもaccessible nameは`SRC-nnn`を維持。
 
-## Accessibility
+## 未確認事項
 
-- visible controlは両端末で44 × 44px以上。
-- Don / Katは文字、番号、side color、border、`aria-pressed`を併用。
-- 可視音源名を削除してもbutton accessible nameに名称を保持。
-- Favorite sheetはopen / close後にfocus returnする既存実装を維持。
-- `:focus-visible` 3px ring、`prefers-reduced-motion`規則を維持。
-
-## Open questions / 未確認事項
-
-- `#AC6D7`の意図が`#0AC6D7`ではなく`#AC6DD7`等だった場合の色修正。
-- 実機iPhone / iPad Safariのsafe area、address barによるdynamic viewport、長押し、実指境界tap、iOSオーディオ制約。
-- Dynamic Type / Safariページ拡大時の最終レイアウト。
-- 適切なWAVがないためMy Soundのfile picker、キャンセル、不正形式、8MB / 5秒上限。
-- Favorite削除 / 6秒Undoは保存dataの破壊を避け、未実行。
+- 実機iPhone / iPad Safariのsafe area、address barによるdynamic viewport、長押し、実指での境界tap、Bluetooth keyboard、iOS audio制約。
+- Dynamic Type、Safariページ拡大時の最終layout。
+- iOS native file pickerにおけるMy Soundの選択、cancel、不正形式、上限超過。
+- 通信遮断中の初回pack取得失敗と再試行体験。
+- Cloud Browserは実機Safariと同一ではないため、上記をPASS扱いにしていない。
 
 ## Implementation checklist
 
-- [x] Production `main`へ直接反映。
-- [x] 可視音源名を全current pair表示から削除し、accessible nameは保持。
-- [x] timeline note / targetを縮小。
-- [x] 判断buttonを候補側sticky toolbarへ移動。
-- [x] seekと直下buttonの重なりを構造的に解消。
-- [x] 候補側 / 再生側を指定基準色のgradientで分離。
-- [x] iPhone / iPadのCloud Browser QAと比較画像確認。
-- [x] 15 / 15 tests PASS、Production Pages Run #104 success。
+- [x] 111 WAVへ全置換し、旧built-in packを削除。
+- [x] visible source名を`SRC-nnn`へ統一。
+- [x] drum familyとA / B / Cを同時識別可能にした。
+- [x] `X = 12` / `X + Y + 1空白 = 12`のpacking ruleを実装。
+- [x] responsive capacityと44px以上のtouch targetを維持。
+- [x] 候補面 / 再生面をcyber gradientで分離。
+- [x] iPhone / iPad Cloud Browserでrenderingと主要操作をQA。
+- [x] 17 / 17 tests PASS、final console error / warning 0。
 
 final result: passed
