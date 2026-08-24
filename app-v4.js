@@ -13,7 +13,6 @@
   const MAX_HITSOUND_DURATION_SEC = 5;
   const MAX_DECODED_HITSOUND_CACHE = 32;
   const SKIP_SEC = 4;
-  const LOOP_MIN_MS = 500;
   const TRANSPORT_UI_INTERVAL_MS = 33;
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
@@ -23,20 +22,6 @@
   const HS_FILES = {};
 
   const $ = id => document.getElementById(id);
-  const rangeElements = [
-    {
-      start: $('startMarkButton'), startValue: $('startMarkValue'),
-      end: $('endMarkButton'), endValue: $('endMarkValue'), length: $('rangeLength'),
-      jumpStart: $('jumpStartButton'), jumpEnd: $('jumpEndButton'),
-      loopToggle: $('loopToggleButton'), clear: $('clearLoopButton'), status: $('loopStatus'),
-    },
-    {
-      start: $('startMarkButton2'), startValue: $('startMarkValue2'),
-      end: $('endMarkButton2'), endValue: $('endMarkValue2'), length: $('rangeLength2'),
-      jumpStart: $('jumpStartButton2'), jumpEnd: $('jumpEndButton2'),
-      loopToggle: $('loopToggleButton2'), clear: $('clearLoopButton2'), status: $('loopStatus2'),
-    },
-  ];
   const el = {
     oszInput: $('oszInput'), fileName: $('fileName'), status: $('statusBadge'),
     diff: $('difficultySelect'), songTitle: $('songTitle'), songMeta: $('songMeta'), samplePolicy: $('samplePolicy'),
@@ -52,12 +37,6 @@
   let zip = null;
   let maps = [];
   let map = null;
-  const ranges = [
-    { start: null, end: null },
-    { start: null, end: null },
-  ];
-  let activeLoopIndex = -1;
-  let loopSeekPending = false;
   let ready = false;
   let raf = 0;
 
@@ -114,15 +93,6 @@
   const durationSec = () => musicBuffer ? musicBuffer.duration : 0;
   const durationMs = () => durationSec() * 1000;
   const spanMs = () => OBJECT_TIMELINE_SPAN_MS;
-  const rangeDurationMs = index => {
-    const range = ranges[index];
-    return range?.start && range?.end ? range.end.time - range.start.time : NaN;
-  };
-  const validRange = index => {
-    const length = rangeDurationMs(index);
-    return Number.isFinite(length) && length >= LOOP_MIN_MS;
-  };
-  const activeRange = () => activeLoopIndex >= 0 && validRange(activeLoopIndex) ? ranges[activeLoopIndex] : null;
   const css = (name, fallback) => {
     if (!cssTokenCache.has(name)) {
       cssTokenCache.set(name, getComputedStyle(document.documentElement).getPropertyValue(name).trim());
@@ -143,22 +113,12 @@
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(z).padStart(3, '0')}`;
   }
 
-  function fmtOut(ms) {
-    const q = Math.max(0, Math.floor((Number.isFinite(ms) ? ms : 0) / 1000));
-    const h = Math.floor(q / 3600);
-    const m = Math.floor((q % 3600) / 60);
-    const s = q % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-
   function fmtTimeline(ms) {
     const q = Math.max(0, Math.floor((Number.isFinite(ms) ? ms : 0) / 1000));
     const m = Math.floor(q / 60);
     const s = q % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
-
-  const fmtLen = ms => Number.isFinite(ms) && ms >= 0 ? `${(ms / 1000).toFixed(3)} s` : '—';
 
   function showSeekFeedback(positionSec, { linger = true } = {}) {
     if (!el.seekTime) return;
@@ -187,113 +147,16 @@
   }
 
   function outputText() {
-    if (!map) return '**曲名：—**\n用途：—\n難易度：**—**\n区間：—（Fade-in/out：含まない）';
+    if (!map) return '**曲名：—**\n用途：—\n難易度：**—**';
     const title = map.metadata.TitleUnicode || map.metadata.Title || 'Untitled';
     const diff = map.metadata.Version || 'Unknown';
     const purpose = el.purpose?.value || '未選択';
-    const fade = el.fade?.value || '含まない';
-    const primary = ranges[0];
-    const range = validRange(0)
-      ? `${fmtOut(primary.start.time)}～${fmtOut(primary.end.time)}`
-      : (primary.start && primary.end ? 'ENDがSTARTより前です' : '未選択');
-    return `**曲名：${title}**\n用途：${purpose}\n難易度：**${diff}**\n区間：${range}（Fade-in/out：${fade}）`;
+    return `**曲名：${title}**\n用途：${purpose}\n難易度：**${diff}**`;
   }
 
   function updateOutput() {
     if (el.preview) el.preview.textContent = outputText();
-    if (el.copyOut) el.copyOut.disabled = !(map && el.purpose?.value && validRange(0));
-  }
-
-  function updateRanges() {
-    if (activeLoopIndex >= 0 && !validRange(activeLoopIndex)) activeLoopIndex = -1;
-    rangeElements.forEach((nodes, index) => {
-      const range = ranges[index];
-      const enabled = activeLoopIndex === index;
-      if (nodes.start) {
-        nodes.start.classList.toggle('marked', !!range.start);
-        nodes.start.setAttribute('aria-label', range.start ? `現在位置で区間${index + 1}のAを更新` : `現在位置を区間${index + 1}のAに設定`);
-      }
-      if (nodes.end) {
-        nodes.end.classList.toggle('marked', !!range.end);
-        nodes.end.setAttribute('aria-label', range.end ? `現在位置で区間${index + 1}のBを更新` : `現在位置を区間${index + 1}のBに設定`);
-        nodes.end.disabled = !ready || !range.start;
-      }
-      if (nodes.startValue) nodes.startValue.textContent = range.start ? `A ${fmt(range.start.time)}` : 'A 未設定';
-      if (nodes.endValue) nodes.endValue.textContent = range.end ? `B ${fmt(range.end.time)}` : 'B 未設定';
-      if (nodes.length) nodes.length.textContent = validRange(index) ? fmtLen(rangeDurationMs(index)) : '—';
-      if (nodes.jumpStart) nodes.jumpStart.disabled = !ready || !range.start;
-      if (nodes.jumpEnd) nodes.jumpEnd.disabled = !ready || !range.end;
-      if (nodes.loopToggle) {
-        nodes.loopToggle.disabled = !ready || !validRange(index);
-        nodes.loopToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        nodes.loopToggle.setAttribute('aria-label', enabled ? `区間${index + 1}のリピートを停止` : `区間${index + 1}をリピート`);
-      }
-      if (nodes.clear) nodes.clear.disabled = !ready || (!range.start && !range.end);
-      if (nodes.status) {
-        const length = rangeDurationMs(index);
-        if (!range.start) nodes.status.textContent = 'Aを設定してください';
-        else if (!range.end) nodes.status.textContent = 'Bを設定してください';
-        else if (length < LOOP_MIN_MS) nodes.status.textContent = '区間は0.500秒以上にしてください';
-        else nodes.status.textContent = enabled ? `${fmtLen(length)}を反復中` : `${fmtLen(length)}を反復できます`;
-      }
-    });
-    window.dispatchEvent(new CustomEvent('viewer-loop-change', {
-      detail: {
-        activeIndex: activeLoopIndex,
-        ranges: ranges.map((range, index) => ({
-          startMs: range.start?.time ?? null,
-          endMs: range.end?.time ?? null,
-          durationMs: validRange(index) ? rangeDurationMs(index) : null,
-          valid: validRange(index),
-          enabled: activeLoopIndex === index,
-        })),
-      }
-    }));
-    updateOutput();
-    if (map && musicBuffer) renderSongStatic();
-  }
-
-  function resetRange(index = null) {
-    const indexes = index == null ? [0, 1] : [index];
-    for (const target of indexes) {
-      ranges[target].start = null;
-      ranges[target].end = null;
-      if (activeLoopIndex === target) activeLoopIndex = -1;
-    }
-    updateRanges();
-  }
-
-  function toggleMark(index, which) {
-    if (!map || !musicBuffer) return;
-    const range = ranges[index];
-    const point = { time: Math.round(audiblePosition() * 1000) };
-    if (which === 'start') {
-      range.start = point;
-      range.end = null;
-      if (activeLoopIndex === index) activeLoopIndex = -1;
-    } else {
-      if (!range.start) return;
-      const length = point.time - range.start.time;
-      if (length < LOOP_MIN_MS) {
-        range.end = null;
-        if (activeLoopIndex === index) activeLoopIndex = -1;
-      } else {
-        range.end = point;
-      }
-    }
-    updateRanges();
-  }
-
-  function toggleLoop(index) {
-    if (!validRange(index)) return;
-    activeLoopIndex = activeLoopIndex === index ? -1 : index;
-    updateRanges();
-  }
-
-  function jumpToRangeMark(index, which) {
-    const mark = ranges[index]?.[which];
-    if (!mark) return;
-    seekTo(mark.time / 1000, { showFeedback: true }).catch(error => fail(error instanceof Error ? error.message : '再生位置を移動できませんでした。'));
+    if (el.copyOut) el.copyOut.disabled = !(map && el.purpose?.value);
   }
 
   async function copy(text, button) {
@@ -781,13 +644,7 @@
     if (!musicBuffer || !hitsoundsReady || !map) return;
     await ensureContext(true);
     const requested = clampSec(offset);
-    const loopRange = activeRange();
-    const loopStart = loopRange ? loopRange.start.time / 1000 : 0;
-    const loopEnd = loopRange ? loopRange.end.time / 1000 : 0;
-    const startAt = loopRange && (requested < loopStart || requested >= loopEnd)
-      ? loopStart
-      : requested;
-    pausedOffset = startAt >= durationSec() - 0.001 ? 0 : startAt;
+    pausedOffset = requested >= durationSec() - 0.001 ? 0 : requested;
     stopSources();
 
     const when = ac.currentTime + START_DELAY_SEC;
@@ -824,17 +681,8 @@
     stopSources();
   }
 
-  async function seekTo(target, { fromLoop = false, showFeedback = false } = {}) {
+  async function seekTo(target, { showFeedback = false } = {}) {
     const next = clampSec(target);
-    const loopRange = activeRange();
-    if (!fromLoop && loopRange) {
-      const start = loopRange.start.time / 1000;
-      const end = loopRange.end.time / 1000;
-      if (next < start || next >= end) {
-        activeLoopIndex = -1;
-        updateRanges();
-      }
-    }
     const wasPlaying = playing;
     if (wasPlaying) pausedOffset = enginePosition();
     stopSources();
@@ -971,10 +819,9 @@
 
   function setControls(enabled) {
     ready = enabled;
-    [el.play, el.back, el.fwd, el.seek, el.copyTime, ...rangeElements.map(nodes => nodes.start)].forEach(node => {
+    [el.play, el.back, el.fwd, el.seek, el.copyTime].forEach(node => {
       if (node) node.disabled = !enabled;
     });
-    updateRanges();
     updateOutput();
   }
 
@@ -983,7 +830,6 @@
     stopSources();
     map = maps[index];
     if (!map) return;
-    resetRange();
     setControls(false);
     setStatus('音源解析中');
     try {
@@ -1005,7 +851,7 @@
       setControls(true);
       setStatus('準備完了');
       renderSongStatic();
-      renderObjectAt(0);
+      renderTimelineAt(0);
       drawSongCursor(0);
     } catch (error) {
       fail(error instanceof Error ? error.message : String(error));
@@ -1033,7 +879,6 @@
     musicName = '';
     map = null;
     maps = [];
-    resetRange();
     setControls(false);
     if (el.diff) {
       el.diff.disabled = true;
@@ -1150,7 +995,6 @@
   }
 
   function renderObjectAt(positionSec) {
-    if (externalTimelineRenderer) return;
     if (!map || !musicBuffer || !el.timelineViewport || !el.timelineStatic) return;
     const rect = viewportSize(el.timelineViewport, timelineSize);
     if (rect.width <= 0 || rect.height <= 0) return;
@@ -1201,41 +1045,19 @@
       }
     }
 
-    ranges.forEach((range, index) => {
-      if (!validRange(index)) return;
-      const a = Math.max(left, range.start.time);
-      const b = Math.min(right, range.end.time);
-      if (b <= a) return;
-      ctx.fillStyle = index === 0 ? 'rgba(104,211,154,.055)' : 'rgba(123,217,255,.05)';
-      ctx.fillRect(xForTime(a), 0, xForTime(b) - xForTime(a), rect.height);
-    });
-
-    const drawMark = (mark, label, color) => {
-      if (!mark || mark.time < left || mark.time > right) return;
-      const x = xForTime(mark.time);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.moveTo(x, 4);
-      ctx.lineTo(x, rect.height - 14);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = color;
-      ctx.font = '800 9px -apple-system,BlinkMacSystemFont,sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(label, x + 3, 4);
-    };
-    drawMark(ranges[0].start, '1A', css('--range-start', '#68d39a'));
-    drawMark(ranges[0].end, '1B', css('--range-end', '#f3b55d'));
-    drawMark(ranges[1].start, '2A', css('--range2-start', '#7bd9ff'));
-    drawMark(ranges[1].end, '2B', css('--range2-end', '#d89aff'));
-
     if (el.timelineCursor) {
       const c = sizeCanvas(el.timelineCursor, rect.width, rect.height);
       c.clearRect(0, 0, rect.width, rect.height);
     }
+  }
+
+  function renderTimelineAt(positionSec) {
+    const renderer = window.CreateSEObjectTimeline;
+    if (externalTimelineRenderer && renderer?.renderAt) {
+      renderer.renderAt(positionSec);
+      return;
+    }
+    renderObjectAt(positionSec);
   }
 
   function chooseMajorTickSeconds(durationSeconds) {
@@ -1295,12 +1117,6 @@
       ctx.fillRect(xForTime(range.start), 0, Math.max(1, xForTime(finish) - xForTime(range.start)), rect.height);
     }
 
-    ranges.forEach((range, index) => {
-      if (!validRange(index)) return;
-      ctx.fillStyle = index === 0 ? 'rgba(104,211,154,.065)' : 'rgba(123,217,255,.055)';
-      ctx.fillRect(xForTime(range.start.time), 0, Math.max(1, xForTime(range.end.time) - xForTime(range.start.time)), rect.height);
-    });
-
     drawSongDensity(ctx, rect, d);
 
     const baseline = rect.height - 14;
@@ -1352,21 +1168,6 @@
         lastLabelX = x;
       }
     }
-
-    const mark = (point, color) => {
-      if (!point) return;
-      const x = xForTime(point.time);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
-      ctx.stroke();
-    };
-    mark(ranges[0].start, css('--range-start', '#68d39a'));
-    mark(ranges[0].end, css('--range-end', '#f3b55d'));
-    mark(ranges[1].start, css('--range2-start', '#7bd9ff'));
-    mark(ranges[1].end, css('--range2-end', '#d89aff'));
   }
 
   function drawSongCursor(positionSec) {
@@ -1404,7 +1205,7 @@
       el.seek.value = String(p);
       el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
     }
-    renderObjectAt(p);
+    renderTimelineAt(p);
     drawSongCursor(p);
   }
 
@@ -1433,13 +1234,6 @@
 
   function frame(now) {
     const p = audiblePosition();
-    const loopRange = activeRange();
-    if (playing && loopRange && !loopSeekPending && p >= loopRange.end.time / 1000) {
-      loopSeekPending = true;
-      seekTo(loopRange.start.time / 1000, { fromLoop: true })
-        .catch(error => fail(error instanceof Error ? error.message : '区間を繰り返せませんでした。'))
-        .finally(() => { loopSeekPending = false; });
-    }
     const canSyncSeek = !seekScrub && !timelineScrub && !overviewScrub && el.seek;
     if (now - lastTransportUiPaint >= TRANSPORT_UI_INTERVAL_MS) {
       const formatted = fmt(p * 1000);
@@ -1451,7 +1245,7 @@
       drawSongCursor(p);
       lastTransportUiPaint = now;
     }
-    renderObjectAt(p);
+    renderTimelineAt(p);
     renderDebug(now);
     raf = requestAnimationFrame(frame);
   }
@@ -1471,20 +1265,11 @@
 
   function scrubTo(targetSec) {
     pausedOffset = clampSec(targetSec);
-    const loopRange = activeRange();
-    if (loopRange) {
-      const start = loopRange.start.time / 1000;
-      const end = loopRange.end.time / 1000;
-      if (pausedOffset < start || pausedOffset >= end) {
-        activeLoopIndex = -1;
-        updateRanges();
-      }
-    }
     if (el.seek) {
       el.seek.value = String(pausedOffset);
       el.seek.setAttribute('aria-valuetext', fmt(pausedOffset * 1000));
     }
-    renderObjectAt(pausedOffset);
+    renderTimelineAt(pausedOffset);
     drawSongCursor(pausedOffset);
     showSeekFeedback(pausedOffset, { linger: false });
   }
@@ -1533,14 +1318,6 @@
   el.copyTime?.addEventListener('click', event => {
     event.stopPropagation();
     copy(fmt(audiblePosition() * 1000), el.copyTime);
-  });
-  rangeElements.forEach((nodes, index) => {
-    nodes.start?.addEventListener('click', () => toggleMark(index, 'start'));
-    nodes.end?.addEventListener('click', () => toggleMark(index, 'end'));
-    nodes.jumpStart?.addEventListener('click', () => jumpToRangeMark(index, 'start'));
-    nodes.jumpEnd?.addEventListener('click', () => jumpToRangeMark(index, 'end'));
-    nodes.loopToggle?.addEventListener('click', () => toggleLoop(index));
-    nodes.clear?.addEventListener('click', () => resetRange(index));
   });
   el.purpose?.addEventListener('change', updateOutput);
   el.fade?.addEventListener('change', updateOutput);
@@ -1621,7 +1398,6 @@
     hitsoundsReady = false;
     musicName = '';
     pausedOffset = 0;
-    resetRange();
     setControls(false);
     if (el.seek) {
       el.seek.max = '1';
@@ -1638,6 +1414,7 @@
       const context = canvas.getContext('2d');
       context?.clearRect(0, 0, canvas.width, canvas.height);
     }
+    window.CreateSEObjectTimeline?.invalidate?.();
     clearError();
     setStatus(statusText);
   }
@@ -1645,6 +1422,7 @@
   const redraw = () => {
     cssTokenCache.clear();
     refreshViewportMetrics();
+    window.CreateSEObjectTimeline?.invalidate?.();
     if (!map || !musicBuffer) return;
     renderSongStatic();
     syncVisualToPosition();
@@ -1686,15 +1464,6 @@
       nextHitIndex: nextEffectHitIndex,
     }),
     skipSeconds: SKIP_SEC,
-    loopState: () => ({
-      activeIndex: activeLoopIndex,
-      ranges: ranges.map((range, index) => ({
-        startMs: range.start?.time ?? null,
-        endMs: range.end?.time ?? null,
-        valid: validRange(index),
-        enabled: activeLoopIndex === index,
-      })),
-    }),
   };
 
   window.CreateSEViewer = {
@@ -1707,18 +1476,8 @@
     applyHitsoundBytes,
     applyHitsoundPairBytes,
     setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },
-    loopState: () => ({
-      activeIndex: activeLoopIndex,
-      ranges: ranges.map((range, index) => ({
-        startMs: range.start?.time ?? null,
-        endMs: range.end?.time ?? null,
-        valid: validRange(index),
-        enabled: activeLoopIndex === index,
-      })),
-    }),
   };
 
-  updateRanges();
   setPlayState(false);
   raf = requestAnimationFrame(frame);
 })();
