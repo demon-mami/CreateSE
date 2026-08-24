@@ -29,10 +29,6 @@
   const POST_HIT_FADE_MS = 110;
   const FIXED_SPAN_MS = 1000;
   const MAX_CANVAS_DPR = 2;
-  // ProMotion iPads can schedule requestAnimationFrame at 120Hz. The lane is
-  // intentionally capped near 60fps so canvas work cannot consume two frames
-  // for every visual update while audio timing remains independent.
-  const MIN_RENDER_INTERVAL_MS = 15;
   const DON = 'rgb(235,69,44)';
   const KA = 'rgb(68,141,171)';
   const LANE = '#121214';
@@ -43,7 +39,6 @@
   let lastRenderedPositionMs = NaN;
   let lastRenderedSpanMs = NaN;
   let lastRenderedMap = null;
-  let lastAnimationPaint = -Infinity;
   let timelineVisible = true;
   const viewportSize = { width: 0, height: 0 };
   const surfaceColor = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#0f1014';
@@ -384,12 +379,9 @@
   timelineIntersectionObserver?.observe(viewport);
   measureViewport();
 
-  function frame(now) {
+  function frame() {
     const canPaint = timelineVisible && document.visibilityState !== 'hidden';
-    if (canPaint && (renderInvalidated || now - lastAnimationPaint >= MIN_RENDER_INTERVAL_MS)) {
-      lastAnimationPaint = now;
-      render();
-    }
+    if (canPaint) render();
     requestAnimationFrame(frame);
   }
 
