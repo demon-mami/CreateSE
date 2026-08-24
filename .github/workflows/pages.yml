@@ -52,6 +52,8 @@ jobs:
           cp app-v4.js _site/
           cp hitsound-controller.js _site/
           cp hitsound-favorites.js _site/
+          cp favorite-slot-ui.js _site/
+          cp favorite-pager-v4.js _site/
           cp hitsound-grid.js _site/
           cp workbench-ui.js _site/
           cp object-timeline-v2.js _site/
