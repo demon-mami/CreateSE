@@ -49,6 +49,7 @@ jobs:
           cp candidate-numbering.js _site/
           cp charts.js _site/
           cp chart-loader.js _site/
+          cp orientation-guard.js _site/
           cp app-v4.js _site/
           cp hitsound-controller.js _site/
           cp hitsound-favorites.js _site/
