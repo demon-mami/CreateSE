@@ -9,8 +9,17 @@
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
   <link rel="stylesheet" href="./hitsound-grid.css?v=4.3-pair-presets">
   <link rel="stylesheet" href="./workbench.css?v=2.1-no-ranges">
+  <style>
+    .transport-row{display:flex!important;justify-content:center!important;align-items:center!important;padding-inline:0!important}
+    .transport-row .play-button{width:96px!important;min-width:96px!important}
+    .orientation-guard[hidden]{display:none!important}
+    .orientation-guard{position:fixed;inset:0;z-index:10000;place-items:center;padding:28px;background:#071018;color:#fff;text-align:center;font:800 16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif}
+    html.orientation-blocked body>:not(.orientation-guard){visibility:hidden!important;pointer-events:none!important}
+    html.orientation-blocked .orientation-guard{display:grid!important;visibility:visible!important}
+  </style>
 </head>
 <body>
+  <div id="orientationGuard" class="orientation-guard" hidden role="alert"></div>
   <a class="skip-link" href="#auditionPanel">比較操作へ移動</a>
   <main class="app-shell">
     <header class="appbar">
@@ -42,8 +51,6 @@
       <input id="oszInput" type="file" accept=".osz,.OSZ" hidden>
       <select id="difficultySelect" hidden disabled><option>固定難易度</option></select>
       <p id="fileName" hidden></p>
-      <input id="donHitsoundInput" type="file" accept="audio/*,.wav" hidden>
-      <input id="kaHitsoundInput" type="file" accept="audio/*,.wav" hidden>
       <input id="customHitsoundInput" type="file" accept=".wav,audio/wav" hidden>
 
       <div class="pair-builder" aria-label="Hitsound selector">
@@ -94,10 +101,7 @@
 
         <section class="editor-panel" aria-label="譜面再生">
           <div class="playback-timeline-stack">
-            <div id="timelineViewport" class="timeline-viewport" aria-label="現在位置周辺のTaikoヒットポイント">
-              <canvas id="timelineStaticCanvas" class="timeline-static" aria-hidden="true"></canvas>
-              <canvas id="timelineCursorCanvas" class="timeline-cursor" aria-hidden="true"></canvas>
-            </div>
+            <div id="timelineViewport" class="timeline-viewport" aria-label="現在位置周辺のTaikoヒットポイント"></div>
 
             <div id="overviewViewport" class="overview-viewport" aria-label="曲全体のタイムライン">
               <canvas id="overviewStaticCanvas" class="overview-static" aria-hidden="true"></canvas>
@@ -106,15 +110,12 @@
 
             <div class="seek-wrap">
               <label class="seek-label" for="seekBar">曲の位置</label>
-              <input id="seekBar" class="seek-bar" type="range" min="0" max="1" step="0.001" value="0" aria-label="曲の位置" aria-valuetext="0秒000" disabled>
-              <output id="seekTimeFeedback" class="seek-time-feedback" aria-live="off" hidden>00:00:000</output>
+              <input id="seekBar" class="seek-bar" type="range" min="0" max="1" step="0.001" value="0" aria-label="曲の位置" disabled>
             </div>
           </div>
 
           <div class="transport-row">
-            <button id="backButton" class="transport-button" type="button" aria-label="4秒戻る" disabled>−4s</button>
             <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>▶</button>
-            <button id="forwardButton" class="transport-button" type="button" aria-label="4秒進む" disabled>＋4s</button>
           </div>
         </section>
 
@@ -159,9 +160,10 @@
   <script src="./candidates.js?v=3.0-current111-abc-v5"></script>
   <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.3-15charts"></script>
-  <script src="./app-v4.js?v=4.1-single-raf-no-ranges"></script>
-  <script src="./object-timeline-v2.js?v=4.0-app-frame-sync"></script>
-  <script src="./hitsound-controller.js?v=4.1-latest-switch-wins"></script>
+  <script src="./orientation-guard.js?v=1.0-fixed-device-orientation"></script>
+  <script src="./app-v4.js?v=4.2-engine-clock-fixed-ui"></script>
+  <script src="./object-timeline-v2.js?v=4.1-fixed-geometry-no-fade"></script>
+  <script src="./hitsound-controller.js?v=4.2-direct-only"></script>
   <script src="./hitsound-favorites.js?v=5.0-preset-slots"></script>
   <script src="./favorite-slot-ui.js?v=2.0-collections-12x2"></script>
   <script src="./hitsound-grid.js?v=4.2-no-delete-rating"></script>
