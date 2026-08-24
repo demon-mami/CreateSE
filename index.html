@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style.css?v=0.1">
   <link rel="stylesheet" href="./theme-col07.css?v=0.1">
   <link rel="stylesheet" href="./hitsound-grid.css?v=4.3-pair-presets">
-  <link rel="stylesheet" href="./workbench.css?v=2.0-pair-ranges">
+  <link rel="stylesheet" href="./workbench.css?v=2.1-no-ranges">
 </head>
 <body>
   <a class="skip-link" href="#auditionPanel">比較操作へ移動</a>
@@ -83,7 +83,7 @@
     <aside id="auditionPanel" class="audition-panel panel" aria-label="譜面再生" tabindex="-1">
       <div class="dock-mini" aria-label="固定再生Dock">
         <button id="previewButton" class="mini-play" type="button" aria-label="曲を再生" aria-pressed="false" disabled><span>▶</span></button>
-        <div class="mini-state"><span id="miniLoopState"></span></div>
+        <div class="mini-state" aria-hidden="true"></div>
         <button id="dockToggleButton" class="dock-toggle" type="button" aria-label="再生パネルを展開" aria-expanded="false" aria-controls="dockExpanded"><span class="dock-icon" aria-hidden="true"></span></button>
       </div>
 
@@ -116,42 +116,6 @@
             <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>▶</button>
             <button id="forwardButton" class="transport-button" type="button" aria-label="4秒進む" disabled>＋4s</button>
           </div>
-
-          <section class="loop-panel range-one" aria-label="区間1">
-            <span class="loop-index" aria-hidden="true">1</span>
-            <div class="loop-controls">
-              <button id="startMarkButton" type="button" aria-label="現在位置をAに設定" disabled>A</button>
-              <span id="startMarkValue">A 未設定</span>
-              <button id="endMarkButton" type="button" aria-label="現在位置をBに設定" disabled>B</button>
-              <span id="endMarkValue">B 未設定</span>
-            </div>
-            <div class="loop-actions">
-              <button id="jumpStartButton" type="button" aria-label="区間1のAへ移動" disabled>↤A</button>
-              <button id="jumpEndButton" type="button" aria-label="区間1のBへ移動" disabled>B↦</button>
-              <button id="loopToggleButton" type="button" aria-label="区間1をリピート" aria-pressed="false" disabled>↻</button>
-              <button id="clearLoopButton" type="button" aria-label="A–B設定を解除" disabled>×</button>
-              <span id="rangeLength" class="range-length">—</span>
-            </div>
-            <p id="loopStatus" class="inline-status sr-only" role="status" aria-live="polite">AとBを設定してください</p>
-          </section>
-
-          <section class="loop-panel range-two" aria-label="区間2">
-            <span class="loop-index" aria-hidden="true">2</span>
-            <div class="loop-controls">
-              <button id="startMarkButton2" type="button" aria-label="現在位置を区間2のAに設定" disabled>A</button>
-              <span id="startMarkValue2">A 未設定</span>
-              <button id="endMarkButton2" type="button" aria-label="現在位置を区間2のBに設定" disabled>B</button>
-              <span id="endMarkValue2">B 未設定</span>
-            </div>
-            <div class="loop-actions">
-              <button id="jumpStartButton2" type="button" aria-label="区間2のAへ移動" disabled>↤A</button>
-              <button id="jumpEndButton2" type="button" aria-label="区間2のBへ移動" disabled>B↦</button>
-              <button id="loopToggleButton2" type="button" aria-label="区間2をリピート" aria-pressed="false" disabled>↻</button>
-              <button id="clearLoopButton2" type="button" aria-label="区間2のA–B設定を解除" disabled>×</button>
-              <span id="rangeLength2" class="range-length">—</span>
-            </div>
-            <p id="loopStatus2" class="inline-status sr-only" role="status" aria-live="polite">AとBを設定してください</p>
-          </section>
         </section>
 
       </div>
@@ -195,13 +159,13 @@
   <script src="./candidates.js?v=3.0-current111-abc-v5"></script>
   <script src="./candidate-numbering.js?v=3.0"></script>
   <script src="./charts.js?v=0.3-15charts"></script>
-  <script src="./app-v4.js?v=4.0-dual-ranges"></script>
-  <script src="./object-timeline-v2.js?v=3.2-fixed-span"></script>
+  <script src="./app-v4.js?v=4.1-single-raf-no-ranges"></script>
+  <script src="./object-timeline-v2.js?v=4.0-app-frame-sync"></script>
   <script src="./hitsound-controller.js?v=4.1-latest-switch-wins"></script>
   <script src="./hitsound-favorites.js?v=5.0-preset-slots"></script>
   <script src="./favorite-slot-ui.js?v=2.0-collections-12x2"></script>
   <script src="./hitsound-grid.js?v=4.2-no-delete-rating"></script>
-  <script src="./workbench-ui.js?v=2.0-playback-only"></script>
+  <script src="./workbench-ui.js?v=2.1-no-loop-state"></script>
   <script src="./chart-loader.js?v=0.6-state-safe"></script>
   <script src="./favorite-pager-v4.js?v=4.0-arrow-pages"></script>
 </body>
