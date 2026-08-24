@@ -5,18 +5,8 @@
   const SILENT_ID = '__SILENT__';
   const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-4]__$/;
   const SELECTION_STORAGE_KEY = 'osutaiko-hitsound-lab:selection:current111-abc-v5';
-  const $ = id => document.getElementById(id);
-
-  const el = {
-    donInput: $('donHitsoundInput'),
-    katInput: $('kaHitsoundInput'),
-    previewAudio: $('samplePreviewAudio'),
-    status: $('statusBadge'),
-    play: $('playButton'),
-    oszInput: $('oszInput'),
-  };
-
-  if (!CANDIDATES.length || !el.donInput || !el.katInput) return;
+  const previewAudio = document.getElementById('samplePreviewAudio');
+  if (!CANDIDATES.length) return;
 
   const builtInById = id => CANDIDATES.find(candidate => candidate.id === id) || null;
   const customSources = new Map();
@@ -45,6 +35,7 @@
     don: restoreBuiltIn(persistedSelection.don, initialDon),
     kat: restoreBuiltIn(persistedSelection.kat, initialKat),
   };
+
   let packPromise = null;
   const bytesCache = new Map();
   const bytesPromises = new Map();
@@ -60,10 +51,6 @@
     persistedSelection.don = selection.don;
     persistedSelection.kat = selection.kat;
     try { localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(selection)); } catch {}
-  }
-
-  function isViewerPlaying() {
-    return !!el.play && !el.play.disabled && el.play.getAttribute('aria-pressed') === 'true';
   }
 
   async function hitsoundPack() {
@@ -142,26 +129,12 @@
     ].join(':');
   }
 
-  function fileFor(id, bytes) {
-    const source = byId(id);
-    const silent = id === null || id === SILENT_ID;
-    const custom = customSources.has(id);
-    const name = silent ? 'silent.wav' : (source?.name || 'hitsound.wav');
-    const type = silent || !custom ? 'audio/wav' : (source?.type || '');
-    return new File([bytes], name, {
-      type,
-      lastModified: custom ? (source?.lastModified || Date.now()) : 0,
-    });
-  }
-
   function registerCustomSource(id, source) {
     if (!CUSTOM_ID_PATTERN.test(String(id))) throw new Error('ユーザー音源スロットが不正です。');
     const rawBytes = source?.bytes;
     let bytes = null;
     if (rawBytes instanceof ArrayBuffer) bytes = rawBytes;
-    else if (ArrayBuffer.isView(rawBytes)) {
-      bytes = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
-    }
+    else if (ArrayBuffer.isView(rawBytes)) bytes = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
     if (!bytes?.byteLength) throw new Error('空の音源ファイルは追加できません。');
 
     const slot = Number(source?.slot);
@@ -182,6 +155,7 @@
       bytes,
     };
     customSources.set(id, entry);
+
     let restored = false;
     for (const side of ['don', 'kat']) {
       if (persistedSelection[side] === id && selection[side] !== id) {
@@ -199,7 +173,6 @@
 
   async function unregisterCustomSource(id) {
     if (!customSources.has(id)) return false;
-
     const affectedSides = ['don', 'kat'].filter(side => selection[side] === id);
     stopPreview();
     customSources.delete(id);
@@ -217,77 +190,22 @@
     return true;
   }
 
-  function setInputFile(input, file) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-  }
-
-  function viewerReady() {
-    return (el.status?.textContent || '') === '準備完了' && !!el.play && !el.play.disabled;
-  }
-
   function directViewerReady() {
-    return !!el.play && !el.play.disabled
-      && typeof window.CreateSEViewer?.applyHitsoundBytes === 'function'
+    return typeof window.CreateSEViewer?.applyHitsoundBytes === 'function'
       && typeof window.CreateSEViewer?.applyHitsoundPairBytes === 'function';
   }
 
-  function viewerRebuilding() {
-    return /Hitsound(?:生成|反映)中/.test(el.status?.textContent || '');
-  }
-
-  function wasPlaying() {
-    return isViewerPlaying();
-  }
-
-  async function waitForViewerReady(timeoutMs = 30000) {
-    const start = performance.now();
-    while (performance.now() - start < timeoutMs) {
-      if (viewerReady()) return true;
-      await new Promise(resolve => setTimeout(resolve, 80));
-    }
-    return false;
-  }
-
-  async function waitForRebuild(serial, timeoutMs = 15000) {
-    const start = performance.now();
-    while (serial === applySerial && performance.now() - start < timeoutMs) {
-      const elapsed = performance.now() - start;
-      if (elapsed >= 120 && viewerReady()) return true;
-      await new Promise(resolve => setTimeout(resolve, 60));
-    }
-    return false;
-  }
-
-  async function applyOne(side, id, { resume = true } = {}) {
-    if (!viewerReady() && !directViewerReady()) return false;
-
-    const input = side === 'don' ? el.donInput : el.katInput;
+  async function applyOne(side, id) {
+    if (!directViewerReady()) return false;
     const serial = ++applySerial;
-    const resumeAfter = resume && wasPlaying();
     const bytes = await candidateBytes(id);
     if (serial !== applySerial) return false;
-
-    if (directViewerReady()) {
-      return window.CreateSEViewer.applyHitsoundBytes(side, bytes, audioCacheKey(id));
-    }
-
-    setInputFile(input, fileFor(id, bytes));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-
-    if (resumeAfter) {
-      const ready = await waitForRebuild(serial);
-      if (ready && serial === applySerial && !isViewerPlaying()) el.play.click();
-    }
-    return true;
+    return window.CreateSEViewer.applyHitsoundBytes(side, bytes, audioCacheKey(id));
   }
 
-  async function applyPair({ resume = false } = {}) {
-    if (!viewerReady() && !directViewerReady()) return false;
-
+  async function applyPair() {
+    if (!directViewerReady()) return false;
     const serial = ++applySerial;
-    const resumeAfter = resume && wasPlaying();
     const donId = selection.don;
     const katId = selection.kat;
     const [donBytes, katBytes] = await Promise.all([
@@ -295,24 +213,10 @@
       candidateBytes(katId),
     ]);
     if (serial !== applySerial) return false;
-
-    if (directViewerReady()) {
-      return window.CreateSEViewer.applyHitsoundPairBytes({
-        don: { bytes: donBytes, cacheKey: audioCacheKey(donId) },
-        kat: { bytes: katBytes, cacheKey: audioCacheKey(katId) },
-      });
-    }
-
-    setInputFile(el.donInput, fileFor(donId, donBytes));
-    el.donInput.dispatchEvent(new Event('change', { bubbles: true }));
-    if (!(await waitForRebuild(serial))) return false;
-
-    setInputFile(el.katInput, fileFor(katId, katBytes));
-    el.katInput.dispatchEvent(new Event('change', { bubbles: true }));
-    if (!(await waitForRebuild(serial))) return false;
-
-    if (resumeAfter && serial === applySerial && !isViewerPlaying()) el.play.click();
-    return true;
+    return window.CreateSEViewer.applyHitsoundPairBytes({
+      don: { bytes: donBytes, cacheKey: audioCacheKey(donId) },
+      kat: { bytes: katBytes, cacheKey: audioCacheKey(katId) },
+    });
   }
 
   function emitSelection() {
@@ -320,13 +224,13 @@
   }
 
   function clearPreview({ reset = true } = {}) {
-    if (!el.previewAudio) return;
-    el.previewAudio.pause();
+    if (!previewAudio) return;
+    previewAudio.pause();
     if (reset) {
-      try { el.previewAudio.currentTime = 0; } catch {}
+      try { previewAudio.currentTime = 0; } catch {}
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = '';
-      el.previewAudio.removeAttribute('src');
+      previewAudio.removeAttribute('src');
     }
   }
 
@@ -338,7 +242,7 @@
 
   async function previewCandidate(id, { waitUntilEnded = false, meta = null } = {}) {
     const directPreview = typeof window.CreateSEViewer?.previewHitsoundBytes === 'function';
-    if ((!el.previewAudio && !directPreview) || id === null || id === SILENT_ID || !validSideId(id)) return false;
+    if ((!previewAudio && !directPreview) || id === null || id === SILENT_ID || !validSideId(id)) return false;
 
     const serial = ++previewSerial;
     const preparePromise = directPreview
@@ -376,21 +280,21 @@
     const source = byId(id);
     const type = customSources.has(id) ? (source?.type || '') : 'audio/wav';
     previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
-    el.previewAudio.src = previewUrl;
-    el.previewAudio.currentTime = 0;
-    await el.previewAudio.play();
-    if (waitUntilEnded && serial === previewSerial && !el.previewAudio.ended) {
+    previewAudio.src = previewUrl;
+    previewAudio.currentTime = 0;
+    await previewAudio.play();
+    if (waitUntilEnded && serial === previewSerial && !previewAudio.ended) {
       await new Promise(resolve => {
         const finish = () => {
-          el.previewAudio.removeEventListener('ended', finish);
-          el.previewAudio.removeEventListener('pause', finish);
-          el.previewAudio.removeEventListener('error', finish);
+          previewAudio.removeEventListener('ended', finish);
+          previewAudio.removeEventListener('pause', finish);
+          previewAudio.removeEventListener('error', finish);
           resolve();
         };
-        el.previewAudio.addEventListener('ended', finish, { once: true });
-        el.previewAudio.addEventListener('pause', finish, { once: true });
-        el.previewAudio.addEventListener('error', finish, { once: true });
-        if (el.previewAudio.ended || el.previewAudio.paused || serial !== previewSerial) finish();
+        previewAudio.addEventListener('ended', finish, { once: true });
+        previewAudio.addEventListener('pause', finish, { once: true });
+        previewAudio.addEventListener('error', finish, { once: true });
+        if (previewAudio.ended || previewAudio.paused || serial !== previewSerial) finish();
       });
     }
     return true;
@@ -402,21 +306,11 @@
   }
 
   async function applyPendingSelection(serial) {
-    if (serial !== selectionSerial || !pendingSides.size) return false;
-
-    if (!viewerReady() && !directViewerReady()) {
-      if (!viewerRebuilding()) return false;
-      if (!(await waitForViewerReady()) || serial !== selectionSerial) return false;
-    }
-
+    if (serial !== selectionSerial || !pendingSides.size || !directViewerReady()) return false;
     const sides = Array.from(pendingSides);
     sides.forEach(side => pendingSides.delete(side));
-    if (sides.length === 1) {
-      const side = sides[0];
-      await applyOne(side, selection[side], { resume: true });
-    } else {
-      await applyPair({ resume: true });
-    }
+    if (sides.length === 1) await applyOne(sides[0], selection[sides[0]]);
+    else await applyPair();
     return serial === selectionSerial;
   }
 
@@ -473,34 +367,26 @@
     persistSelection();
     stopPreview();
     emitSelection();
-
     await applyPendingSelection(serial);
     return true;
   }
 
-  el.previewAudio?.addEventListener('ended', () => {
+  previewAudio?.addEventListener('ended', () => {
     previewActive = false;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = '';
-    el.previewAudio.removeAttribute('src');
+    previewAudio.removeAttribute('src');
   });
-  el.previewAudio?.addEventListener('play', () => { previewActive = true; });
-  el.previewAudio?.addEventListener('pause', () => {
+  previewAudio?.addEventListener('play', () => { previewActive = true; });
+  previewAudio?.addEventListener('pause', () => {
     if (!window.CreateSEViewer?.previewHitsoundBytes) previewActive = false;
   });
   window.addEventListener('hitsound-preview-state', event => {
     previewActive = !!event.detail?.playing;
   });
 
-  el.oszInput?.addEventListener('change', async () => {
-    if (!(await waitForViewerReady())) return;
-    try {
-      await applyPair({ resume: false });
-      pendingSides.clear();
-    } catch (error) {
-      console.warn(error);
-      if (el.status) el.status.textContent = 'Current111音パック待ち';
-    }
+  window.addEventListener('viewer-ready', () => {
+    applyPair().then(() => pendingSides.clear()).catch(error => console.warn(error));
   });
 
   window.addEventListener('beforeunload', () => {
