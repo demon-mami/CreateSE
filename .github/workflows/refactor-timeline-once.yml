@@ -1,0 +1,313 @@
+name: One-shot timeline simplification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/refactor-timeline-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Apply simplification
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              Path(path).write_text(text, encoding='utf-8')
+
+          def require_replace(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'missing replacement target: {label}')
+              return text.replace(old, new, 1)
+
+          def cut(text, start_marker, end_marker, replacement=''):
+              start = text.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f'missing start marker: {start_marker}')
+              end = text.find(end_marker, start)
+              if end < 0:
+                  raise SystemExit(f'missing end marker: {end_marker}')
+              return text[:start] + replacement + text[end:]
+
+          # app-v4.js -------------------------------------------------------
+          app = read('app-v4.js')
+          for line in [
+              "  const OBJECT_NOTE_RADIUS = 14;\n",
+              "  const SKIP_SEC = 4;\n",
+              "  const TRANSPORT_UI_INTERVAL_MS = 33;\n",
+              "  let lastNativeTimestamp = null;\n",
+              "  let lastTransportUiPaint = 0;\n",
+              "  let externalTimelineRenderer = false;\n",
+              "  const timelineSize = { width: 0, height: 0 };\n",
+              "  let copyTimeButtonWidth = 70;\n",
+              "  let seekFeedbackTimer = 0;\n",
+          ]:
+              app = app.replace(line, '')
+
+          for line in [
+              "    donHsInput: $('donHitsoundInput'), kaHsInput: $('kaHitsoundInput'),\n",
+              "    seekTime: $('seekTimeFeedback'), copyTime: $('copyTimeButton'),\n",
+              "    back: $('backButton'), play: $('playButton'), fwd: $('forwardButton'), seek: $('seekBar'),\n",
+              "    timelineViewport: $('timelineViewport'), timelineStatic: $('timelineStaticCanvas'), timelineCursor: $('timelineCursorCanvas'),\n",
+          ]:
+              app = app.replace(line, '')
+          app = require_replace(
+              app,
+              "    overviewViewport: $('overviewViewport'), overviewStatic: $('overviewStaticCanvas'), overviewCursor: $('overviewCursorCanvas'),\n",
+              "    play: $('playButton'), seek: $('seekBar'), timelineViewport: $('timelineViewport'),\n    overviewViewport: $('overviewViewport'), overviewStatic: $('overviewStaticCanvas'), overviewCursor: $('overviewCursorCanvas'),\n",
+              'app el transport/timeline refs',
+          )
+
+          app = cut(app, '  function showSeekFeedback(', '  function setPlayState(', '')
+          app = cut(app, '  async function decodeHitsoundFile(', '  async function ensureContext(', '')
+          app = cut(
+              app,
+              '  function readNativeOutputTimestamp()',
+              '  function stopSources()',
+              "  function enginePosition() {\n    if (!playing || !ac) return clampSec(pausedOffset);\n    return clampSec(transportOffset + Math.max(0, ac.currentTime - transportStartCtx));\n  }\n\n",
+          )
+          app = cut(
+              app,
+              '  async function seekTo(',
+              '  async function loadMusic(',
+              "  async function seekTo(target) {\n    const next = clampSec(target);\n    const wasPlaying = playing;\n    if (wasPlaying) pausedOffset = enginePosition();\n    stopSources();\n    pausedOffset = next;\n    if (wasPlaying) await startPlayback(next);\n    syncVisualToPosition();\n  }\n\n",
+          )
+          app = cut(app, '  async function loadCustomHitsound(', '  function setControls(', '')
+          app = cut(
+              app,
+              '  function setControls(',
+              '  async function useMap(',
+              "  function setControls(enabled) {\n    ready = enabled;\n    [el.play, el.seek].forEach(node => {\n      if (node) node.disabled = !enabled;\n    });\n    updateOutput();\n  }\n\n",
+          )
+          app = cut(
+              app,
+              '  function refreshViewportMetrics()',
+              '  function lowerHit(',
+              "  function refreshViewportMetrics() {\n    measureViewport(el.overviewViewport, overviewSize);\n  }\n\n",
+          )
+          app = cut(
+              app,
+              '  function drawObjectTicks(',
+              '  function chooseMajorTickSeconds(',
+              "  function renderTimelineAt(positionSec) {\n    window.CreateSEObjectTimeline?.renderAt?.(positionSec);\n  }\n\n",
+          )
+
+          # Remove visible mm:ss labels from the static overview; keep the scale marks.
+          app = re.sub(
+              r"\n      if \(major\) \{\n        ctx\.fillStyle = 'rgba\(255,255,255,\.52\)';\n        ctx\.font = '8px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';\n        ctx\.textAlign = x < 20 \? 'left' : \(x > rect\.width - 20 \? 'right' : 'center'\);\n        ctx\.textBaseline = 'bottom';\n        ctx\.fillText\(fmtTimeline\(sec \* 1000\), x, baseline - 13\);\n      \}",
+              '',
+              app,
+              count=1,
+          )
+
+          # Remove copy-time DOM movement from the overview cursor.
+          draw_start = app.find('  function drawSongCursor(')
+          sync_start = app.find('  function syncVisualToPosition()', draw_start)
+          if draw_start < 0 or sync_start < 0:
+              raise SystemExit('drawSongCursor/syncVisualToPosition markers missing')
+          draw_chunk = app[draw_start:sync_start]
+          draw_chunk = re.sub(r"\n    if \(el\.copyTime\) \{.*?\n    \}\n", '\n', draw_chunk, count=1, flags=re.S)
+          app = app[:draw_start] + draw_chunk + app[sync_start:]
+
+          app = cut(
+              app,
+              '  function syncVisualToPosition()',
+              '  function beginScrub(',
+              "  function syncVisualToPosition() {\n    const p = enginePosition();\n    if (!seekScrub && el.seek) el.seek.value = String(p);\n    renderTimelineAt(p);\n    drawSongCursor(p);\n  }\n\n  function renderDebug(now) {\n    if (!DEBUG_MODE || !el.debug) return;\n    if (now - lastDebugPaint < DEBUG_REFRESH_MS) return;\n    lastDebugPaint = now;\n    const n = value => Number.isFinite(value) ? Number(value).toFixed(3) : 'n/a';\n    el.debug.textContent = [\n      `sampleRate: ${ac?.sampleRate ?? 'n/a'} Hz`,\n      `currentTime: ${n(ac?.currentTime)} s`,\n      `enginePosition: ${n(enginePosition() * 1000)} ms`,\n      `transportStartCtx: ${n(transportStartCtx)} s`,\n      `transportOffset: ${n(transportOffset)} s`,\n    ].join('\\n');\n  }\n\n  function frame(now) {\n    const p = enginePosition();\n    renderTimelineAt(p);\n    renderDebug(now);\n    raf = requestAnimationFrame(frame);\n  }\n\n",
+          )
+
+          app = app.replace('audiblePosition()', 'enginePosition()')
+          app = re.sub(r"^.*setAttribute\('aria-valuetext'.*$\n?", '', app, flags=re.M)
+          app = re.sub(r"^.*showSeekFeedback\(.*$\n?", '', app, flags=re.M)
+
+          # Hidden-file fallback listeners are obsolete; HitsoundController uses Direct API only.
+          app = re.sub(r"  el\.donHsInput\?\.addEventListener\('change', async event => \{.*?\n  \}\);\n", '', app, count=1, flags=re.S)
+          app = re.sub(r"  el\.kaHsInput\?\.addEventListener\('change', async event => \{.*?\n  \}\);\n", '', app, count=1, flags=re.S)
+          app = re.sub(r"^  el\.back\?\.addEventListener.*$\n?", '', app, flags=re.M)
+          app = re.sub(r"^  el\.fwd\?\.addEventListener.*$\n?", '', app, flags=re.M)
+          if "  el.copyTime?.addEventListener" in app:
+              app = cut(app, "  el.copyTime?.addEventListener", "  el.purpose?.addEventListener", '')
+
+          # Reset no longer owns transient time UI or legacy timeline canvases.
+          if '    clearTimeout(seekFeedbackTimer);' in app:
+              start = app.index('    clearTimeout(seekFeedbackTimer);')
+              end = app.index('    for (const canvas', start)
+              app = app[:start] + app[end:]
+          app = app.replace(
+              '    for (const canvas of [el.timelineStatic, el.timelineCursor, el.overviewStatic, el.overviewCursor]) {',
+              '    for (const canvas of [el.overviewStatic, el.overviewCursor]) {',
+          )
+
+          # No responsive redraw loop: geometry is established once per supported orientation.
+          if '  const redraw = () => {' in app:
+              app = cut(app, '  const redraw = () => {', "  window.addEventListener('beforeunload'", '  refreshViewportMetrics();\n')
+
+          app = app.replace('    skipSeconds: SKIP_SEC,\n', '')
+          app = app.replace('    positionSec: audiblePosition,', '    positionSec: enginePosition,')
+          app = app.replace("    setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },\n", '')
+
+          # Notify the Direct Hitsound controller after chart/audio readiness without touching transport.
+          app = require_replace(
+              app,
+              "      setControls(true);\n      setStatus('準備完了');\n      renderSongStatic();",
+              "      setControls(true);\n      setStatus('準備完了');\n      window.dispatchEvent(new CustomEvent('viewer-ready'));\n      renderSongStatic();",
+              'viewer-ready dispatch',
+          )
+
+          # Remove obsolete visible-time formatter if it is no longer referenced.
+          if app.count('fmtTimeline(') == 1:
+              app = re.sub(r"\n  function fmtTimeline\(ms\) \{.*?\n  \}\n", '\n', app, count=1, flags=re.S)
+          if app.count('fmt(') == 1:
+              app = re.sub(r"\n  function fmt\(ms\) \{.*?\n  \}\n", '\n', app, count=1, flags=re.S)
+
+          for forbidden in [
+              'audiblePosition', 'getOutputTimestamp', 'outputLatency', 'SKIP_SEC',
+              'backButton', 'forwardButton', 'seekTimeFeedback', 'copyTimeButton',
+              'timelineStaticCanvas', 'timelineCursorCanvas', 'setExternalTimelineRenderer',
+              'new ResizeObserver(redraw)', "window.addEventListener('resize', redraw)",
+          ]:
+              if forbidden in app:
+                  raise SystemExit(f'app still contains forbidden token: {forbidden}')
+          if 'const p = enginePosition();' not in app or 'renderTimelineAt(p);' not in app:
+              raise SystemExit('app frame is not engine-clock driven')
+          write('app-v4.js', app)
+
+          # hitsound-controller.js -----------------------------------------
+          controller = read('hitsound-controller.js')
+          controller = controller.replace(
+              '  if (!CANDIDATES.length || !el.donInput || !el.katInput) return;',
+              '  if (!CANDIDATES.length) return;',
+          )
+          controller = cut(controller, '  function fileFor(', '  function registerCustomSource(', '')
+          controller = cut(
+              controller,
+              '  function setInputFile(',
+              '  function emitSelection()',
+              "  function directViewerReady() {\n    return typeof window.CreateSEViewer?.applyHitsoundBytes === 'function'\n      && typeof window.CreateSEViewer?.applyHitsoundPairBytes === 'function';\n  }\n\n  async function applyOne(side, id) {\n    if (!directViewerReady()) return false;\n    const serial = ++applySerial;\n    const bytes = await candidateBytes(id);\n    if (serial !== applySerial) return false;\n    return window.CreateSEViewer.applyHitsoundBytes(side, bytes, audioCacheKey(id));\n  }\n\n  async function applyPair() {\n    if (!directViewerReady()) return false;\n    const serial = ++applySerial;\n    const donId = selection.don;\n    const katId = selection.kat;\n    const [donBytes, katBytes] = await Promise.all([candidateBytes(donId), candidateBytes(katId)]);\n    if (serial !== applySerial) return false;\n    return window.CreateSEViewer.applyHitsoundPairBytes({\n      don: { bytes: donBytes, cacheKey: audioCacheKey(donId) },\n      kat: { bytes: katBytes, cacheKey: audioCacheKey(katId) },\n    });\n  }\n\n",
+          )
+          controller = cut(
+              controller,
+              '  async function applyPendingSelection(',
+              '  async function setSide(',
+              "  async function applyPendingSelection(serial) {\n    if (serial !== selectionSerial || !pendingSides.size || !directViewerReady()) return false;\n    const sides = Array.from(pendingSides);\n    sides.forEach(side => pendingSides.delete(side));\n    if (sides.length === 1) await applyOne(sides[0], selection[sides[0]]);\n    else await applyPair();\n    return serial === selectionSerial;\n  }\n\n",
+          )
+          controller = controller.replace("      await applyOne(side, selection[side], { resume: true });", "      await applyOne(side, selection[side]);")
+          controller = controller.replace("      await applyPair({ resume: true });", "      await applyPair();")
+
+          if "  el.oszInput?.addEventListener('change'" in controller:
+              controller = cut(
+                  controller,
+                  "  el.oszInput?.addEventListener('change'",
+                  "  window.addEventListener('beforeunload'",
+                  "  window.addEventListener('viewer-ready', () => {\n    applyPair().then(() => pendingSides.clear()).catch(error => console.warn(error));\n  });\n\n",
+              )
+
+          for forbidden in ['DataTransfer', 'waitForViewerReady', 'waitForRebuild', 'viewerRebuilding', "dispatchEvent(new Event('change'", 'resumeAfter']:
+              if forbidden in controller:
+                  raise SystemExit(f'controller still contains fallback token: {forbidden}')
+          write('hitsound-controller.js', controller)
+
+          # index.html ------------------------------------------------------
+          html = read('index.html')
+          html = re.sub(r'^\s*<input id="donHitsoundInput"[^>]*>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<input id="kaHitsoundInput"[^>]*>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<canvas id="timelineStaticCanvas"[^>]*></canvas>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<canvas id="timelineCursorCanvas"[^>]*></canvas>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<output id="seekTimeFeedback"[^>]*>.*?</output>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<button id="backButton"[^>]*>.*?</button>\n?', '', html, flags=re.M)
+          html = re.sub(r'^\s*<button id="forwardButton"[^>]*>.*?</button>\n?', '', html, flags=re.M)
+          html = html.replace(' aria-valuetext="0秒000"', '')
+          html = require_replace(
+              html,
+              '<body>\n',
+              '<body>\n  <div id="orientationGuard" class="orientation-guard" hidden role="alert"></div>\n',
+              'orientation guard markup',
+          )
+          html = html.replace('./workbench.css?v=2.1-no-ranges', './workbench.css?v=2.2-fixed-orientation')
+          html = html.replace('./app-v4.js?v=4.1-single-raf-no-ranges', './app-v4.js?v=4.2-engine-clock-fixed-ui')
+          html = html.replace('./object-timeline-v2.js?v=4.0-app-frame-sync', './object-timeline-v2.js?v=4.1-fixed-geometry-no-fade')
+          html = html.replace('./hitsound-controller.js?v=4.1-latest-switch-wins', './hitsound-controller.js?v=4.2-direct-only')
+          html = require_replace(
+              html,
+              '  <script src="./app-v4.js?v=4.2-engine-clock-fixed-ui"></script>\n',
+              '  <script src="./orientation-guard.js?v=1.0-fixed-device-orientation"></script>\n  <script src="./app-v4.js?v=4.2-engine-clock-fixed-ui"></script>\n',
+              'orientation guard script',
+          )
+          for forbidden in ['backButton', 'forwardButton', 'seekTimeFeedback', 'timelineStaticCanvas', 'timelineCursorCanvas', 'donHitsoundInput', 'kaHitsoundInput']:
+              if forbidden in html:
+                  raise SystemExit(f'index still contains forbidden id: {forbidden}')
+          write('index.html', html)
+
+          # workbench.css ---------------------------------------------------
+          css = read('workbench.css')
+          css += """
+
+/* Fixed supported environments: iPhone portrait / iPad landscape. */
+.transport-row{display:flex!important;justify-content:center!important;align-items:center!important;padding-inline:0!important}
+.transport-row .play-button{width:96px!important;min-width:96px!important}
+.orientation-guard[hidden]{display:none!important}
+.orientation-guard{
+  position:fixed;inset:0;z-index:10000;place-items:center;padding:28px;
+  background:#071018;color:#fff;text-align:center;font:800 16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif
+}
+html.orientation-blocked body> :not(.orientation-guard){visibility:hidden!important;pointer-events:none!important}
+html.orientation-blocked .orientation-guard{display:grid!important;visibility:visible!important}
+"""
+          write('workbench.css', css)
+
+          # Pages must publish the orientation guard runtime.
+          pages = read('.github/workflows/pages.yml')
+          if 'cp orientation-guard.js _site/' not in pages:
+              pages = require_replace(
+                  pages,
+                  '          cp workbench-ui.js _site/\n',
+                  '          cp workbench-ui.js _site/\n          cp orientation-guard.js _site/\n',
+                  'pages orientation asset',
+              )
+          write('.github/workflows/pages.yml', pages)
+
+          # Runtime invariants.
+          timeline = read('object-timeline-v2.js')
+          for forbidden in ['drawBeatLines', 'POST_HIT_FADE_MS', 'ResizeObserver', 'orientationchange', "addEventListener('resize'", 'progress = postHit']:
+              if forbidden in timeline:
+                  raise SystemExit(f'timeline still contains removed behavior: {forbidden}')
+          if 'lockedGeometry' not in timeline or 'lowerHit(map.hits, nowMs)' not in timeline:
+              raise SystemExit('timeline fixed-geometry / instant-removal invariants missing')
+          PY
+
+      - name: Syntax and invariant checks
+        shell: bash
+        run: |
+          node --check app-v4.js
+          node --check object-timeline-v2.js
+          node --check hitsound-controller.js
+          node --check orientation-guard.js
+          grep -q "const p = enginePosition();" app-v4.js
+          ! grep -q "audiblePosition\|getOutputTimestamp\|SKIP_SEC" app-v4.js
+          ! grep -q "backButton\|forwardButton\|seekTimeFeedback" index.html
+          ! grep -q "drawBeatLines\|POST_HIT_FADE_MS\|ResizeObserver" object-timeline-v2.js
+
+      - name: Commit result and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/refactor-timeline-once.yml
+          git config user.name "demon mami"
+          git config user.email "toguro926@gmail.com"
+          git add -A
+          git commit -m "Strip timeline runtime to fixed engine-clock path"
+          git push
