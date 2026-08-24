@@ -24,7 +24,6 @@
     'background:transparent'
   ].join(';');
   viewport.appendChild(canvas);
-  window.CreateSEViewer?.setExternalTimelineRenderer?.(true);
 
   const POST_HIT_FADE_MS = 110;
   const FIXED_SPAN_MS = 1000;
@@ -201,58 +200,17 @@
     strokeLines(measureLines, 'rgba(255,255,255,.25)');
   }
 
-  function drawRegisteredRanges(ctx, leftTime, rightTime, xForTime, laneTop, laneBottom) {
-    const state = window.CreateSEViewer?.loopState?.();
-    const ranges = Array.isArray(state?.ranges) ? state.ranges : [];
-    const palette = [
-      { start: '#68d39a', end: '#f3b55d', fill: 'rgba(104,211,154,.055)' },
-      { start: '#7bd9ff', end: '#d89aff', fill: 'rgba(123,217,255,.05)' },
-    ];
+  function render(positionSec) {
+    if (!timelineVisible || document.visibilityState === 'hidden') return;
 
-    for (let index = 0; index < Math.min(2, ranges.length); index++) {
-      const range = ranges[index] || {};
-      const colors = palette[index];
-      const start = range.startMs == null ? NaN : Number(range.startMs);
-      const end = range.endMs == null ? NaN : Number(range.endMs);
-      if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-        const visibleStart = Math.max(leftTime, start);
-        const visibleEnd = Math.min(rightTime, end);
-        if (visibleEnd > visibleStart) {
-          ctx.fillStyle = colors.fill;
-          ctx.fillRect(xForTime(visibleStart), laneTop, xForTime(visibleEnd) - xForTime(visibleStart), laneBottom - laneTop);
-        }
-      }
-
-      const drawMark = (time, label, color) => {
-        if (!Number.isFinite(time) || time < leftTime || time > rightTime) return;
-        const x = Math.round(xForTime(time)) + 0.5;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath();
-        ctx.moveTo(x, laneTop);
-        ctx.lineTo(x, laneBottom);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = color;
-        ctx.font = '800 9px -apple-system,BlinkMacSystemFont,sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(label, x + 3, laneTop + 3);
-      };
-      drawMark(start, `${index + 1}A`, colors.start);
-      drawMark(end, `${index + 1}B`, colors.end);
-    }
-  }
-
-  function render() {
     const rect = viewportSize;
     if (!(rect.width > 0 && rect.height > 0)) measureViewport();
     if (rect.width <= 0 || rect.height <= 0) return;
 
     const map = activeMap();
     const durationMs = Number(seek.max) > 0 ? Number(seek.max) * 1000 : 0;
-    const nowMs = currentPositionSec() * 1000;
+    const supplied = Number(positionSec);
+    const nowMs = (Number.isFinite(supplied) ? supplied : currentPositionSec()) * 1000;
     const span = zoomSpanMs();
     if (!renderInvalidated && map === lastRenderedMap && span === lastRenderedSpanMs && Math.abs(nowMs - lastRenderedPositionMs) < 0.01) return;
     renderInvalidated = false;
@@ -270,7 +228,6 @@
     const leftTime = nowMs - hitX / pxPerMs;
     const rightTime = nowMs + (rect.width - hitX) / pxPerMs;
 
-    // The lane keeps its previous ~80px height. Only top/bottom breathing room grows.
     const laneHeight = Math.min(LANE_HEIGHT, Math.max(54, rect.height - 24));
     const laneTop = Math.round((rect.height - laneHeight) / 2);
     const laneBottom = laneTop + laneHeight;
@@ -278,15 +235,12 @@
     const normalRadius = 14;
     const bigRadius = 17;
 
-    // Fully mask the legacy OBJECT canvas, including every Kiai yellow region.
     ctx.fillStyle = surfaceColor;
     ctx.fillRect(0, 0, rect.width, rect.height);
 
-    // Back: lane.
     ctx.fillStyle = LANE;
     ctx.fillRect(0, laneTop, rect.width, laneHeight);
 
-    // Lane borders: 1px white lines edge-to-edge.
     ctx.strokeStyle = 'rgba(255,255,255,.48)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -296,11 +250,8 @@
     ctx.lineTo(rect.width, laneBottom + 0.5);
     ctx.stroke();
 
-    // Behind notes: beat / measure lines and both registered ranges.
     drawBeatLines(ctx, map, leftTime, rightTime, xForTime, laneTop, laneBottom);
-    drawRegisteredRanges(ctx, leftTime, rightTime, xForTime, laneTop, laneBottom);
 
-    // Notes.
     const visibleLeftTime = nowMs - POST_HIT_FADE_MS;
     const visibleRightTime = rightTime + 50;
     for (let index = lowerHit(map.hits, visibleLeftTime); index < map.hits.length; index++) {
@@ -337,7 +288,6 @@
       ctx.globalAlpha = 1;
     }
 
-    // Front: keep the target compact while remaining distinct from the moving notes.
     const targetRadius = 19.5;
     ctx.strokeStyle = 'rgba(235,235,238,.82)';
     ctx.lineWidth = 2;
@@ -361,9 +311,8 @@
 
   diff.addEventListener('change', () => {
     renderInvalidated = true;
-    setTimeout(render, 0);
+    render(currentPositionSec());
   });
-  window.addEventListener('viewer-loop-change', () => { renderInvalidated = true; });
   window.addEventListener('resize', measureViewport);
   window.addEventListener('orientationchange', measureViewport);
   const timelineResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(measureViewport) : null;
@@ -373,17 +322,20 @@
         const entry = entries.find(item => item.target === viewport);
         if (!entry) return;
         timelineVisible = entry.isIntersecting;
-        if (timelineVisible) renderInvalidated = true;
+        if (timelineVisible) {
+          renderInvalidated = true;
+          render(currentPositionSec());
+        }
       })
     : null;
   timelineIntersectionObserver?.observe(viewport);
+
+  window.CreateSEObjectTimeline = Object.freeze({
+    renderAt: positionSec => render(positionSec),
+    invalidate: () => { renderInvalidated = true; },
+  });
+  window.CreateSEViewer?.setExternalTimelineRenderer?.(true);
+
   measureViewport();
-
-  function frame() {
-    const canPaint = timelineVisible && document.visibilityState !== 'hidden';
-    if (canPaint) render();
-    requestAnimationFrame(frame);
-  }
-
-  requestAnimationFrame(frame);
+  render(currentPositionSec());
 })();
