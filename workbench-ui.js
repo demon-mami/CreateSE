@@ -217,10 +217,6 @@
     restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);
-  window.addEventListener('viewer-loop-change', event => {
-    const activeIndex = Number(event.detail?.activeIndex);
-    setText('miniLoopState', Number.isInteger(activeIndex) && activeIndex >= 0 ? `↻ ${activeIndex + 1}` : '');
-  });
   window.addEventListener('hitsound-preset-applied', event => {
     closePresets();
     if (workbenchStatus) workbenchStatus.textContent = `${event.detail?.label || 'Preset'} を適用しました`;
