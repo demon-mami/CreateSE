@@ -2,7 +2,6 @@
   'use strict';
 
   const OBJECT_TIMELINE_SPAN_MS = 1000;
-  const OBJECT_NOTE_RADIUS = 14;
   const START_DELAY_SEC = 0.10;
   const MUSIC_GAIN = 0.70;
   const EFFECT_GAIN = 1.00;
@@ -12,23 +11,17 @@
   const MAX_HITSOUND_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_HITSOUND_DURATION_SEC = 5;
   const MAX_DECODED_HITSOUND_CACHE = 32;
-  const SKIP_SEC = 4;
-  const TRANSPORT_UI_INTERVAL_MS = 33;
   const DEBUG_REFRESH_MS = 250;
   const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
-  // Built-in effects are supplied exclusively by CreateSE's official 116-sound pack.
-  // Keeping this empty prevents the legacy Viewer hitsounds from being fetched or mixed in.
+  // Built-in effects stay empty. CreateSE uses only the currently selected Don/Ka pair.
   const HS_FILES = {};
 
   const $ = id => document.getElementById(id);
   const el = {
     oszInput: $('oszInput'), fileName: $('fileName'), status: $('statusBadge'),
     diff: $('difficultySelect'), songTitle: $('songTitle'), songMeta: $('songMeta'), samplePolicy: $('samplePolicy'),
-    donHsInput: $('donHitsoundInput'), kaHsInput: $('kaHitsoundInput'),
-    seekTime: $('seekTimeFeedback'), copyTime: $('copyTimeButton'),
-    back: $('backButton'), play: $('playButton'), fwd: $('forwardButton'), seek: $('seekBar'),
-    timelineViewport: $('timelineViewport'), timelineStatic: $('timelineStaticCanvas'), timelineCursor: $('timelineCursorCanvas'),
+    play: $('playButton'), seek: $('seekBar'), timelineViewport: $('timelineViewport'),
     overviewViewport: $('overviewViewport'), overviewStatic: $('overviewStaticCanvas'), overviewCursor: $('overviewCursorCanvas'),
     purpose: $('purposeSelect'), fade: $('fadeSelect'), preview: $('outputPreview'), copyOut: $('copyOutputButton'),
     debug: $('audioDebug'), errorCard: $('errorCard'), error: $('errorMessage'),
@@ -69,15 +62,9 @@
   let seekScrub = null;
   let timelineScrub = null;
   let overviewScrub = null;
-  let lastNativeTimestamp = null;
   let lastDebugPaint = 0;
-  let lastTransportUiPaint = 0;
-  let externalTimelineRenderer = false;
   const cssTokenCache = new Map();
-  const timelineSize = { width: 0, height: 0 };
   const overviewSize = { width: 0, height: 0 };
-  let copyTimeButtonWidth = 70;
-  let seekFeedbackTimer = 0;
 
   const setStatus = text => { if (el.status) el.status.textContent = text; };
   const clearError = () => {
@@ -104,39 +91,6 @@
     const v = Number.isFinite(value) ? value : 0;
     return d > 0 ? Math.min(Math.max(v, 0), d) : Math.max(v, 0);
   };
-
-  function fmt(ms) {
-    ms = Math.max(0, Math.floor(Number.isFinite(ms) ? ms : 0));
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    const z = ms % 1000;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(z).padStart(3, '0')}`;
-  }
-
-  function fmtTimeline(ms) {
-    const q = Math.max(0, Math.floor((Number.isFinite(ms) ? ms : 0) / 1000));
-    const m = Math.floor(q / 60);
-    const s = q % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
-
-  function showSeekFeedback(positionSec, { linger = true } = {}) {
-    if (!el.seekTime) return;
-    clearTimeout(seekFeedbackTimer);
-    el.seekTime.value = fmt(clampSec(positionSec) * 1000);
-    el.seekTime.textContent = el.seekTime.value;
-    const duration = durationSec();
-    const ratio = duration > 0 ? clampSec(positionSec) / duration : 0;
-    el.seekTime.style.left = `${Math.max(10, Math.min(90, ratio * 100))}%`;
-    el.seekTime.hidden = false;
-    el.seekTime.classList.add('visible');
-    if (linger) {
-      seekFeedbackTimer = window.setTimeout(() => {
-        el.seekTime.classList.remove('visible');
-        el.seekTime.hidden = true;
-      }, 900);
-    }
-  }
 
   function setPlayState(nextPlaying) {
     if (!el.play) return;
@@ -224,7 +178,6 @@
       const objectSet = hit.sampleName === 'hitnormal' ? sample.normalSet : sample.additionSet;
       const resolved = objectSet || timingSet || generalSet;
       hit.resolvedSampleSet = resolved;
-      // Viewer v3.2にはNormal/Soft素材のみを同梱しているため、SampleSet=Drum(3)はNormalへ意図的にフォールバックする。
       hit.family = resolved === 2 ? 'soft' : 'normal';
       if (resolved === 3) m.hasDrumFallback = true;
       hit.volume = Math.max(0, Math.min(100, sample.volume || (tp ? tp.volume : 100) || 100));
@@ -317,54 +270,21 @@
     return zip.file(name) || Object.values(zip.files).find(entry => !entry.dir && norm(entry.name) === norm(name)) || null;
   }
 
-  function hitTimeToFrame(timeMs, sampleRate) {
-    return Math.round(timeMs / 1000 * sampleRate);
-  }
-
-  async function buildEffectBuffer(activeMap, music, buffers, audioContext, customBuffers = null) {
-    const sr = audioContext.sampleRate;
-    const channels = music.numberOfChannels;
-    const effect = audioContext.createBuffer(channels, music.length, sr);
-    let hitIndex = 0;
-    for (const hit of activeMap.hits) {
-      const custom = customBuffers?.get(hit.kind);
-      const hs = custom || buffers.get(`${hit.family}:${hit.sampleName}`) || buffers.get(`normal:${hit.sampleName}`);
-      if (hs) {
-        const nominalStart = hitTimeToFrame(hit.time, sr);
-        if (nominalStart < effect.length) {
-          const gain = hit.volume / 100;
-          const srcOffset = nominalStart < 0 ? -nominalStart : 0;
-          const startFrame = Math.max(0, nominalStart);
-          for (let ch = 0; ch < channels; ch++) {
-            const dst = effect.getChannelData(ch);
-            const srcData = hs.getChannelData(Math.min(ch, hs.numberOfChannels - 1));
-            const maxFrames = Math.min(srcData.length - srcOffset, dst.length - startFrame);
-            for (let i = 0; i < maxFrames; i++) dst[startFrame + i] += srcData[srcOffset + i] * gain;
-          }
-        }
-      }
-      if ((++hitIndex & 63) === 0) await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    return effect;
-  }
-
-  function startPairedBuffers({ audioContext, music, effect, musicDestination, effectDestination, when, offset }) {
-    const musicNode = audioContext.createBufferSource();
-    const effectNode = audioContext.createBufferSource();
-    musicNode.buffer = music;
-    effectNode.buffer = effect;
-    musicNode.connect(musicDestination);
-    effectNode.connect(effectDestination);
-    musicNode.start(when, offset);
-    effectNode.start(when, offset);
-    return { musicNode, effectNode };
-  }
-
   function hitsoundForHit(hit, customBuffers = customHsBuffers) {
     return customBuffers?.get(hit.kind)
       || hsBuffers.get(`${hit.family}:${hit.sampleName}`)
       || hsBuffers.get(`normal:${hit.sampleName}`)
       || null;
+  }
+
+  function lowerHit(timeMs) {
+    let lo = 0, hi = map ? map.hits.length : 0;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (map.hits[mid].time < timeMs) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
   }
 
   function releaseEffectVoice(voice) {
@@ -392,7 +312,6 @@
   function scheduleEffectVoice(hit, scheduledWhen, now) {
     const buffer = hitsoundForHit(hit);
     if (!buffer) return;
-
     const sourceOffset = Math.max(0, now - scheduledWhen);
     if (sourceOffset >= buffer.duration) return;
 
@@ -412,7 +331,6 @@
 
   function scheduleUpcomingHits() {
     if (!playing || !ac || !map || !hitsoundsReady || !effectGain) return;
-
     const now = ac.currentTime;
     const horizon = now + EFFECT_SCHEDULE_AHEAD_SEC;
     while (nextEffectHitIndex < map.hits.length) {
@@ -434,16 +352,11 @@
 
   function refreshScheduledHitsounds() {
     if (!playing || !ac || !map || !hitsoundsReady) return;
-
     const cutoverWhen = ac.currentTime + EFFECT_RESCHEDULE_LEAD_SEC;
     stopEffectVoices({ fromWhen: cutoverWhen });
     const cutoverPosition = transportOffset + Math.max(0, cutoverWhen - transportStartCtx);
     nextEffectHitIndex = lowerHit(Math.max(0, cutoverPosition * 1000 - 0.001));
     scheduleUpcomingHits();
-  }
-
-  function hitsoundFileKey(file) {
-    return [file.name, file.size, file.lastModified, file.type].join('\u0000');
   }
 
   function rememberDecodedHitsound(key, decoded) {
@@ -456,28 +369,20 @@
 
   function hitsoundBytes(value) {
     if (value instanceof ArrayBuffer) return value;
-    if (ArrayBuffer.isView(value)) {
-      return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
-    }
+    if (ArrayBuffer.isView(value)) return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
     return null;
   }
 
   function validateDecodedHitsound(decoded) {
-    if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
-      throw new Error('音源の長さを確認できません。');
-    }
-    if (decoded.duration > MAX_HITSOUND_DURATION_SEC + 0.01) {
-      throw new Error('ヒットサウンドは5秒以下にしてください。');
-    }
+    if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) throw new Error('音源の長さを確認できません。');
+    if (decoded.duration > MAX_HITSOUND_DURATION_SEC + 0.01) throw new Error('ヒットサウンドは5秒以下にしてください。');
     return decoded;
   }
 
   async function decodeHitsoundBytes(value, cacheKey) {
     const bytes = hitsoundBytes(value);
     if (!bytes?.byteLength) throw new Error('空の音源ファイルは追加できません。');
-    if (bytes.byteLength > MAX_HITSOUND_FILE_BYTES) {
-      throw new Error('音源は8MB以下にしてください。');
-    }
+    if (bytes.byteLength > MAX_HITSOUND_FILE_BYTES) throw new Error('音源は8MB以下にしてください。');
 
     const key = `${String(cacheKey || 'anonymous')}\u0000${bytes.byteLength}`;
     if (decodedHitsoundCache.has(key)) {
@@ -495,11 +400,6 @@
     })().finally(() => decodedHitsoundPromises.delete(key));
     decodedHitsoundPromises.set(key, promise);
     return promise;
-  }
-
-  async function decodeHitsoundFile(file) {
-    const raw = await file.arrayBuffer();
-    return decodeHitsoundBytes(raw, `file:${hitsoundFileKey(file)}`);
   }
 
   async function ensureContext(resume = false) {
@@ -588,50 +488,18 @@
     await hsLoadPromise;
   }
 
-  function readNativeOutputTimestamp() {
-    if (!ac || typeof ac.getOutputTimestamp !== 'function') return null;
-    try {
-      const ts = ac.getOutputTimestamp();
-      if (ts && Number.isFinite(ts.contextTime) && Number.isFinite(ts.performanceTime)) {
-        lastNativeTimestamp = { contextTime: ts.contextTime, performanceTime: ts.performanceTime };
-        return lastNativeTimestamp;
-      }
-    } catch {}
-    return null;
-  }
-
-  function visualOutputContextTime() {
-    if (!ac) return 0;
-    const ts = readNativeOutputTimestamp();
-    if (ts) {
-      const ageSec = (performance.now() - ts.performanceTime) / 1000;
-      if (Number.isFinite(ageSec) && ageSec >= -0.05 && ageSec <= 1.0) {
-        const projected = ts.contextTime + Math.max(0, ageSec);
-        return Math.max(0, Math.min(ac.currentTime, projected));
-      }
-    }
-    const latency = Number.isFinite(ac.outputLatency) ? Math.max(0, ac.outputLatency) : 0;
-    return Math.max(0, ac.currentTime - latency);
-  }
-
   function enginePosition() {
     if (!playing || !ac) return clampSec(pausedOffset);
     return clampSec(transportOffset + Math.max(0, ac.currentTime - transportStartCtx));
-  }
-
-  function audiblePosition() {
-    if (!playing || !ac) return clampSec(pausedOffset);
-    return clampSec(transportOffset + Math.max(0, visualOutputContextTime() - transportStartCtx));
   }
 
   function stopSources() {
     sourceGeneration++;
     stopEffectScheduler();
     stopEffectVoices();
-    const sources = [musicSource];
+    const source = musicSource;
     musicSource = null;
-    for (const source of sources) {
-      if (!source) continue;
+    if (source) {
       try { source.onended = null; } catch {}
       try { source.stop(); } catch {}
       try { source.disconnect(); } catch {}
@@ -681,7 +549,7 @@
     stopSources();
   }
 
-  async function seekTo(target, { showFeedback = false } = {}) {
+  async function seekTo(target) {
     const next = clampSec(target);
     const wasPlaying = playing;
     if (wasPlaying) pausedOffset = enginePosition();
@@ -689,7 +557,6 @@
     pausedOffset = next;
     if (wasPlaying) await startPlayback(next);
     syncVisualToPosition();
-    if (showFeedback) showSeekFeedback(next);
   }
 
   async function loadMusic(activeMap) {
@@ -730,10 +597,8 @@
     const target = viewerHitsoundKind(kind);
     const label = target === 'ka' ? 'Ka' : 'Don';
     const serial = ++hitsoundApplySerial[target];
-    let failed = false;
     hitsoundLoadsInFlight++;
     clearError();
-    setStatus(`${label} Hitsound反映中`);
     try {
       const decoded = await decodeHitsoundBytes(value, cacheKey);
       if (serial !== hitsoundApplySerial[target]) return false;
@@ -744,13 +609,11 @@
       return true;
     } catch (error) {
       if (serial !== hitsoundApplySerial[target]) return false;
-      failed = true;
-      if (map && musicBuffer && hitsoundsReady) setControls(true);
       fail(error instanceof Error ? `${label} Hitsoundを読み込めません: ${error.message}` : `${label} Hitsoundを読み込めませんでした。`);
       throw error;
     } finally {
       hitsoundLoadsInFlight = Math.max(0, hitsoundLoadsInFlight - 1);
-      if (!failed && hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
+      if (hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
     }
   }
 
@@ -760,10 +623,8 @@
     if (!don?.bytes || !kat?.bytes) return false;
     const donSerial = ++hitsoundApplySerial.don;
     const kaSerial = ++hitsoundApplySerial.ka;
-    let failed = false;
     hitsoundLoadsInFlight++;
     clearError();
-    setStatus('Hitsound反映中');
     try {
       const [donDecoded, kaDecoded] = await Promise.all([
         decodeHitsoundBytes(don.bytes, don.cacheKey),
@@ -778,48 +639,17 @@
       return true;
     } catch (error) {
       if (donSerial !== hitsoundApplySerial.don || kaSerial !== hitsoundApplySerial.ka) return false;
-      failed = true;
-      if (map && musicBuffer && hitsoundsReady) setControls(true);
       fail(error instanceof Error ? `Hitsoundを読み込めません: ${error.message}` : 'Hitsoundを読み込めませんでした。');
       throw error;
     } finally {
       hitsoundLoadsInFlight = Math.max(0, hitsoundLoadsInFlight - 1);
-      if (!failed && hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
-    }
-  }
-
-  async function loadCustomHitsound(kind, file) {
-    if (!file) return;
-    const label = kind === 'ka' ? 'Ka' : 'Don';
-    const input = kind === 'ka' ? el.kaHsInput : el.donHsInput;
-    const serial = ++hitsoundApplySerial[kind];
-    let failed = false;
-    hitsoundLoadsInFlight++;
-    clearError();
-    setStatus(`${label} Hitsound反映中`);
-    try {
-      await ensureContext(false);
-      const decoded = await decodeHitsoundFile(file);
-      if (serial !== hitsoundApplySerial[kind]) return;
-      const nextCustom = new Map(customHsBuffers);
-      nextCustom.set(kind, decoded);
-      customHsBuffers = nextCustom;
-      refreshScheduledHitsounds();
-    } catch (error) {
-      if (serial !== hitsoundApplySerial[kind]) return;
-      failed = true;
-      if (input) input.value = '';
-      if (map && musicBuffer && hitsoundsReady) setControls(true);
-      fail(error instanceof Error ? `${label} Hitsoundを読み込めません: ${error.message}` : `${label} Hitsoundを読み込めませんでした。`);
-    } finally {
-      hitsoundLoadsInFlight = Math.max(0, hitsoundLoadsInFlight - 1);
-      if (!failed && hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
+      if (hitsoundLoadsInFlight === 0 && map && musicBuffer && hitsoundsReady) setStatus('準備完了');
     }
   }
 
   function setControls(enabled) {
     ready = enabled;
-    [el.play, el.back, el.fwd, el.seek, el.copyTime].forEach(node => {
+    [el.play, el.seek].forEach(node => {
       if (node) node.disabled = !enabled;
     });
     updateOutput();
@@ -845,14 +675,13 @@
       if (el.seek) {
         el.seek.max = String(durationSec());
         el.seek.value = '0';
-        el.seek.setAttribute('aria-valuetext', '00:00:000');
       }
       pausedOffset = 0;
       setControls(true);
       setStatus('準備完了');
+      window.dispatchEvent(new CustomEvent('viewer-ready'));
       renderSongStatic();
       renderTimelineAt(0);
-      drawSongCursor(0);
     } catch (error) {
       fail(error instanceof Error ? error.message : String(error));
     }
@@ -942,122 +771,8 @@
     return target;
   }
 
-  function refreshViewportMetrics() {
-    measureViewport(el.timelineViewport, timelineSize);
-    measureViewport(el.overviewViewport, overviewSize);
-    if (el.copyTime) copyTimeButtonWidth = Math.max(58, el.copyTime.offsetWidth || 70);
-  }
-
-  function lowerHit(timeMs) {
-    let lo = 0, hi = map ? map.hits.length : 0;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (map.hits[mid].time < timeMs) lo = mid + 1;
-      else hi = mid;
-    }
-    return lo;
-  }
-
-  function drawObjectTicks(ctx, left, right, xForTime, width, height) {
-    if (!map) return;
-    const baseline = height - 14;
-    ctx.strokeStyle = 'rgba(255,255,255,.22)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, baseline + 0.5);
-    ctx.lineTo(width, baseline + 0.5);
-    ctx.stroke();
-
-    let safety = 0;
-    const red = map.redTiming || [];
-    for (let r = 0; r < red.length; r++) {
-      const tp = red[r];
-      const sectionEnd = r + 1 < red.length ? red[r + 1].time : right;
-      const a = Math.max(left, tp.time);
-      const b = Math.min(right, sectionEnd);
-      if (b < a) continue;
-      let n = Math.ceil((a - tp.time) / tp.beat);
-      if (!Number.isFinite(n)) continue;
-      for (let time = tp.time + n * tp.beat; time <= b + 0.01; time += tp.beat, n++) {
-        if (++safety > 2500) return;
-        const x = xForTime(time);
-        const meter = Math.max(1, tp.meter);
-        const measure = ((n % meter) + meter) % meter === 0;
-        const tick = measure ? 20 : 8;
-        ctx.strokeStyle = measure ? 'rgba(255,255,255,.54)' : 'rgba(255,255,255,.24)';
-        ctx.lineWidth = measure ? 1.4 : 1;
-        ctx.beginPath();
-        ctx.moveTo(x, baseline - tick);
-        ctx.lineTo(x, baseline);
-        ctx.stroke();
-      }
-    }
-  }
-
-  function renderObjectAt(positionSec) {
-    if (!map || !musicBuffer || !el.timelineViewport || !el.timelineStatic) return;
-    const rect = viewportSize(el.timelineViewport, timelineSize);
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const ctx = sizeCanvas(el.timelineStatic, rect.width, rect.height);
-    const center = positionSec * 1000;
-    const half = spanMs() / 2;
-    const left = center - half;
-    const right = center + half;
-    const xForTime = time => (time - left) / spanMs() * rect.width;
-
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    ctx.fillStyle = css('--surface', '#101015');
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    ctx.fillStyle = 'rgba(244,220,125,.15)';
-    for (const range of kiaiIntervals()) {
-      const a = Math.max(left, range.start);
-      const b = Math.min(right, range.end);
-      if (b > a) ctx.fillRect(xForTime(a), 0, xForTime(b) - xForTime(a), rect.height);
-    }
-
-    drawObjectTicks(ctx, left, right, xForTime, rect.width, rect.height);
-
-    const noteY = Math.max(36, Math.min(rect.height - 44, rect.height * 0.48));
-    const normalRadius = OBJECT_NOTE_RADIUS;
-    const bigRadius = normalRadius * 1.22;
-    const don = css('--don', '#ef6862');
-    const ka = css('--ka', '#69bde0');
-    const first = lowerHit(left);
-    for (let i = first; i < map.hits.length; i++) {
-      const hit = map.hits[i];
-      if (hit.time > right) break;
-      const x = xForTime(hit.time);
-      const radius = hit.big ? bigRadius : normalRadius;
-      ctx.fillStyle = hit.kind === 'ka' ? ka : don;
-      ctx.strokeStyle = 'rgba(255,255,255,.78)';
-      ctx.lineWidth = hit.big ? 2.6 : 2;
-      ctx.beginPath();
-      ctx.arc(x, noteY, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (hit.big) {
-        ctx.strokeStyle = 'rgba(255,255,255,.28)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(x, noteY, radius + 3, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-
-    if (el.timelineCursor) {
-      const c = sizeCanvas(el.timelineCursor, rect.width, rect.height);
-      c.clearRect(0, 0, rect.width, rect.height);
-    }
-  }
-
   function renderTimelineAt(positionSec) {
-    const renderer = window.CreateSEObjectTimeline;
-    if (externalTimelineRenderer && renderer?.renderAt) {
-      renderer.renderAt(positionSec);
-      return;
-    }
-    renderObjectAt(positionSec);
+    window.CreateSEObjectTimeline?.renderAt?.(positionSec);
   }
 
   function chooseMajorTickSeconds(durationSeconds) {
@@ -1068,7 +783,6 @@
 
   function drawSongDensity(ctx, rect, d) {
     if (!map || !map.hits.length || !(d > 0)) return;
-
     const bins = Math.max(36, Math.min(72, Math.floor(rect.width / 6)));
     const counts = new Array(bins).fill(0);
     for (const hit of map.hits) {
@@ -1076,18 +790,15 @@
       const index = Math.min(bins - 1, Math.max(0, Math.floor(hit.time / d * bins)));
       counts[index]++;
     }
-
     const nonZero = counts.filter(Boolean).sort((a, b) => a - b);
     if (!nonZero.length) return;
     const percentileIndex = Math.min(nonZero.length - 1, Math.floor((nonZero.length - 1) * 0.90));
     const reference = Math.max(1, nonZero[percentileIndex]);
-
     const bandTop = 22;
     const bandBottom = Math.max(bandTop + 10, Math.min(rect.height - 27, 51));
     const bandHeight = Math.max(10, bandBottom - bandTop);
     const step = rect.width / bins;
     const barWidth = Math.max(1, step - 1);
-
     ctx.fillStyle = 'rgba(233,101,165,.16)';
     for (let i = 0; i < bins; i++) {
       const count = counts[i];
@@ -1139,13 +850,6 @@
       ctx.moveTo(x, baseline - tick);
       ctx.lineTo(x, baseline);
       ctx.stroke();
-      if (major) {
-        ctx.fillStyle = 'rgba(255,255,255,.52)';
-        ctx.font = '8px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
-        ctx.textAlign = x < 20 ? 'left' : (x > rect.width - 20 ? 'right' : 'center');
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(fmtTimeline(sec * 1000), x, baseline - 13);
-      }
     }
 
     let lastLabelX = -Infinity;
@@ -1190,21 +894,11 @@
     ctx.lineTo(x, 6);
     ctx.closePath();
     ctx.fill();
-
-    if (el.copyTime) {
-      const buttonWidth = copyTimeButtonWidth;
-      const labelX = Math.max(buttonWidth / 2 + 3, Math.min(rect.width - buttonWidth / 2 - 3, x));
-      el.copyTime.style.left = `${labelX}px`;
-      el.copyTime.style.transform = 'translateX(-50%)';
-    }
   }
 
   function syncVisualToPosition() {
-    const p = audiblePosition();
-    if (!seekScrub && el.seek) {
-      el.seek.value = String(p);
-      el.seek.setAttribute('aria-valuetext', fmt(p * 1000));
-    }
+    const p = enginePosition();
+    if (!seekScrub && el.seek) el.seek.value = String(p);
     renderTimelineAt(p);
     drawSongCursor(p);
   }
@@ -1213,38 +907,18 @@
     if (!DEBUG_MODE || !el.debug) return;
     if (now - lastDebugPaint < DEBUG_REFRESH_MS) return;
     lastDebugPaint = now;
-    const raw = readNativeOutputTimestamp() || lastNativeTimestamp;
     const n = value => Number.isFinite(value) ? Number(value).toFixed(3) : 'n/a';
-    const engine = enginePosition();
-    const audible = audiblePosition();
     el.debug.textContent = [
       `sampleRate: ${ac?.sampleRate ?? 'n/a'} Hz`,
       `currentTime: ${n(ac?.currentTime)} s`,
-      `native contextTime: ${n(raw?.contextTime)} s`,
-      `native performanceTime: ${n(raw?.performanceTime)} ms`,
-      `baseLatency: ${n(Number.isFinite(ac?.baseLatency) ? ac.baseLatency * 1000 : NaN)} ms`,
-      `outputLatency: ${n(Number.isFinite(ac?.outputLatency) ? ac.outputLatency * 1000 : NaN)} ms`,
-      `enginePosition: ${n(engine * 1000)} ms`,
-      `audiblePosition: ${n(audible * 1000)} ms`,
-      `engine-audible: ${n((engine - audible) * 1000)} ms`,
+      `enginePosition: ${n(enginePosition() * 1000)} ms`,
       `transportStartCtx: ${n(transportStartCtx)} s`,
       `transportOffset: ${n(transportOffset)} s`,
     ].join('\n');
   }
 
   function frame(now) {
-    const p = audiblePosition();
-    const canSyncSeek = !seekScrub && !timelineScrub && !overviewScrub && el.seek;
-    if (now - lastTransportUiPaint >= TRANSPORT_UI_INTERVAL_MS) {
-      const formatted = fmt(p * 1000);
-      if (canSyncSeek) {
-        const position = String(p);
-        if (el.seek.value !== position) el.seek.value = position;
-        if (el.seek.getAttribute('aria-valuetext') !== formatted) el.seek.setAttribute('aria-valuetext', formatted);
-      }
-      drawSongCursor(p);
-      lastTransportUiPaint = now;
-    }
+    const p = enginePosition();
     renderTimelineAt(p);
     renderDebug(now);
     raf = requestAnimationFrame(frame);
@@ -1252,10 +926,10 @@
 
   function beginScrub(kind) {
     if (!ready) return null;
-    const visual = audiblePosition();
+    const visual = enginePosition();
     const state = { kind, wasPlaying: playing, basePosition: visual };
     if (playing) {
-      pausedOffset = enginePosition();
+      pausedOffset = visual;
       stopSources();
     } else {
       pausedOffset = visual;
@@ -1265,24 +939,19 @@
 
   function scrubTo(targetSec) {
     pausedOffset = clampSec(targetSec);
-    if (el.seek) {
-      el.seek.value = String(pausedOffset);
-      el.seek.setAttribute('aria-valuetext', fmt(pausedOffset * 1000));
-    }
+    if (el.seek) el.seek.value = String(pausedOffset);
     renderTimelineAt(pausedOffset);
     drawSongCursor(pausedOffset);
-    showSeekFeedback(pausedOffset, { linger: false });
   }
 
   async function endScrub(state) {
     if (state?.wasPlaying) await startPlayback(pausedOffset);
-    showSeekFeedback(pausedOffset);
   }
 
   function timelineTargetFromEvent(event) {
     const rect = el.timelineViewport.getBoundingClientRect();
     const q = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    const base = timelineScrub?.basePosition ?? audiblePosition();
+    const base = timelineScrub?.basePosition ?? enginePosition();
     return clampSec(base + ((q - 0.5) * spanMs()) / 1000);
   }
 
@@ -1296,14 +965,6 @@
     const file = event.target.files && event.target.files[0];
     if (file) await loadOsz(file);
   });
-  el.donHsInput?.addEventListener('change', async event => {
-    const file = event.target.files && event.target.files[0];
-    if (file) await loadCustomHitsound('don', file);
-  });
-  el.kaHsInput?.addEventListener('change', async event => {
-    const file = event.target.files && event.target.files[0];
-    if (file) await loadCustomHitsound('ka', file);
-  });
   el.diff?.addEventListener('change', () => useMap(Number(el.diff.value)));
   el.play?.addEventListener('click', async () => {
     try {
@@ -1312,12 +973,6 @@
     } catch (error) {
       fail(error instanceof Error ? error.message : '再生できませんでした。');
     }
-  });
-  el.back?.addEventListener('click', () => seekTo(audiblePosition() - SKIP_SEC, { showFeedback: true }));
-  el.fwd?.addEventListener('click', () => seekTo(audiblePosition() + SKIP_SEC, { showFeedback: true }));
-  el.copyTime?.addEventListener('click', event => {
-    event.stopPropagation();
-    copy(fmt(audiblePosition() * 1000), el.copyTime);
   });
   el.purpose?.addEventListener('change', updateOutput);
   el.fade?.addEventListener('change', updateOutput);
@@ -1365,7 +1020,7 @@
   });
 
   el.overviewViewport?.addEventListener('pointerdown', event => {
-    if (!ready || event.target === el.copyTime || el.copyTime?.contains(event.target)) return;
+    if (!ready) return;
     event.preventDefault();
     el.overviewViewport.setPointerCapture?.(event.pointerId);
     overviewScrub = beginScrub('overview');
@@ -1402,14 +1057,8 @@
     if (el.seek) {
       el.seek.max = '1';
       el.seek.value = '0';
-      el.seek.setAttribute('aria-valuetext', '00:00:000');
     }
-    clearTimeout(seekFeedbackTimer);
-    if (el.seekTime) {
-      el.seekTime.classList.remove('visible');
-      el.seekTime.hidden = true;
-    }
-    for (const canvas of [el.timelineStatic, el.timelineCursor, el.overviewStatic, el.overviewCursor]) {
+    for (const canvas of [el.overviewStatic, el.overviewCursor]) {
       if (!canvas) continue;
       const context = canvas.getContext('2d');
       context?.clearRect(0, 0, canvas.width, canvas.height);
@@ -1419,21 +1068,6 @@
     setStatus(statusText);
   }
 
-  const redraw = () => {
-    cssTokenCache.clear();
-    refreshViewportMetrics();
-    window.CreateSEObjectTimeline?.invalidate?.();
-    if (!map || !musicBuffer) return;
-    renderSongStatic();
-    syncVisualToPosition();
-  };
-  window.addEventListener('resize', redraw);
-  window.addEventListener('orientationchange', redraw);
-  if ('ResizeObserver' in window) {
-    const timelineResizeObserver = new ResizeObserver(redraw);
-    if (el.timelineViewport) timelineResizeObserver.observe(el.timelineViewport);
-    if (el.overviewViewport) timelineResizeObserver.observe(el.overviewViewport);
-  }
   window.addEventListener('beforeunload', () => {
     cancelAnimationFrame(raf);
     stopHitsoundPreview({ notify: false });
@@ -1451,9 +1085,6 @@
   }
 
   window.__MAMI_VIEWER_TEST__ = {
-    hitTimeToFrame,
-    buildEffectBuffer,
-    startPairedBuffers,
     audioState: () => ({
       playing,
       hitsoundsReady,
@@ -1463,19 +1094,17 @@
       previewing: !!previewVoice,
       nextHitIndex: nextEffectHitIndex,
     }),
-    skipSeconds: SKIP_SEC,
   };
 
   window.CreateSEViewer = {
     resetChart,
     reportError: message => fail(String(message || '読み込みに失敗しました。')),
-    positionSec: audiblePosition,
+    positionSec: enginePosition,
     prepareHitsoundAudio: () => ensureContext(true),
     previewHitsoundBytes,
     stopHitsoundPreview,
     applyHitsoundBytes,
     applyHitsoundPairBytes,
-    setExternalTimelineRenderer: enabled => { externalTimelineRenderer = !!enabled; },
   };
 
   setPlayState(false);
