@@ -7,9 +7,31 @@
 
   const LEGACY_KEY = favorites.KEY || 'osutaiko-hitsound-lab:pair-favorite-slots:v1';
   const COLLECTION_KEY = 'osutaiko-hitsound-lab:pair-favorite-collections:v2';
-  const MAX_ITEMS = 12;
+  const FAVORITE2_SEED_KEY = 'osutaiko-hitsound-lab:favorite2-seed:20260826-15-v1';
+  const MAX_ITEMS = 30;
   const SILENT_ID = controller.SILENT_ID;
-  const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫'];
+  const CIRCLED = [
+    '①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩',
+    '⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳',
+    '㉑','㉒','㉓','㉔','㉕','㉖','㉗','㉘','㉙','㉚',
+  ];
+  const FAVORITE2_SEED_PAIRS = Object.freeze([
+    ['006','007'],
+    ['025','026'],
+    ['043','047'],
+    ['050','046'],
+    ['051','050'],
+    ['050','052'],
+    ['051','052'],
+    ['066','069'],
+    ['071','073'],
+    ['072','073'],
+    ['115','069'],
+    ['093','092'],
+    ['098','099'],
+    ['107','101'],
+    ['006','003'],
+  ]);
   const $ = id => document.getElementById(id);
 
   const toggleButtons = {
@@ -32,6 +54,10 @@
   function makeId(prefix = 'favorite') {
     if (globalThis.crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function sourceId(number) {
+    return `SRC${String(number).padStart(3, '0')}`;
   }
 
   function normalizeDescriptor(value) {
@@ -136,6 +162,18 @@
     }
   }
 
+  function setFeedback(message, error = false) {
+    if (workbenchStatus) workbenchStatus.textContent = message;
+    if (!feedback) return;
+    clearTimeout(feedbackTimer);
+    feedback.textContent = message;
+    feedback.classList.toggle('error', error);
+    feedbackTimer = window.setTimeout(() => {
+      feedback.textContent = '';
+      feedback.classList.remove('error');
+    }, 2400);
+  }
+
   function writeCollections(collections) {
     const normalized = {
       version: 2,
@@ -154,7 +192,7 @@
     }
   }
 
-  function descriptorFromCurrent(id) {
+  function descriptorFromId(id) {
     if (!id || id === SILENT_ID) return null;
     const source = controller.byId(id);
     if (!source) return null;
@@ -175,11 +213,39 @@
   function currentEntry(prefix = 'favorite') {
     const selection = controller.getSelection();
     if (!selection?.don || !selection?.kat) return null;
-    const don = descriptorFromCurrent(selection.don);
-    const kat = descriptorFromCurrent(selection.kat);
+    const don = descriptorFromId(selection.don);
+    const kat = descriptorFromId(selection.kat);
     if (!don || !kat) return null;
     if ((don.custom && !don.fingerprint) || (kat.custom && !kat.fingerprint)) return null;
     return { id: makeId(prefix), don, kat, createdAt: new Date().toISOString() };
+  }
+
+  function seedFavorite2Once() {
+    try {
+      if (localStorage.getItem(FAVORITE2_SEED_KEY) === '1') return;
+      const collections = readCollections();
+      const baseTime = Date.now() + FAVORITE2_SEED_PAIRS.length + 1;
+      const seeded = [];
+
+      for (let index = 0; index < FAVORITE2_SEED_PAIRS.length; index++) {
+        const [donNumber, katNumber] = FAVORITE2_SEED_PAIRS[index];
+        const don = descriptorFromId(sourceId(donNumber));
+        const kat = descriptorFromId(sourceId(katNumber));
+        if (!don || !kat) return;
+        seeded.push({
+          id: `favorite2-seed-${String(index + 1).padStart(2, '0')}`,
+          don,
+          kat,
+          createdAt: new Date(baseTime - index).toISOString(),
+        });
+      }
+
+      const seedKeys = new Set(seeded.map(entryKey));
+      const existing = collections.favorite2.filter(entry => !seedKeys.has(entryKey(entry)));
+      collections.favorite2 = [...seeded, ...existing];
+      if (!writeCollections(collections)) return;
+      localStorage.setItem(FAVORITE2_SEED_KEY, '1');
+    } catch {}
   }
 
   function slotLabel(slotName) {
@@ -217,18 +283,6 @@
     const don = availability(entry?.don);
     const kat = availability(entry?.kat);
     return don.ok && kat.ok ? { ok: true, reason: '' } : { ok: false, reason: don.reason || kat.reason };
-  }
-
-  function setFeedback(message, error = false) {
-    if (workbenchStatus) workbenchStatus.textContent = message;
-    if (!feedback) return;
-    clearTimeout(feedbackTimer);
-    feedback.textContent = message;
-    feedback.classList.toggle('error', error);
-    feedbackTimer = window.setTimeout(() => {
-      feedback.textContent = '';
-      feedback.classList.remove('error');
-    }, 2400);
   }
 
   function currentSavedIndex(slotName, current = currentEntry('current'), collections = readCollections()) {
@@ -516,7 +570,7 @@
   });
 
   const style = document.createElement('style');
-  style.dataset.feature = 'favorite-unified-dropdown-v4';
+  style.dataset.feature = 'favorite-unified-dropdown-v5';
   style.textContent = `
     .judgment-panel{position:relative!important}
     .judgment-actions{
@@ -555,7 +609,7 @@
     .favorite-quick-dropdown[hidden]{display:none!important}
     .favorite-quick-dropdown{
       position:absolute;z-index:80;top:calc(100% + 5px);left:50%;transform:translateX(-50%);
-      width:min(356px,calc(100vw - 24px));max-height:min(362px,54dvh);overflow:auto;overscroll-behavior:contain;
+      width:min(356px,calc(100vw - 24px));max-height:min(430px,62dvh);overflow:auto;overscroll-behavior:contain;
       padding:8px;border:1px solid rgba(121,212,236,.38);border-radius:12px;
       background:linear-gradient(180deg,rgba(28,46,55,.985),rgba(19,32,39,.99));box-shadow:0 15px 38px rgba(0,0,0,.48);
     }
@@ -609,6 +663,7 @@
   document.head.appendChild(style);
 
   migrateLegacyIfNeeded();
+  seedFavorite2Once();
   ensureDropdown();
   renderAll();
 
