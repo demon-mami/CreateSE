@@ -40,11 +40,11 @@ test('favorite and fixed-set controls share one compact dropdown model', () => {
   assert.match(html, /id="favoriteTwoButton"[^>]*>☆<\/button>/);
   assert.match(html, /id="favoriteTwoListButton"[^>]*aria-haspopup="menu"[^>]*>お気に入り②<\/button>/);
   assert.match(html, /id="favoriteOpenButton"[^>]*aria-haspopup="menu"[^>]*aria-controls="favoriteQuickDropdown"[^>]*>[\s\S]*?::<\/span><span>セット<\/span>/);
-  assert.match(html, /favorite-slot-ui\.js\?v=4\.0-unified-dropdown/);
+  assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
   assert.doesNotMatch(html, /favorite-pager-v4\.js|aria-haspopup="dialog"/);
 
-  assert.match(favoriteSlot, /const MAX_ITEMS = 12;/);
-  assert.match(favoriteSlot, /const CIRCLED = \['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫'\];/);
+  assert.match(favoriteSlot, /const MAX_ITEMS = 30;/);
+  assert.match(favoriteSlot, /'㉙','㉚'/);
   assert.match(favoriteSlot, /function toggleCurrent\(slotName\)/);
   assert.match(favoriteSlot, /items\.findIndex\(entry => entryKey\(entry\) === entryKey\(current\)\)/);
   assert.match(favoriteSlot, /if \(index >= 0\) \{\s*items\.splice\(index, 1\)/);
@@ -56,6 +56,23 @@ test('favorite and fixed-set controls share one compact dropdown model', () => {
   assert.match(favoriteSlot, /favorite-quick-dropdown/);
 });
 
+test('favorite2 receives the approved fifteen pairs once in listed order', () => {
+  const expected = [
+    ['006','007'], ['025','026'], ['043','047'], ['050','046'], ['051','050'],
+    ['050','052'], ['051','052'], ['066','069'], ['071','073'], ['072','073'],
+    ['115','069'], ['093','092'], ['098','099'], ['107','101'], ['006','003'],
+  ];
+  assert.match(favoriteSlot, /const FAVORITE2_SEED_KEY = 'osutaiko-hitsound-lab:favorite2-seed:20260826-15-v1';/);
+  assert.match(favoriteSlot, /function seedFavorite2Once\(\)/);
+  assert.match(favoriteSlot, /collections\.favorite2 = \[\.\.\.seeded, \.\.\.existing\];/);
+  assert.match(favoriteSlot, /localStorage\.setItem\(FAVORITE2_SEED_KEY, '1'\)/);
+  assert.match(favoriteSlot, /seedFavorite2Once\(\);/);
+  for (const [don, kat] of expected) {
+    assert.ok(favoriteSlot.includes(`['${don}','${kat}']`), `${don}+${kat} seed is missing`);
+  }
+  assert.equal(expected.length, 15);
+});
+
 test('dropdown cards expose only rank and Don Kat source numbers with current selection highlight', () => {
   assert.match(favoriteSlot, /rank\.className = 'favorite-card-rank';/);
   assert.match(favoriteSlot, /don\.className = 'favorite-card-source don';/);
@@ -65,7 +82,6 @@ test('dropdown cards expose only rank and Don Kat source numbers with current se
   assert.match(favoriteSlot, /row\.classList\.toggle\('is-current-selection', selected\);/);
   assert.match(favoriteSlot, /apply\.setAttribute\('aria-current', 'true'\)/);
   assert.match(favoriteSlot, /\.favorite-dropdown-row\.is-current-selection/);
-  assert.doesNotMatch(favoriteSlot, /apply\.textContent = `\$\{index \+ 1\}\. \$\{pairText\(entry\)\}`/);
 });
 
 test('favorite toggle glow reflects only the current pair', () => {
@@ -133,7 +149,7 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /app-v4\.js\?v=4\.2-engine-clock-fixed-ui/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
-  assert.match(html, /favorite-slot-ui\.js\?v=4\.0-unified-dropdown/);
+  assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
 });
 
 test('Pages publishes every runtime asset needed by the fixed timeline', () => {
