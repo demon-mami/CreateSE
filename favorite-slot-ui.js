@@ -11,24 +11,24 @@
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
 
-  const buttons = {
+  const toggleButtons = {
     favorite1: $('favoriteOneButton'),
     favorite2: $('favoriteTwoButton'),
   };
-  const openButton = $('favoriteOpenButton');
-  const countNode = $('favoriteCount');
-  const sheet = $('favoriteSheet');
-  const dialog = $('savedSetsPanel');
-  const title = $('favoriteSheetTitle');
-  const list = $('savedSetsList');
+  const listButtons = {
+    favorite1: $('favoriteOneListButton'),
+    favorite2: $('favoriteTwoListButton'),
+  };
+  const setButton = $('favoriteOpenButton');
+  const judgmentPanel = document.querySelector('.judgment-panel');
   const exportButton = $('exportFavoritesButton');
   const sheetStatus = $('favoriteSheetStatus');
   const feedback = $('setFeedback');
   const workbenchStatus = $('workbenchStatus');
 
-  let activeTab = 'preset';
+  let openSlot = '';
+  let dropdown = null;
   let feedbackTimer = 0;
-  let tabsRoot = null;
 
   function makeId(prefix = 'favorite') {
     if (globalThis.crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
@@ -88,10 +88,6 @@
     return out;
   }
 
-  function emptyCollections() {
-    return { favorite1: [], favorite2: [] };
-  }
-
   function readLegacySlots() {
     try {
       if (typeof favorites.readSlots === 'function') {
@@ -115,12 +111,11 @@
     try {
       if (localStorage.getItem(COLLECTION_KEY)) return;
       const legacy = readLegacySlots();
-      const initial = {
+      localStorage.setItem(COLLECTION_KEY, JSON.stringify({
         version: 2,
         favorite1: legacy.favorite1 ? [legacy.favorite1] : [],
         favorite2: legacy.favorite2 ? [legacy.favorite2] : [],
-      };
-      localStorage.setItem(COLLECTION_KEY, JSON.stringify(initial));
+      }));
     } catch {}
   }
 
@@ -133,7 +128,7 @@
         favorite2: dedupe(parsed.favorite2),
       };
     } catch {
-      return emptyCollections();
+      return { favorite1: [], favorite2: [] };
     }
   }
 
@@ -146,17 +141,11 @@
     try {
       localStorage.setItem(COLLECTION_KEY, JSON.stringify(normalized));
       const verify = JSON.parse(localStorage.getItem(COLLECTION_KEY) || 'null') || {};
-      const actual = {
-        favorite1: dedupe(verify.favorite1),
-        favorite2: dedupe(verify.favorite2),
-      };
-      if (actual.favorite1.length !== normalized.favorite1.length || actual.favorite2.length !== normalized.favorite2.length) {
-        throw new Error('favorite collection verification failed');
-      }
-      window.dispatchEvent(new CustomEvent('hitsound-favorite-collections-change', { detail: actual }));
+      if (!Array.isArray(verify.favorite1) || !Array.isArray(verify.favorite2)) throw new Error('verify failed');
+      window.dispatchEvent(new CustomEvent('hitsound-favorite-collections-change', { detail: normalized }));
       return true;
     } catch {
-      setFeedback('お気に入りを保存できませんでした。ブラウザのサイトデータ保存設定を確認してください', true);
+      setFeedback('お気に入りを保存できませんでした', true);
       return false;
     }
   }
@@ -189,28 +178,30 @@
     return { id: makeId(prefix), don, kat, createdAt: new Date().toISOString() };
   }
 
+  function slotLabel(slotName) {
+    return slotName === 'favorite1' ? 'お気に入り①' : 'お気に入り②';
+  }
+
   function pairText(entry) {
-    if (!entry) return '未登録';
-    return `Don ${entry.don?.sourceNumber || '—'} + Kat ${entry.kat?.sourceNumber || '—'}`;
+    return `Don ${entry?.don?.sourceNumber || '—'} + Kat ${entry?.kat?.sourceNumber || '—'}`;
   }
 
   function availability(side) {
     if (!side?.id || side.id === SILENT_ID || side.silent) return { ok: false, reason: '無音を含む組み合わせは使用できません' };
     const source = controller.byId(side.id);
-    if (!source) return { ok: false, reason: `${side.sourceNumber} ${side.name} を再登録してください` };
+    if (!source) return { ok: false, reason: `${side.sourceNumber || '—'} ${side.name || ''} を再登録してください` };
     if (side.custom) {
       if (!side.fingerprint) return { ok: false, reason: 'My Soundを再登録してください' };
       if (!source.custom || source.fingerprint !== side.fingerprint) {
-        return { ok: false, reason: `${side.sourceNumber} ${side.name} と同じMy Soundを再登録してください` };
+        return { ok: false, reason: `${side.sourceNumber || '—'} ${side.name || ''} と同じMy Soundを再登録してください` };
       }
     }
     return { ok: true, reason: '' };
   }
 
   function entryAvailability(entry) {
-    if (!entry) return { ok: false, reason: '組み合わせがありません' };
-    const don = availability(entry.don);
-    const kat = availability(entry.kat);
+    const don = availability(entry?.don);
+    const kat = availability(entry?.kat);
     return don.ok && kat.ok ? { ok: true, reason: '' } : { ok: false, reason: don.reason || kat.reason };
   }
 
@@ -223,7 +214,7 @@
     feedbackTimer = window.setTimeout(() => {
       feedback.textContent = '';
       feedback.classList.remove('error');
-    }, 2800);
+    }, 2400);
   }
 
   function setSheetStatus(message = '', error = false) {
@@ -232,34 +223,37 @@
     sheetStatus.classList.toggle('error', error);
   }
 
-  function slotLabel(slotName) {
-    return slotName === 'favorite1' ? 'お気に入り1' : 'お気に入り2';
+  function currentSavedIndex(slotName, current = currentEntry('current'), collections = readCollections()) {
+    if (!current) return -1;
+    const key = entryKey(current);
+    return collections[slotName].findIndex(entry => entryKey(entry) === key);
   }
 
-  function addCurrent(slotName) {
-    const entry = currentEntry(slotName);
-    const label = slotLabel(slotName);
-    if (!entry) {
+  function toggleCurrent(slotName) {
+    const current = currentEntry(slotName);
+    if (!current) {
       setFeedback('DonとKatの両方を選択してください', true);
       return;
     }
 
     const collections = readCollections();
     const items = collections[slotName];
-    if (items.some(item => entryKey(item) === entryKey(entry))) {
-      setFeedback(`${label}に保存済みです`);
-      renderAll();
-      return;
-    }
-    if (items.length >= MAX_ITEMS) {
-      setFeedback(`${label}は最大${MAX_ITEMS}件です。一覧から不要な組み合わせを削除してください`, true);
-      renderAll();
-      return;
-    }
+    const index = items.findIndex(entry => entryKey(entry) === entryKey(current));
+    const label = slotLabel(slotName);
 
-    items.push(entry);
-    if (!writeCollections(collections)) return;
-    setFeedback(`${label}へ追加しました（${items.length}/${MAX_ITEMS}）`);
+    if (index >= 0) {
+      items.splice(index, 1);
+      if (!writeCollections(collections)) return;
+      setFeedback(`${label}から解除しました`);
+    } else {
+      if (items.length >= MAX_ITEMS) {
+        setFeedback(`${label}は最大${MAX_ITEMS}件です`, true);
+        return;
+      }
+      items.push(current);
+      if (!writeCollections(collections)) return;
+      setFeedback(`${label}へ登録しました`);
+    }
     renderAll();
   }
 
@@ -272,177 +266,144 @@
     renderAll();
   }
 
-  async function applyEntry(entry, sourceLabel) {
+  async function applyEntry(entry, slotName) {
     const state = entryAvailability(entry);
     if (!state.ok) {
-      setSheetStatus(state.reason, true);
+      setFeedback(state.reason, true);
       return;
     }
     const applied = await controller.setPair(entry.don.id, entry.kat.id);
     if (!applied) {
-      setSheetStatus('組み合わせを適用できませんでした', true);
+      setFeedback('組み合わせを適用できませんでした', true);
       return;
     }
-    setSheetStatus(`${sourceLabel} ${pairText(entry)} を適用しました`);
-    window.dispatchEvent(new CustomEvent('hitsound-preset-applied', { detail: { label: `${sourceLabel} ${pairText(entry)}` } }));
+    setFeedback(`${slotLabel(slotName)} ${pairText(entry)} を適用しました`);
+    closeDropdown();
   }
 
-  function getPresets() {
-    return typeof favorites.readPresets === 'function' ? favorites.readPresets() : [];
+  function ensureDropdown() {
+    if (dropdown || !judgmentPanel) return dropdown;
+    dropdown = document.createElement('div');
+    dropdown.id = 'favoriteQuickDropdown';
+    dropdown.className = 'favorite-quick-dropdown';
+    dropdown.hidden = true;
+    dropdown.setAttribute('role', 'menu');
+    judgmentPanel.append(dropdown);
+    return dropdown;
   }
 
-  function createTabs() {
-    if (!dialog || tabsRoot) return;
-    tabsRoot = document.createElement('div');
-    tabsRoot.className = 'favorite-collection-tabs';
-    tabsRoot.setAttribute('role', 'tablist');
-    tabsRoot.setAttribute('aria-label', '保存済み組み合わせ');
-    const actions = dialog.querySelector('.favorite-dialog-actions');
-    if (actions) actions.insertAdjacentElement('afterend', tabsRoot);
-    else dialog.insertBefore(tabsRoot, list || null);
-  }
-
-  function renderTabs() {
-    createTabs();
-    if (!tabsRoot) return;
+  function renderDropdown() {
+    const root = ensureDropdown();
+    if (!root || !openSlot) return;
     const collections = readCollections();
-    const tabs = [
-      ['preset', 'Preset', getPresets().length || 12],
-      ['favorite1', 'お気に入り1', collections.favorite1.length],
-      ['favorite2', 'お気に入り2', collections.favorite2.length],
-    ];
-    tabsRoot.replaceChildren();
-    for (const [tab, label, amount] of tabs) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'favorite-collection-tab';
-      button.dataset.favoriteTab = tab;
-      button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', activeTab === tab ? 'true' : 'false');
-      button.textContent = tab === 'preset' ? `${label} ${amount}` : `${label} ${amount}/${MAX_ITEMS}`;
-      tabsRoot.append(button);
-    }
-  }
+    const items = collections[openSlot];
+    root.replaceChildren();
+    root.dataset.slot = openSlot;
 
-  function makeItem(entry, { label = '', deletable = false, slotName = '' } = {}) {
-    const item = document.createElement('div');
-    item.className = 'favorite-set-item favorite-collection-item';
-    const state = entryAvailability(entry);
-    item.classList.toggle('unavailable', !state.ok);
+    const head = document.createElement('div');
+    head.className = 'favorite-dropdown-head';
+    const title = document.createElement('strong');
+    title.textContent = slotLabel(openSlot);
+    const count = document.createElement('span');
+    count.textContent = `${items.length}/${MAX_ITEMS}`;
+    head.append(title, count);
+    root.append(head);
 
-    const apply = document.createElement('button');
-    apply.type = 'button';
-    apply.className = 'hs-key favorite-set-apply';
-    apply.dataset.favoriteApply = entry.id;
-    if (slotName) apply.dataset.favoriteSlot = slotName;
-    apply.disabled = !state.ok;
-    apply.title = state.ok ? `${entry.don.name} + ${entry.kat.name}` : state.reason;
-    apply.setAttribute('aria-label', state.ok ? `${label} ${pairText(entry)} を適用` : `${pairText(entry)} は適用不可。${state.reason}`);
-
-    const face = document.createElement('span');
-    face.className = 'favorite-pair-face';
-    const primary = document.createElement('strong');
-    primary.textContent = label ? `${label}　${pairText(entry)}` : pairText(entry);
-    face.append(primary);
-    if (!state.ok) {
-      const reason = document.createElement('small');
-      reason.textContent = state.reason;
-      face.append(reason);
-    }
-    apply.append(face);
-    item.append(apply);
-
-    if (deletable) {
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'hs-key favorite-set-delete';
-      del.dataset.favoriteDelete = entry.id;
-      del.dataset.favoriteSlot = slotName;
-      del.setAttribute('aria-label', `${pairText(entry)} を${slotLabel(slotName)}から削除`);
-      const delFace = document.createElement('span');
-      delFace.textContent = '×';
-      del.append(delFace);
-      item.append(del);
-    }
-
-    return item;
-  }
-
-  function renderList() {
-    if (!list) return;
-    list.replaceChildren();
-    setSheetStatus('');
-
-    if (activeTab === 'preset') {
-      const presets = getPresets();
-      presets.forEach((entry, index) => {
-        const label = String(entry.id || `P${String(index + 1).padStart(2, '0')}`);
-        list.append(makeItem(entry, { label }));
-      });
-      if (title) title.textContent = 'Preset / Favorites';
-      return;
-    }
-
-    const collections = readCollections();
-    const items = collections[activeTab];
     if (!items.length) {
       const empty = document.createElement('p');
-      empty.className = 'favorite-empty';
-      empty.textContent = `${slotLabel(activeTab)}はまだ登録されていません`;
-      list.append(empty);
+      empty.className = 'favorite-dropdown-empty';
+      empty.textContent = 'まだ登録されていません';
+      root.append(empty);
       return;
     }
 
+    const list = document.createElement('div');
+    list.className = 'favorite-dropdown-list';
     items.forEach((entry, index) => {
-      list.append(makeItem(entry, {
-        label: `${index + 1}.`,
-        deletable: true,
-        slotName: activeTab,
-      }));
+      const row = document.createElement('div');
+      row.className = 'favorite-dropdown-row';
+
+      const apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'favorite-dropdown-apply';
+      const state = entryAvailability(entry);
+      apply.disabled = !state.ok;
+      apply.dataset.favoriteApply = entry.id;
+      apply.dataset.favoriteSlot = openSlot;
+      apply.textContent = `${index + 1}. ${pairText(entry)}`;
+      apply.setAttribute('aria-label', state.ok ? `${pairText(entry)} を適用` : `${pairText(entry)} は適用不可。${state.reason}`);
+      if (!state.ok) apply.title = state.reason;
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'favorite-dropdown-delete';
+      del.dataset.favoriteDelete = entry.id;
+      del.dataset.favoriteSlot = openSlot;
+      del.textContent = '×';
+      del.setAttribute('aria-label', `${pairText(entry)} を${slotLabel(openSlot)}から削除`);
+
+      row.append(apply, del);
+      list.append(row);
     });
+    root.append(list);
+  }
+
+  function openDropdown(slotName) {
+    const root = ensureDropdown();
+    if (!root) return;
+    if (openSlot === slotName && !root.hidden) {
+      closeDropdown();
+      return;
+    }
+    openSlot = slotName;
+    renderDropdown();
+    root.hidden = false;
+    for (const [name, button] of Object.entries(listButtons)) {
+      button?.setAttribute('aria-expanded', name === slotName ? 'true' : 'false');
+    }
+  }
+
+  function closeDropdown() {
+    openSlot = '';
+    if (dropdown) dropdown.hidden = true;
+    for (const button of Object.values(listButtons)) button?.setAttribute('aria-expanded', 'false');
   }
 
   function renderButtons() {
     const collections = readCollections();
     const current = currentEntry('current');
-    for (const [slotName, button] of Object.entries(buttons)) {
+    for (const [slotName, button] of Object.entries(toggleButtons)) {
       if (!button) continue;
-      const items = collections[slotName];
-      const currentSaved = !!current && items.some(item => entryKey(item) === entryKey(current));
+      const currentSaved = currentSavedIndex(slotName, current, collections) >= 0;
       const isOne = slotName === 'favorite1';
-      const icon = isOne ? (items.length ? '♥' : '♡') : (items.length ? '★' : '☆');
-
       button.disabled = !current;
-      button.classList.toggle('has-saved-pair', items.length > 0);
       button.classList.toggle('is-current-favorite', currentSaved);
+      button.classList.remove('has-saved-pair');
       button.setAttribute('aria-pressed', currentSaved ? 'true' : 'false');
-      button.setAttribute('aria-label', `${slotLabel(slotName)} ${items.length}/${MAX_ITEMS}。${currentSaved ? '現在の組み合わせは保存済み' : '現在の組み合わせを追加'}`);
-      button.title = `${slotLabel(slotName)}: ${items.length}/${MAX_ITEMS}`;
-      button.replaceChildren();
-
-      const iconNode = document.createElement('span');
-      iconNode.className = 'favorite-slot-icon';
-      iconNode.setAttribute('aria-hidden', 'true');
-      iconNode.textContent = icon;
-      const meta = document.createElement('span');
-      meta.className = 'favorite-slot-meta';
-      const labelNode = document.createElement('span');
-      labelNode.className = 'favorite-slot-label';
-      labelNode.textContent = slotLabel(slotName);
-      const count = document.createElement('span');
-      count.className = 'favorite-slot-pair';
-      count.textContent = `${items.length} / ${MAX_ITEMS}`;
-      meta.append(labelNode, count);
-      button.append(iconNode, meta);
+      button.textContent = isOne ? (currentSaved ? '♥' : '♡') : (currentSaved ? '★' : '☆');
+      button.setAttribute('aria-label', currentSaved
+        ? `現在の組み合わせを${slotLabel(slotName)}から解除`
+        : `現在の組み合わせを${slotLabel(slotName)}へ登録`);
+      button.title = currentSaved ? '現在の組み合わせは登録済み' : '現在の組み合わせを登録';
     }
-    if (countNode) countNode.textContent = '12';
-    if (openButton) openButton.setAttribute('aria-label', 'Presetとお気に入り一覧を開く');
+
+    for (const [slotName, button] of Object.entries(listButtons)) {
+      if (!button) continue;
+      const amount = collections[slotName].length;
+      button.textContent = slotLabel(slotName);
+      button.title = `${slotLabel(slotName)} ${amount}/${MAX_ITEMS}`;
+      button.setAttribute('aria-label', `${slotLabel(slotName)}の登録済み組み合わせを表示。${amount}/${MAX_ITEMS}件`);
+    }
+
+    if (setButton) {
+      setButton.setAttribute('aria-label', '固定セットを確認');
+      setButton.title = '固定セットを確認';
+    }
   }
 
   function renderAll() {
     renderButtons();
-    renderTabs();
-    if (sheet && !sheet.hidden) renderList();
+    if (openSlot) renderDropdown();
   }
 
   function csvCell(value) {
@@ -463,7 +424,7 @@
       'KatNo','KatID','KatName','KatFamily','KatPitchHz','KatUserLabel','KatMySound','KatFingerprint',
       'Available','CreatedAt'
     ]];
-    const presets = getPresets();
+    const presets = typeof favorites.readPresets === 'function' ? favorites.readPresets() : [];
     presets.forEach((entry, index) => rows.push([
       'PRESET', index + 1, ...descriptorCsv(entry.don), ...descriptorCsv(entry.kat), entryAvailability(entry).ok ? 'YES' : 'NO', ''
     ]));
@@ -499,13 +460,40 @@
     setSheetStatus('CSVを出力しました');
   }
 
-  for (const [slotName, button] of Object.entries(buttons)) {
+  for (const [slotName, button] of Object.entries(toggleButtons)) {
     button?.addEventListener('click', event => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      addCurrent(slotName);
+      toggleCurrent(slotName);
     }, { capture: true });
   }
+
+  for (const [slotName, button] of Object.entries(listButtons)) {
+    button?.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openDropdown(slotName);
+    });
+  }
+
+  ensureDropdown()?.addEventListener('click', event => {
+    const del = event.target.closest('[data-favorite-delete]');
+    if (del) {
+      event.preventDefault();
+      removeEntry(del.dataset.favoriteSlot, del.dataset.favoriteDelete);
+      return;
+    }
+    const apply = event.target.closest('[data-favorite-apply]');
+    if (apply) {
+      event.preventDefault();
+      const collections = readCollections();
+      const slotName = apply.dataset.favoriteSlot;
+      const entry = collections[slotName]?.find(item => item.id === apply.dataset.favoriteApply);
+      if (entry) applyEntry(entry, slotName).catch(error => setFeedback(error?.message || '適用できませんでした', true));
+    }
+  });
+
+  setButton?.addEventListener('click', closeDropdown);
 
   exportButton?.addEventListener('click', event => {
     event.preventDefault();
@@ -513,49 +501,17 @@
     exportCsv().catch(error => setSheetStatus(error?.message || 'CSVを出力できませんでした', true));
   }, { capture: true });
 
-  dialog?.addEventListener('click', event => {
-    const tab = event.target.closest('[data-favorite-tab]');
-    if (tab) {
-      event.preventDefault();
-      activeTab = tab.dataset.favoriteTab || 'preset';
-      renderTabs();
-      renderList();
-      return;
-    }
-
-    const del = event.target.closest('[data-favorite-delete]');
-    if (del) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      removeEntry(del.dataset.favoriteSlot, del.dataset.favoriteDelete);
-      return;
-    }
-
-    const apply = event.target.closest('[data-favorite-apply]');
-    if (apply) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const id = apply.dataset.favoriteApply;
-      const slotName = apply.dataset.favoriteSlot || '';
-      if (slotName) {
-        const entry = readCollections()[slotName].find(item => item.id === id);
-        if (entry) applyEntry(entry, slotLabel(slotName)).catch(error => setSheetStatus(error?.message || '適用できませんでした', true));
-      } else {
-        const entry = getPresets().find(item => item.id === id);
-        if (entry) applyEntry(entry, String(entry.id || 'Preset')).catch(error => setSheetStatus(error?.message || '適用できませんでした', true));
-      }
-    }
-  }, { capture: true });
-
-  openButton?.addEventListener('click', () => {
-    activeTab = 'preset';
-    queueMicrotask(() => {
-      renderTabs();
-      renderList();
-    });
+  document.addEventListener('pointerdown', event => {
+    if (!openSlot || !dropdown || dropdown.hidden) return;
+    if (dropdown.contains(event.target)) return;
+    if (Object.values(listButtons).some(button => button?.contains(event.target))) return;
+    closeDropdown();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && openSlot) closeDropdown();
   });
 
-  window.addEventListener('hitsound-selection-change', () => queueMicrotask(renderButtons));
+  window.addEventListener('hitsound-selection-change', () => queueMicrotask(renderAll));
   window.addEventListener('hitsound-custom-sources-change', () => queueMicrotask(renderAll));
   window.addEventListener('hitsound-favorite-collections-change', () => queueMicrotask(renderAll));
   window.addEventListener('storage', event => {
@@ -567,53 +523,73 @@
   });
 
   const style = document.createElement('style');
-  style.dataset.feature = 'favorite-collections-v2';
+  style.dataset.feature = 'favorite-split-dropdown-v3';
   style.textContent = `
+    .judgment-panel{position:relative!important}
     .judgment-actions{
-      grid-template-columns:112px 112px 72px!important;
-      justify-content:center;
-      align-items:stretch;
-      gap:10px!important;
+      grid-template-columns:112px 112px 82px!important;
+      justify-content:center;align-items:stretch;gap:8px!important;
     }
-    .judgment-actions .quick-favorite{
-      width:112px;min-width:112px;min-height:48px;padding:4px 7px!important;
-      display:grid;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:5px;text-align:left;
+    .favorite-split{
+      min-width:0;height:48px;display:grid;grid-template-columns:42px minmax(0,1fr);
+      border:1px solid rgba(255,255,255,.18);border-radius:10px;overflow:hidden;background:rgba(45,59,66,.50);
     }
-    .favorite-slot-icon{display:grid;place-items:center;font-size:20px;line-height:1}
-    .favorite-slot-meta{min-width:0;display:grid;gap:2px;line-height:1.1}
-    .favorite-slot-label{overflow:hidden;color:rgba(255,255,255,.76);font-size:9px;font-weight:820;white-space:nowrap;text-overflow:ellipsis}
-    .favorite-slot-pair{overflow:hidden;color:rgba(255,255,255,.62);font-size:9px;font-weight:760;font-variant-numeric:tabular-nums;white-space:nowrap;text-overflow:ellipsis}
-    .quick-favorite.has-saved-pair{border-color:rgba(255,255,255,.42)!important}
-    .quick-favorite.favorite-one.has-saved-pair{color:#fff3c7;background:rgba(137,109,39,.22)}
-    .quick-favorite.favorite-two.has-saved-pair{color:#f3deff;background:rgba(111,76,139,.25)}
-    .quick-favorite.is-current-favorite{box-shadow:0 0 0 1px rgba(255,255,255,.22),0 0 15px rgba(255,255,255,.11)!important}
-    .judgment-actions .preset-action{width:72px;min-width:72px}
-    .favorite-collection-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 11px}
-    .favorite-collection-tab{min-height:44px;padding:0 8px!important;border-radius:9px!important;font-size:11px!important}
-    .favorite-collection-tab[aria-selected="true"]{border-color:rgba(121,212,236,.72)!important;background:rgba(68,149,174,.36)!important;color:#ecfbff!important}
-    .favorite-collection-item{grid-template-columns:minmax(0,1fr) 52px}
-    .favorite-collection-item:not(:has(.favorite-set-delete)){grid-template-columns:minmax(0,1fr)}
-    .favorite-pair-face{height:auto!important;min-height:44px!important;padding:7px 10px!important;display:grid!important;align-content:center!important;justify-items:start!important;gap:2px!important;text-align:left!important}
-    .favorite-pair-face strong{font-size:11px;font-weight:820}
-    .favorite-pair-face small{display:block;color:#ffd0d2;font-size:9px;line-height:1.25;font-weight:650;white-space:normal}
-    .favorite-set-item.unavailable .favorite-set-apply{opacity:.58}
+    .favorite-split>button{width:auto!important;min-width:0!important;height:46px!important;min-height:46px!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+    .favorite-split .quick-favorite{
+      display:grid!important;place-items:center!important;padding:0!important;font-size:21px!important;
+      border-right:1px solid rgba(255,255,255,.14)!important;background:rgba(255,255,255,.035)!important;
+    }
+    .favorite-split .favorite-list-button{
+      padding:0 5px!important;background:transparent!important;color:rgba(255,255,255,.78)!important;
+      font-size:9px!important;font-weight:850!important;line-height:1.1!important;white-space:nowrap!important;
+    }
+    .favorite-split .favorite-list-button[aria-expanded="true"]{background:rgba(121,212,236,.14)!important;color:#f1fcff!important}
+    .favorite-split .favorite-one[aria-pressed="true"]{
+      color:#fff3c7!important;background:rgba(137,109,39,.42)!important;
+      box-shadow:inset 0 0 12px rgba(244,212,125,.15)!important;
+    }
+    .favorite-split .favorite-two[aria-pressed="true"]{
+      color:#f3deff!important;background:rgba(111,76,139,.44)!important;
+      box-shadow:inset 0 0 12px rgba(196,139,238,.15)!important;
+    }
+    .favorite-split .quick-favorite:not([aria-pressed="true"]){color:rgba(255,255,255,.72)!important}
+    .judgment-actions .preset-action{
+      width:82px!important;min-width:82px!important;display:grid!important;grid-template-columns:auto 1fr!important;
+      place-items:center!important;gap:4px!important;padding:0 7px!important;font-size:9px!important;line-height:1.05!important;
+    }
+    .set-check-icon{font-size:16px;font-weight:950;letter-spacing:-2px}
+    .favorite-quick-dropdown[hidden]{display:none!important}
+    .favorite-quick-dropdown{
+      position:absolute;z-index:80;top:calc(100% + 5px);left:50%;transform:translateX(-50%);
+      width:min(344px,calc(100vw - 28px));max-height:min(310px,48dvh);overflow:auto;overscroll-behavior:contain;
+      padding:8px;border:1px solid rgba(121,212,236,.38);border-radius:12px;
+      background:linear-gradient(180deg,rgba(28,46,55,.985),rgba(19,32,39,.99));box-shadow:0 15px 38px rgba(0,0,0,.48);
+    }
+    .favorite-dropdown-head{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px;color:#eefbff;font-size:11px}
+    .favorite-dropdown-head span{color:rgba(255,255,255,.58);font-variant-numeric:tabular-nums}
+    .favorite-dropdown-list{display:grid;gap:5px}
+    .favorite-dropdown-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:5px}
+    .favorite-dropdown-apply,.favorite-dropdown-delete{min-height:44px!important;border-radius:8px!important}
+    .favorite-dropdown-apply{padding:0 10px!important;text-align:left!important;font-size:11px!important;font-weight:800!important}
+    .favorite-dropdown-delete{padding:0!important;color:#ffd0d2!important;background:rgba(121,48,55,.34)!important;font-size:17px!important;font-weight:900!important}
+    .favorite-dropdown-empty{margin:0;padding:14px 8px;color:rgba(255,255,255,.60);font-size:11px;text-align:center}
     @media(max-width:430px){
-      .judgment-actions{grid-template-columns:106px 106px 68px!important;gap:8px!important}
-      .judgment-actions .quick-favorite{width:106px;min-width:106px;padding-inline:6px!important}
-      .judgment-actions .preset-action{width:68px;min-width:68px}
-      .favorite-slot-label{font-size:8px}.favorite-slot-pair{font-size:8px}
-      .favorite-collection-tabs{gap:5px}.favorite-collection-tab{font-size:9px!important;padding-inline:4px!important}
+      .judgment-actions{grid-template-columns:108px 108px 78px!important;gap:6px!important}
+      .favorite-split{grid-template-columns:40px minmax(0,1fr)}
+      .favorite-split .favorite-list-button{font-size:8px!important;padding-inline:3px!important}
+      .judgment-actions .preset-action{width:78px!important;min-width:78px!important;padding-inline:5px!important;font-size:8px!important}
     }
   `;
   document.head.appendChild(style);
 
   migrateLegacyIfNeeded();
-  createTabs();
+  ensureDropdown();
   renderAll();
 
   window.HitsoundFavoriteCollections = {
     KEY: COLLECTION_KEY,
     MAX_ITEMS,
     read: readCollections,
+    toggleCurrent,
   };
 })();
