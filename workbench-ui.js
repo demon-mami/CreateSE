@@ -5,8 +5,6 @@
   if (!controller) return;
 
   const $ = id => document.getElementById(id);
-  const POSITION_KEY = 'osutaiko-hitsound-lab:candidate-position:v1';
-  const sourcePanel = document.querySelector('.source-panel');
   const auditionPanel = $('auditionPanel');
   const dockMini = auditionPanel?.querySelector('.dock-mini');
   const dockToggle = $('dockToggleButton');
@@ -20,18 +18,12 @@
   const workbenchStatus = $('workbenchStatus');
   let activeSide = 'don';
   let favoriteReturnFocus = null;
-  let savePositionTimer = 0;
   let swipeStart = null;
   let dockTransitionTimer = 0;
   let dockTransitionHandler = null;
   const DOCK_TRANSITION_MS = 480;
   const DOCK_TRANSITION_FALLBACK_MS = DOCK_TRANSITION_MS * 3;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-
-  function readJson(key, fallback) {
-    try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }
-    catch { return fallback; }
-  }
 
   function setText(id, value) {
     const node = $(id);
@@ -119,62 +111,12 @@
     }
   }
 
-  function layoutKey() {
-    return matchMedia('(min-width:900px) and (orientation:landscape)').matches ? 'two-pane' : 'dock';
-  }
-
-  function readPositions() {
-    return readJson(POSITION_KEY, {});
-  }
-
-  function saveCandidatePosition(side = activeSide, layout = layoutKey()) {
-    if (!sourcePanel) return;
-    const panelTop = sourcePanel.getBoundingClientRect().top + 58;
-    const candidates = Array.from(sourcePanel.querySelectorAll('[data-hs-id]'));
-    const firstVisible = candidates.find(button => button.getBoundingClientRect().bottom > panelTop);
-    const positions = readPositions();
-    positions[`${layout}:${side}`] = {
-      scrollTop: Math.max(0, sourcePanel.scrollTop),
-      candidateId: firstVisible?.dataset.hsId || '',
-    };
-    try { localStorage.setItem(POSITION_KEY, JSON.stringify(positions)); } catch {}
-  }
-
-  function schedulePositionSave() {
-    clearTimeout(savePositionTimer);
-    const side = activeSide;
-    const layout = layoutKey();
-    savePositionTimer = window.setTimeout(() => saveCandidatePosition(side, layout), 120);
-  }
-
-  function restoreCandidatePosition() {
-    if (!sourcePanel) return;
-    const saved = readPositions()[`${layoutKey()}:${activeSide}`];
-    if (saved && typeof saved === 'object' && Number.isFinite(saved.scrollTop)) {
-      sourcePanel.scrollTop = Math.max(0, saved.scrollTop);
-      return;
-    }
-    const id = typeof saved === 'string' ? saved : saved?.candidateId;
-    if (!id) {
-      sourcePanel.scrollTop = 0;
-      return;
-    }
-    const target = sourcePanel.querySelector(`[data-hs-id="${CSS.escape(id)}"]`);
-    if (!target) {
-      sourcePanel.scrollTop = 0;
-      return;
-    }
-    const toolbarHeight = sourcePanel.querySelector('.hs-toolbar')?.offsetHeight || 0;
-    sourcePanel.scrollTop += target.getBoundingClientRect().top - sourcePanel.getBoundingClientRect().top - toolbarHeight - 8;
-  }
-
   miniPlay?.addEventListener('click', () => { if (!playButton?.disabled) playButton.click(); });
   dockToggle?.addEventListener('click', () => setDockExpanded(!auditionPanel?.classList.contains('is-expanded'), { moveFocus: true }));
   dockCollapse?.addEventListener('click', () => setDockExpanded(false, { moveFocus: true }));
   favoriteOpen?.addEventListener('click', openPresets);
   favoriteSheet?.addEventListener('click', event => { if (event.target.closest('[data-close-favorites]')) closePresets(); });
   favoriteSheet?.addEventListener('keydown', trapPresetFocus);
-  sourcePanel?.addEventListener('scroll', schedulePositionSave, { passive: true });
 
   dockMini?.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse') return;
@@ -207,14 +149,8 @@
     }
   });
   window.addEventListener('hitsound-active-side-change', event => {
-    const nextSide = event.detail?.side === 'kat' ? 'kat' : 'don';
-    if (nextSide !== activeSide) {
-      clearTimeout(savePositionTimer);
-      saveCandidatePosition(activeSide);
-    }
-    activeSide = nextSide;
+    activeSide = event.detail?.side === 'kat' ? 'kat' : 'don';
     if (workbenchStatus) workbenchStatus.textContent = '';
-    restoreCandidatePosition();
   });
   window.addEventListener('viewer-play-state', syncPlay);
   window.addEventListener('hitsound-preset-applied', event => {
@@ -227,12 +163,10 @@
   }
 
   window.addEventListener('resize', () => {
-    schedulePositionSave();
     if (matchMedia('(min-width:900px) and (orientation:landscape)').matches) setDockExpanded(false);
   });
 
   try { activeSide = localStorage.getItem('osutaiko-hitsound-lab:active-side:v1') === 'kat' ? 'kat' : 'don'; } catch {}
   syncPlay();
   setText('favoriteCount', String(window.HitsoundFavorites?.readPresets?.().length || 12));
-  requestAnimationFrame(restoreCandidatePosition);
 })();
