@@ -8,19 +8,20 @@
   const LEGACY_STORAGE_KEY = 'osutaiko-hitsound-lab-favorites-current111-abc-v5';
   const LEGACY_SEED_KEY = `${LEGACY_STORAGE_KEY}:seed:phase7a-pair12-v5`;
   const SLOT_STORAGE_KEY = 'osutaiko-hitsound-lab:pair-favorite-slots:v1';
+  const PRESET_MAX_ITEMS = 30;
   const PRESET_PAIRS = Object.freeze([
-    ['P01', 'SRC070', 'SRC084'],
-    ['P02', 'SRC015', 'SRC019'],
-    ['P03', 'SRC098', 'SRC101'],
-    ['P04', 'SRC098', 'SRC064'],
-    ['P05', 'SRC056', 'SRC084'],
-    ['P06', 'SRC070', 'SRC019'],
-    ['P07', 'SRC089', 'SRC064'],
-    ['P08', 'SRC089', 'SRC088'],
-    ['P09', 'SRC101', 'SRC090'],
-    ['P10', 'SRC056', 'SRC077'],
-    ['P11', 'SRC084', 'SRC090'],
-    ['P12', 'SRC079', 'SRC100'],
+    ['P01', 'SRC051', 'SRC052'],
+    ['P02', 'SRC116', 'SRC092'],
+    ['P03', 'SRC072', 'SRC073'],
+    ['P04', 'SRC071', 'SRC073'],
+    ['P05', 'SRC066', 'SRC069'],
+    ['P06', 'SRC069', 'SRC107'],
+    ['P07', 'SRC070', 'SRC101'],
+    ['P08', 'SRC006', 'SRC007'],
+    ['P09', 'SRC025', 'SRC026'],
+    ['P10', 'SRC043', 'SRC047'],
+    ['P11', 'SRC107', 'SRC101'],
+    ['P12', 'SRC006', 'SRC003'],
   ]);
   const SILENT_ID = controller.SILENT_ID;
   const $ = id => document.getElementById(id);
@@ -103,7 +104,7 @@
   }
 
   function presetEntries() {
-    return PRESET_PAIRS.map(([pairId, donId, katId]) => ({
+    return PRESET_PAIRS.slice(0, PRESET_MAX_ITEMS).map(([pairId, donId, katId]) => ({
       id: pairId,
       don: describe(donId),
       kat: describe(katId),
@@ -383,6 +384,7 @@
 
   window.HitsoundFavorites = {
     KEY: SLOT_STORAGE_KEY,
+    MAX_PRESETS: PRESET_MAX_ITEMS,
     readSets: presetEntries,
     readPresets: presetEntries,
     readSlots,
