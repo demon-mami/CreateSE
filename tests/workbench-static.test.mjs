@@ -10,6 +10,7 @@ const controller = read('hitsound-controller.js');
 const favorites = read('hitsound-favorites.js');
 const candidates = read('candidates.js');
 const grid = read('hitsound-grid.js');
+const workbench = read('workbench-ui.js');
 const pages = read('.github/workflows/pages.yml');
 const orientation = read('orientation-guard.js');
 
@@ -67,6 +68,13 @@ test('hitsound switching uses only direct viewer APIs and never rebuilds transpo
   assert.doesNotMatch(controller, /DataTransfer|setInputFile|waitForViewerReady|waitForRebuild|viewerRebuilding|resumeAfter/);
   assert.doesNotMatch(controller, /dispatchEvent\(new Event\('change'/);
   assert.doesNotMatch(controller, /\.play\.click\(\)/);
+});
+
+test('Don Kat switching never restores or rewrites candidate scroll position', () => {
+  assert.match(workbench, /window\.addEventListener\('hitsound-active-side-change',[\s\S]*?activeSide = event\.detail\?\.side === 'kat' \? 'kat' : 'don';/);
+  assert.doesNotMatch(workbench, /POSITION_KEY|saveCandidatePosition|restoreCandidatePosition|schedulePositionSave|readPositions|layoutKey/);
+  assert.doesNotMatch(workbench, /sourcePanel\.scrollTop|scrollIntoView/);
+  assert.match(html, /workbench-ui\.js\?v=2\.2-no-scroll-restore/);
 });
 
 test('supported device orientation is fixed to iPhone portrait and iPad landscape', () => {
