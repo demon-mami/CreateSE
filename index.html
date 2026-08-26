@@ -71,7 +71,7 @@
                 <button id="favoriteTwoButton" class="quick-favorite favorite-two" type="button" aria-label="現在の組み合わせをお気に入り②へ登録" aria-pressed="false" disabled>☆</button>
                 <button id="favoriteTwoListButton" class="favorite-list-button" type="button" aria-label="お気に入り②の登録済み組み合わせを表示" aria-haspopup="menu" aria-expanded="false" aria-controls="favoriteQuickDropdown">お気に入り②</button>
               </div>
-              <button id="favoriteOpenButton" class="preset-action" type="button" aria-label="固定セットを確認" aria-haspopup="dialog"><span class="set-check-icon" aria-hidden="true">::</span><span>セット確認</span></button>
+              <button id="favoriteOpenButton" class="preset-action" type="button" aria-label="固定セットを表示" aria-haspopup="menu" aria-expanded="false" aria-controls="favoriteQuickDropdown"><span class="set-check-icon" aria-hidden="true">::</span><span>セット</span></button>
             </div>
             <div id="setFeedback" class="set-feedback sr-only" role="status" aria-live="polite"></div>
             <div id="workbenchStatus" class="workbench-status sr-only" role="status" aria-live="polite">候補を選択して比較を開始できます</div>
@@ -135,21 +135,6 @@
     </section>
   </main>
 
-  <div id="favoriteSheet" class="favorite-sheet" hidden>
-    <button class="favorite-backdrop" type="button" data-close-favorites aria-label="セット確認を閉じる"></button>
-    <section id="savedSetsPanel" class="favorite-dialog" role="dialog" aria-modal="true" aria-labelledby="favoriteSheetTitle">
-      <header class="favorite-dialog-head">
-        <h2 id="favoriteSheetTitle">セット確認</h2>
-        <button id="favoriteCloseButton" type="button" data-close-favorites aria-label="セット確認を閉じる">×</button>
-      </header>
-      <div class="favorite-dialog-actions">
-        <button id="exportFavoritesButton" type="button">CSV</button>
-      </div>
-      <div id="savedSetsList" class="favorite-set-grid"></div>
-      <div id="favoriteSheetStatus" class="inline-status" role="status" aria-live="polite"></div>
-    </section>
-  </div>
-
   <audio id="samplePreviewAudio" preload="none"></audio>
   <script>
     (() => {
@@ -171,7 +156,7 @@
   <script src="./object-timeline-v2.js?v=4.1-fixed-geometry-no-fade"></script>
   <script src="./hitsound-controller.js?v=4.2-direct-only"></script>
   <script src="./hitsound-favorites.js?v=5.0-preset-slots"></script>
-  <script src="./favorite-slot-ui.js?v=3.0-split-dropdown"></script>
+  <script src="./favorite-slot-ui.js?v=4.0-unified-dropdown"></script>
   <script src="./hitsound-grid.js?v=4.2-no-delete-rating"></script>
   <script src="./workbench-ui.js?v=2.2-no-scroll-restore"></script>
   <script src="./chart-loader.js?v=0.6-state-safe"></script>
