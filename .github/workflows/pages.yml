@@ -71,6 +71,11 @@ jobs:
           (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-wave-20260826.sha256")
           unzip -q /tmp/maps-wave-20260826.zip -d _site/maps
 
+          # Overwrite only Shuuten with the repaired MP3-frame-preserving OSZ.
+          cat .map-assets/maps-shuuten-fix-20260826-*.part > /tmp/maps-shuuten-fix-20260826.zip
+          (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-shuuten-fix-20260826.sha256")
+          unzip -qo /tmp/maps-shuuten-fix-20260826.zip -d _site/maps
+
           # Keep only the verified JSZip vendor file from the frozen Viewer reference.
           cp _reference/vendor/jszip.min.js _site/vendor/jszip.min.js
 
