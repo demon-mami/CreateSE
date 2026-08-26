@@ -1,21 +1,9 @@
 window.TEST_CHARTS = [
   {
-    "id": "what-hurts-the-most",
-    "title": "What Hurts The Most (Topmodelz ReMix)",
-    "difficulty": "Gomen Yuuka [1.4x Rate]",
-    "entry": "what-hurts-the-most.osz"
-  },
-  {
     "id": "over-the-fullereneshift",
     "title": "Over the Fullereneshift",
     "difficulty": "Eternity",
     "entry": "over-the-fullereneshift.osz"
-  },
-  {
-    "id": "navi-98",
-    "title": "navi 98",
-    "difficulty": "genjuro's hell oni",
-    "entry": "navi-98.osz"
   },
   {
     "id": "tool-assisted-speedcore",
@@ -60,18 +48,6 @@ window.TEST_CHARTS = [
     "file": "maps/a-flying-dance-hall.osz"
   },
   {
-    "id": "monochrome-asterisk-makina-remix",
-    "title": "monochrome (Asterisk Makina Remix)",
-    "difficulty": "Kaleidoscope",
-    "file": "maps/monochrome-asterisk-makina-remix.osz"
-  },
-  {
-    "id": "pacific-girls",
-    "title": "Pacific Girls",
-    "difficulty": "Hell Oni",
-    "file": "maps/pacific-girls.osz"
-  },
-  {
     "id": "kusakusa-mimika",
     "title": "草草！ミミカ",
     "difficulty": "kusa sugite kusa",
@@ -88,5 +64,29 @@ window.TEST_CHARTS = [
     "title": "12^2x3.14-13",
     "difficulty": "13 Hours of Love",
     "file": "maps/12-squared-x-pi-minus-13.osz"
+  },
+  {
+    "id": "if",
+    "title": "イフ",
+    "difficulty": "arc & Hivie's Cold Truths under the Radiant Sunlight",
+    "file": "maps/if.osz"
+  },
+  {
+    "id": "shuuten-no-saki",
+    "title": "終点の先が在るとするならば。(あ? edit)",
+    "difficulty": "Finale Oni",
+    "file": "maps/shuuten-no-saki.osz"
+  },
+  {
+    "id": "1208",
+    "title": "#1208",
+    "difficulty": "Inner Oni",
+    "file": "maps/1208.osz"
+  },
+  {
+    "id": "trancing-pulse-brz",
+    "title": "Trancing Pulse (brz_bootleg_remix)",
+    "difficulty": "Taiko Master",
+    "file": "maps/trancing-pulse-brz.osz"
   }
 ];
