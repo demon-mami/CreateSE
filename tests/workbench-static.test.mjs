@@ -8,6 +8,7 @@ const app = read('app-v4.js');
 const timeline = read('object-timeline-v2.js');
 const controller = read('hitsound-controller.js');
 const favorites = read('hitsound-favorites.js');
+const favoriteSlot = read('favorite-slot-ui.js');
 const candidates = read('candidates.js');
 const grid = read('hitsound-grid.js');
 const workbench = read('workbench-ui.js');
@@ -19,16 +20,40 @@ test('current playback UI is range-free, skip-free and time-display-free', () =>
   assert.equal(new Set(ids).size, ids.length);
   for (const id of [
     'roleDonButton','roleKatButton','playButton','seekBar','timelineViewport','overviewViewport',
-    'favoriteOneButton','favoriteTwoButton','favoriteOpenButton','customHitsoundInput','orientationGuard',
+    'favoriteOneButton','favoriteOneListButton','favoriteTwoButton','favoriteTwoListButton','favoriteOpenButton',
+    'customHitsoundInput','orientationGuard',
   ]) assert.ok(ids.includes(id), `${id} is missing`);
   for (const id of [
     'backButton','forwardButton','seekTimeFeedback','timeDisplay','durationDisplay','copyTimeButton',
     'timelineStaticCanvas','timelineCursorCanvas','donHitsoundInput','kaHitsoundInput',
     'startMarkButton','endMarkButton','jumpStartButton','jumpEndButton','loopToggleButton','clearLoopButton',
     'startMarkButton2','endMarkButton2','jumpStartButton2','jumpEndButton2','loopToggleButton2','clearLoopButton2',
-    'rangeLength','rangeLength2','loopStatus','loopStatus2','miniLoopState',
+    'rangeLength','rangeLength2','loopStatus','loopStatus2','miniLoopState','favoriteCount',
   ]) assert.equal(ids.includes(id), false, `${id} must be absent`);
   assert.doesNotMatch(html, /4秒戻る|4秒進む|00:00:000|aria-valuetext=/);
+});
+
+test('favorite controls split registration state, list dropdowns and fixed set confirmation', () => {
+  assert.match(html, /id="favoriteOneButton"[^>]*>♡<\/button>/);
+  assert.match(html, /id="favoriteOneListButton"[^>]*>お気に入り①<\/button>/);
+  assert.match(html, /id="favoriteTwoButton"[^>]*>☆<\/button>/);
+  assert.match(html, /id="favoriteTwoListButton"[^>]*>お気に入り②<\/button>/);
+  assert.match(html, /id="favoriteOpenButton"[^>]*>[\s\S]*?::<\/span><span>セット確認<\/span>/);
+  assert.match(html, /id="favoriteSheetTitle">セット確認<\/h2>/);
+  assert.match(html, /favorite-slot-ui\.js\?v=3\.0-split-dropdown/);
+  assert.doesNotMatch(html, /favorite-pager-v4\.js/);
+
+  assert.match(favoriteSlot, /const MAX_ITEMS = 12;/);
+  assert.match(favoriteSlot, /function toggleCurrent\(slotName\)/);
+  assert.match(favoriteSlot, /items\.findIndex\(entry => entryKey\(entry\) === entryKey\(current\)\)/);
+  assert.match(favoriteSlot, /if \(index >= 0\) \{\s*items\.splice\(index, 1\)/);
+  assert.match(favoriteSlot, /items\.push\(current\)/);
+  assert.match(favoriteSlot, /const currentSaved = currentSavedIndex\(slotName, current, collections\) >= 0;/);
+  assert.match(favoriteSlot, /button\.textContent = isOne \? \(currentSaved \? '♥' : '♡'\) : \(currentSaved \? '★' : '☆'\);/);
+  assert.doesNotMatch(favoriteSlot, /items\.length \? '♥'|items\.length \? '★'/);
+  assert.doesNotMatch(favoriteSlot, /classList\.toggle\('has-saved-pair'/);
+  assert.match(favoriteSlot, /function openDropdown\(slotName\)/);
+  assert.match(favoriteSlot, /favorite-quick-dropdown/);
 });
 
 test('app frame uses only the AudioContext engine clock for the lane', () => {
@@ -89,12 +114,13 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /app-v4\.js\?v=4\.2-engine-clock-fixed-ui/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
+  assert.match(html, /favorite-slot-ui\.js\?v=3\.0-split-dropdown/);
 });
 
 test('Pages publishes every runtime asset needed by the fixed timeline', () => {
   for (const asset of [
     'orientation-guard.js','app-v4.js','object-timeline-v2.js','hitsound-controller.js',
-    'favorite-slot-ui.js','favorite-pager-v4.js','workbench-ui.js','hitsounds-current111-abc-v5.zip',
+    'favorite-slot-ui.js','workbench-ui.js','hitsounds-current111-abc-v5.zip',
   ]) assert.match(pages, new RegExp(`cp ${asset.replaceAll('.', '\\.')} _site\\/`));
 });
 
