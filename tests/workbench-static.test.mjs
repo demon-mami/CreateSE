@@ -184,6 +184,7 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /app-v4\.js\?v=4\.2-engine-clock-fixed-ui/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
+  assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
   assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);
   assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
@@ -201,15 +202,17 @@ test('audio levels remain Music 0.70 and Effect 1.00', () => {
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
 });
 
-test('Current111 and fixed Pair-12 presets remain intact', () => {
+test('Current111 and favorite-derived fixed sets remain intact', () => {
   assert.match(candidates, /Current111 ABC Sorted v5/);
   assert.match(candidates, /dataset: 'current111-abc-v5'/);
   assert.match(grid, /data-abc="\$\{abcGrade\}"/);
+  assert.match(favorites, /const PRESET_MAX_ITEMS = 30;/);
+  assert.match(favorites, /PRESET_PAIRS\.slice\(0, PRESET_MAX_ITEMS\)/);
   const expected = [
-    ['P01','SRC070','SRC084'], ['P02','SRC015','SRC019'], ['P03','SRC098','SRC101'],
-    ['P04','SRC098','SRC064'], ['P05','SRC056','SRC084'], ['P06','SRC070','SRC019'],
-    ['P07','SRC089','SRC064'], ['P08','SRC089','SRC088'], ['P09','SRC101','SRC090'],
-    ['P10','SRC056','SRC077'], ['P11','SRC084','SRC090'], ['P12','SRC079','SRC100'],
+    ['P01','SRC051','SRC052'], ['P02','SRC116','SRC092'], ['P03','SRC072','SRC073'],
+    ['P04','SRC071','SRC073'], ['P05','SRC066','SRC069'], ['P06','SRC069','SRC107'],
+    ['P07','SRC070','SRC101'], ['P08','SRC006','SRC007'], ['P09','SRC025','SRC026'],
+    ['P10','SRC043','SRC047'], ['P11','SRC107','SRC101'], ['P12','SRC006','SRC003'],
   ];
   for (const [label, don, kat] of expected) {
     assert.ok(favorites.includes(`['${label}', '${don}', '${kat}']`), `${label} is missing`);
