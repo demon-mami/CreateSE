@@ -19,7 +19,7 @@
   let currentChart = null;
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'
   }[c]));
 
   function keepChartInfoVisible() {
@@ -47,9 +47,17 @@
     return packPromise;
   }
 
+  function chartFileUrl(chart) {
+    const base = `./${chart.file}`;
+    if (!chart.revision) return base;
+    const separator = base.includes('?') ? '&' : '?';
+    return `${base}${separator}v=${encodeURIComponent(chart.revision)}`;
+  }
+
   async function chartBytes(chart) {
     if (chart.file) {
-      const response = await fetch(`./${chart.file}`, { cache: 'force-cache' });
+      const url = chartFileUrl(chart);
+      const response = await fetch(url, { cache: 'no-cache' });
       if (!response.ok) throw new Error(`譜面ファイルがありません: ${chart.file}`);
       return response.arrayBuffer();
     }
