@@ -11,6 +11,7 @@ const favorites = read('hitsound-favorites.js');
 const favoriteSlot = read('favorite-slot-ui.js');
 const candidates = read('candidates.js');
 const charts = read('charts.js');
+const chartLoader = read('chart-loader.js');
 const grid = read('hitsound-grid.js');
 const workbench = read('workbench-ui.js');
 const pages = read('.github/workflows/pages.yml');
@@ -110,10 +111,19 @@ test('chart rotation removes four old maps and adds four verified replacement ma
     assert.ok(charts.includes(`"difficulty": "${difficulty}"`), `${difficulty} is missing`);
     assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
   }
-  assert.match(html, /charts\.js\?v=0\.4-15charts-replaced/);
+  assert.match(charts, /"revision": "20260826-shuuten-audiofix-v2"/);
+  assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);
+  assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
+  assert.match(chartLoader, /function chartFileUrl\(chart\)/);
+  assert.match(chartLoader, /encodeURIComponent\(chart\.revision\)/);
+  assert.match(chartLoader, /fetch\(url, \{ cache: 'no-cache' \}\)/);
+  assert.doesNotMatch(chartLoader, /fetch\(`\.\/\$\{chart\.file\}`, \{ cache: 'force-cache' \}\)/);
   assert.match(pages, /cat \.map-assets\/maps-wave-20260826-\*\.part > \/tmp\/maps-wave-20260826\.zip/);
   assert.match(pages, /maps-wave-20260826\.sha256/);
   assert.match(pages, /unzip -q \/tmp\/maps-wave-20260826\.zip -d _site\/maps/);
+  assert.match(pages, /cat \.map-assets\/maps-shuuten-fix-20260826-\*\.part > \/tmp\/maps-shuuten-fix-20260826\.zip/);
+  assert.match(pages, /maps-shuuten-fix-20260826\.sha256/);
+  assert.match(pages, /unzip -oq \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);
 });
 
 test('app frame uses only the AudioContext engine clock for the lane', () => {
@@ -175,7 +185,8 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
-  assert.match(html, /charts\.js\?v=0\.4-15charts-replaced/);
+  assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);
+  assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
 });
 
 test('Pages publishes every runtime asset needed by the fixed timeline', () => {
