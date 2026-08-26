@@ -16,6 +16,15 @@
     .orientation-guard{position:fixed;inset:0;z-index:10000;place-items:center;padding:28px;background:#071018;color:#fff;text-align:center;font:800 16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif}
     html.orientation-blocked body>:not(.orientation-guard){visibility:hidden!important;pointer-events:none!important}
     html.orientation-blocked .orientation-guard{display:grid!important;visibility:visible!important}
+    @media(max-width:899px) and (orientation:portrait){
+      .hs-toolbar:has(.favorite-quick-dropdown:not([hidden])){z-index:75!important}
+      .favorite-quick-dropdown{
+        z-index:90!important;
+        max-height:min(330px,40dvh)!important;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-y;
+      }
+    }
   </style>
 </head>
 <body>
