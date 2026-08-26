@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - .github/workflows/replace-set-from-favorites-v2-20260827.yml
+      - .set-replace-trigger
 
 permissions:
   contents: write
