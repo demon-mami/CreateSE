@@ -1,0 +1,142 @@
+name: Import verified replacement maps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-map-wave-20260826.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download source beatmapsets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/map-source
+          download_set() {
+            local id="$1"
+            local out="/tmp/map-source/${id}.osz"
+            if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 \
+              "https://mirror.hinamizawa.ai/api/v1/hinai/d/${id}" -o "$out"; then
+              return 0
+            fi
+            rm -f "$out"
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 \
+              "https://catboy.best/d/${id}" -o "$out"
+          }
+          download_set 2127745
+          download_set 1651911
+          download_set 2000180
+          download_set 1645599
+
+      - name: Verify against uploaded sources and build minimal OSZ files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, re, zipfile
+
+          specs = [
+              {
+                  'setid': '2127745',
+                  'version': "arc & Hivie's Cold Truths under the Radiant Sunlight",
+                  'osu_sha256': '0fecab2bd23c6ec8242c6b33c2030eb43ca8e4f5db16759899ed81ce7a885bbf',
+                  'audio_sha256': 'bd2c9fefb8bb9e5318bf72053dbe2a90b0decc809c4b334310e07e08900e77fd',
+                  'output': 'if.osz',
+              },
+              {
+                  'setid': '1651911',
+                  'version': 'Finale Oni',
+                  'osu_sha256': 'ebc7deadd598856a5bd90ee39c9ff45d05e3e37dcb88da749e457c191aef3060',
+                  'audio_sha256': '1f9ec6a66c0f10c1289d01eecbffe02039e8a1a2f0523d1739da7f85fad23b44',
+                  'output': 'shuuten-no-saki.osz',
+              },
+              {
+                  'setid': '2000180',
+                  'version': 'Inner Oni',
+                  'osu_sha256': 'c4cea77cbdbd4d73b4f1fc6ea183857014486d9aab2dd30fe1531aada61c095c',
+                  'audio_sha256': '8b97f90799824075b72c7b0aea7a77c22a3c5350ce483879c6c941c6742a5bcb',
+                  'output': '1208.osz',
+              },
+              {
+                  'setid': '1645599',
+                  'version': 'Taiko Master',
+                  'osu_sha256': '40c2cd28f5e5990008231997d7d86b736cc28522d53cc9be70769c9973eb96b3',
+                  'audio_sha256': '6cef1927141f2f55e97517972f205d0f1e28cfa25310f411646b1dfd00c6e4d1',
+                  'output': 'trancing-pulse-brz.osz',
+              },
+          ]
+
+          source_dir = Path('/tmp/map-source')
+          out_dir = Path('/tmp/map-minimal')
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          def sha256(data):
+              return hashlib.sha256(data).hexdigest()
+
+          for spec in specs:
+              source = source_dir / f"{spec['setid']}.osz"
+              with zipfile.ZipFile(source) as src:
+                  selected = None
+                  for name in src.namelist():
+                      if not name.lower().endswith('.osu'):
+                          continue
+                      data = src.read(name)
+                      text = data.decode('utf-8-sig', errors='replace')
+                      mode = re.search(r'^Mode:(.*)$', text, re.M)
+                      version = re.search(r'^Version:(.*)$', text, re.M)
+                      if mode and mode.group(1).strip() == '1' and version and version.group(1).strip() == spec['version']:
+                          selected = (name, data, text)
+                          break
+                  if selected is None:
+                      raise RuntimeError(f"{spec['setid']}: target difficulty not found: {spec['version']}")
+
+                  osu_name, osu_bytes, osu_text = selected
+                  if sha256(osu_bytes) != spec['osu_sha256']:
+                      raise RuntimeError(f"{spec['setid']}: osu content differs from uploaded source")
+
+                  audio_match = re.search(r'^AudioFilename:(.*)$', osu_text, re.M)
+                  if not audio_match:
+                      raise RuntimeError(f"{spec['setid']}: AudioFilename missing")
+                  audio_name = audio_match.group(1).strip()
+                  audio_bytes = src.read(audio_name)
+                  if sha256(audio_bytes) != spec['audio_sha256']:
+                      raise RuntimeError(f"{spec['setid']}: audio differs from uploaded source")
+
+                  target = out_dir / spec['output']
+                  with zipfile.ZipFile(target, 'w', compression=zipfile.ZIP_STORED) as dst:
+                      dst.writestr(osu_name, osu_bytes)
+                      dst.writestr(audio_name, audio_bytes)
+                  print(f"verified {spec['setid']} -> {target.name}: {spec['version']}")
+
+          bundle = Path('/tmp/maps-wave-20260826.zip')
+          with zipfile.ZipFile(bundle, 'w', compression=zipfile.ZIP_STORED) as z:
+              for spec in specs:
+                  path = out_dir / spec['output']
+                  z.write(path, arcname=path.name)
+          print('bundle', bundle, bundle.stat().st_size, sha256(bundle.read_bytes()))
+          PY
+
+      - name: Split and commit verified bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .map-assets/maps-wave-20260826-*.part .map-assets/maps-wave-20260826.sha256
+          split -b 785000 -d -a 3 --additional-suffix=.part /tmp/maps-wave-20260826.zip .map-assets/maps-wave-20260826-
+          HASH="$(sha256sum /tmp/maps-wave-20260826.zip | awk '{print $1}')"
+          printf '%s  maps-wave-20260826.zip\n' "$HASH" > .map-assets/maps-wave-20260826.sha256
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .map-assets/maps-wave-20260826-*.part .map-assets/maps-wave-20260826.sha256
+          git commit -m 'Add verified replacement map assets'
+          git push
