@@ -9,6 +9,7 @@
   const COLLECTION_KEY = 'osutaiko-hitsound-lab:pair-favorite-collections:v2';
   const MAX_ITEMS = 12;
   const SILENT_ID = controller.SILENT_ID;
+  const CIRCLED = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫'];
   const $ = id => document.getElementById(id);
 
   const toggleButtons = {
@@ -21,12 +22,10 @@
   };
   const setButton = $('favoriteOpenButton');
   const judgmentPanel = document.querySelector('.judgment-panel');
-  const exportButton = $('exportFavoritesButton');
-  const sheetStatus = $('favoriteSheetStatus');
   const feedback = $('setFeedback');
   const workbenchStatus = $('workbenchStatus');
 
-  let openSlot = '';
+  let openSource = '';
   let dropdown = null;
   let feedbackTimer = 0;
 
@@ -73,7 +72,12 @@
     return entry ? `${descriptorKey(entry.don)}|${descriptorKey(entry.kat)}` : '';
   }
 
-  function dedupe(entries) {
+  function createdTime(entry) {
+    const value = Date.parse(entry?.createdAt || '');
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function dedupeNewest(entries) {
     const out = [];
     const seen = new Set();
     for (const value of Array.isArray(entries) ? entries : []) {
@@ -83,9 +87,9 @@
       if (!key || seen.has(key)) continue;
       seen.add(key);
       out.push(entry);
-      if (out.length >= MAX_ITEMS) break;
     }
-    return out;
+    out.sort((a, b) => createdTime(b) - createdTime(a));
+    return out.slice(0, MAX_ITEMS);
   }
 
   function readLegacySlots() {
@@ -124,8 +128,8 @@
     try {
       const parsed = JSON.parse(localStorage.getItem(COLLECTION_KEY) || 'null') || {};
       return {
-        favorite1: dedupe(parsed.favorite1),
-        favorite2: dedupe(parsed.favorite2),
+        favorite1: dedupeNewest(parsed.favorite1),
+        favorite2: dedupeNewest(parsed.favorite2),
       };
     } catch {
       return { favorite1: [], favorite2: [] };
@@ -135,8 +139,8 @@
   function writeCollections(collections) {
     const normalized = {
       version: 2,
-      favorite1: dedupe(collections.favorite1),
-      favorite2: dedupe(collections.favorite2),
+      favorite1: dedupeNewest(collections.favorite1),
+      favorite2: dedupeNewest(collections.favorite2),
     };
     try {
       localStorage.setItem(COLLECTION_KEY, JSON.stringify(normalized));
@@ -182,8 +186,18 @@
     return slotName === 'favorite1' ? 'お気に入り①' : 'お気に入り②';
   }
 
+  function dropdownLabel(source) {
+    if (source === 'preset') return 'セット';
+    return slotLabel(source);
+  }
+
   function pairText(entry) {
     return `Don ${entry?.don?.sourceNumber || '—'} + Kat ${entry?.kat?.sourceNumber || '—'}`;
+  }
+
+  function formatSourceNumber(value) {
+    const text = String(value ?? '—');
+    return /^\d+$/.test(text) ? text.padStart(3, '0') : text;
   }
 
   function availability(side) {
@@ -217,12 +231,6 @@
     }, 2400);
   }
 
-  function setSheetStatus(message = '', error = false) {
-    if (!sheetStatus) return;
-    sheetStatus.textContent = message;
-    sheetStatus.classList.toggle('error', error);
-  }
-
   function currentSavedIndex(slotName, current = currentEntry('current'), collections = readCollections()) {
     if (!current) return -1;
     const key = entryKey(current);
@@ -250,7 +258,7 @@
         setFeedback(`${label}は最大${MAX_ITEMS}件です`, true);
         return;
       }
-      items.push(current);
+      items.unshift(current);
       if (!writeCollections(collections)) return;
       setFeedback(`${label}へ登録しました`);
     }
@@ -266,7 +274,20 @@
     renderAll();
   }
 
-  async function applyEntry(entry, slotName) {
+  function getPresets() {
+    try {
+      return typeof favorites.readPresets === 'function' ? favorites.readPresets() : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function dropdownItems(source) {
+    if (source === 'preset') return getPresets();
+    return readCollections()[source] || [];
+  }
+
+  async function applyEntry(entry, source) {
     const state = entryAvailability(entry);
     if (!state.ok) {
       setFeedback(state.reason, true);
@@ -277,7 +298,7 @@
       setFeedback('組み合わせを適用できませんでした', true);
       return;
     }
-    setFeedback(`${slotLabel(slotName)} ${pairText(entry)} を適用しました`);
+    setFeedback(`${dropdownLabel(source)} ${pairText(entry)} を適用しました`);
     closeDropdown();
   }
 
@@ -292,20 +313,67 @@
     return dropdown;
   }
 
+  function appendPairCard(list, entry, index, source, currentKey) {
+    const row = document.createElement('div');
+    row.className = 'favorite-dropdown-row';
+    const selected = !!currentKey && entryKey(entry) === currentKey;
+    row.classList.toggle('is-current-selection', selected);
+
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'favorite-dropdown-apply';
+    const state = entryAvailability(entry);
+    apply.disabled = !state.ok;
+    apply.dataset.pairApply = entry.id;
+    apply.dataset.pairSource = source;
+    apply.setAttribute('aria-label', state.ok ? `${pairText(entry)} を適用` : `${pairText(entry)} は適用不可。${state.reason}`);
+    if (selected) apply.setAttribute('aria-current', 'true');
+    if (!state.ok) apply.title = state.reason;
+
+    const rank = document.createElement('span');
+    rank.className = 'favorite-card-rank';
+    rank.textContent = CIRCLED[index] || String(index + 1);
+
+    const don = document.createElement('span');
+    don.className = 'favorite-card-source don';
+    don.textContent = formatSourceNumber(entry.don?.sourceNumber);
+
+    const kat = document.createElement('span');
+    kat.className = 'favorite-card-source kat';
+    kat.textContent = formatSourceNumber(entry.kat?.sourceNumber);
+
+    apply.append(rank, don, kat);
+    row.append(apply);
+
+    if (source !== 'preset') {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'favorite-dropdown-delete';
+      del.dataset.favoriteDelete = entry.id;
+      del.dataset.favoriteSlot = source;
+      del.textContent = '×';
+      del.setAttribute('aria-label', `${pairText(entry)} を${slotLabel(source)}から削除`);
+      row.append(del);
+    }
+
+    list.append(row);
+  }
+
   function renderDropdown() {
     const root = ensureDropdown();
-    if (!root || !openSlot) return;
-    const collections = readCollections();
-    const items = collections[openSlot];
+    if (!root || !openSource) return;
+    const items = dropdownItems(openSource);
+    const current = currentEntry('current');
+    const currentKey = entryKey(current);
     root.replaceChildren();
-    root.dataset.slot = openSlot;
+    root.dataset.source = openSource;
 
     const head = document.createElement('div');
     head.className = 'favorite-dropdown-head';
     const title = document.createElement('strong');
-    title.textContent = slotLabel(openSlot);
+    title.textContent = dropdownLabel(openSource);
     const count = document.createElement('span');
-    count.textContent = `${items.length}/${MAX_ITEMS}`;
+    count.textContent = openSource === 'preset' ? `${items.length}` : `${items.length}/${MAX_ITEMS}`;
     head.append(title, count);
     root.append(head);
 
@@ -319,54 +387,35 @@
 
     const list = document.createElement('div');
     list.className = 'favorite-dropdown-list';
-    items.forEach((entry, index) => {
-      const row = document.createElement('div');
-      row.className = 'favorite-dropdown-row';
-
-      const apply = document.createElement('button');
-      apply.type = 'button';
-      apply.className = 'favorite-dropdown-apply';
-      const state = entryAvailability(entry);
-      apply.disabled = !state.ok;
-      apply.dataset.favoriteApply = entry.id;
-      apply.dataset.favoriteSlot = openSlot;
-      apply.textContent = `${index + 1}. ${pairText(entry)}`;
-      apply.setAttribute('aria-label', state.ok ? `${pairText(entry)} を適用` : `${pairText(entry)} は適用不可。${state.reason}`);
-      if (!state.ok) apply.title = state.reason;
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'favorite-dropdown-delete';
-      del.dataset.favoriteDelete = entry.id;
-      del.dataset.favoriteSlot = openSlot;
-      del.textContent = '×';
-      del.setAttribute('aria-label', `${pairText(entry)} を${slotLabel(openSlot)}から削除`);
-
-      row.append(apply, del);
-      list.append(row);
-    });
+    items.forEach((entry, index) => appendPairCard(list, entry, index, openSource, currentKey));
     root.append(list);
   }
 
-  function openDropdown(slotName) {
+  function triggerButtons() {
+    return [...Object.values(listButtons), setButton].filter(Boolean);
+  }
+
+  function openDropdown(source) {
     const root = ensureDropdown();
     if (!root) return;
-    if (openSlot === slotName && !root.hidden) {
+    if (openSource === source && !root.hidden) {
       closeDropdown();
       return;
     }
-    openSlot = slotName;
+    openSource = source;
     renderDropdown();
     root.hidden = false;
     for (const [name, button] of Object.entries(listButtons)) {
-      button?.setAttribute('aria-expanded', name === slotName ? 'true' : 'false');
+      button?.setAttribute('aria-expanded', name === source ? 'true' : 'false');
     }
+    setButton?.setAttribute('aria-expanded', source === 'preset' ? 'true' : 'false');
   }
 
   function closeDropdown() {
-    openSlot = '';
+    openSource = '';
     if (dropdown) dropdown.hidden = true;
     for (const button of Object.values(listButtons)) button?.setAttribute('aria-expanded', 'false');
+    setButton?.setAttribute('aria-expanded', 'false');
   }
 
   function renderButtons() {
@@ -396,68 +445,14 @@
     }
 
     if (setButton) {
-      setButton.setAttribute('aria-label', '固定セットを確認');
-      setButton.title = '固定セットを確認';
+      setButton.setAttribute('aria-label', '固定セットを表示');
+      setButton.title = '固定セットを表示';
     }
   }
 
   function renderAll() {
     renderButtons();
-    if (openSlot) renderDropdown();
-  }
-
-  function csvCell(value) {
-    return `"${String(value ?? '').replaceAll('"', '""')}"`;
-  }
-
-  function descriptorCsv(side) {
-    return [
-      side?.sourceNumber || '', side?.id || '', side?.name || '', side?.family || '',
-      side?.pitch ?? '', side?.userLabel || '', side?.custom ? 'YES' : '', side?.fingerprint || '',
-    ];
-  }
-
-  function makeCsv() {
-    const rows = [[
-      'PairType','Index',
-      'DonNo','DonID','DonName','DonFamily','DonPitchHz','DonUserLabel','DonMySound','DonFingerprint',
-      'KatNo','KatID','KatName','KatFamily','KatPitchHz','KatUserLabel','KatMySound','KatFingerprint',
-      'Available','CreatedAt'
-    ]];
-    const presets = typeof favorites.readPresets === 'function' ? favorites.readPresets() : [];
-    presets.forEach((entry, index) => rows.push([
-      'PRESET', index + 1, ...descriptorCsv(entry.don), ...descriptorCsv(entry.kat), entryAvailability(entry).ok ? 'YES' : 'NO', ''
-    ]));
-    const collections = readCollections();
-    for (const slotName of ['favorite1', 'favorite2']) {
-      collections[slotName].forEach((entry, index) => rows.push([
-        slotName === 'favorite1' ? 'FAVORITE_1' : 'FAVORITE_2', index + 1,
-        ...descriptorCsv(entry.don), ...descriptorCsv(entry.kat), entryAvailability(entry).ok ? 'YES' : 'NO', entry.createdAt || ''
-      ]));
-    }
-    return '\ufeff' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
-  }
-
-  async function exportCsv() {
-    const file = new File([makeCsv()], 'osu_taiko_hitsound_lab_pairs.csv', { type: 'text/csv;charset=utf-8' });
-    try {
-      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ files: [file], title: 'osu!taiko Hitsound Lab Pairs' });
-        setSheetStatus('CSVを共有しました');
-        return;
-      }
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-    }
-    const url = URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = file.name;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setSheetStatus('CSVを出力しました');
+    if (openSource) renderDropdown();
   }
 
   for (const [slotName, button] of Object.entries(toggleButtons)) {
@@ -471,10 +466,16 @@
   for (const [slotName, button] of Object.entries(listButtons)) {
     button?.addEventListener('click', event => {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       openDropdown(slotName);
-    });
+    }, { capture: true });
   }
+
+  setButton?.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openDropdown('preset');
+  }, { capture: true });
 
   ensureDropdown()?.addEventListener('click', event => {
     const del = event.target.closest('[data-favorite-delete]');
@@ -483,32 +484,24 @@
       removeEntry(del.dataset.favoriteSlot, del.dataset.favoriteDelete);
       return;
     }
-    const apply = event.target.closest('[data-favorite-apply]');
-    if (apply) {
-      event.preventDefault();
-      const collections = readCollections();
-      const slotName = apply.dataset.favoriteSlot;
-      const entry = collections[slotName]?.find(item => item.id === apply.dataset.favoriteApply);
-      if (entry) applyEntry(entry, slotName).catch(error => setFeedback(error?.message || '適用できませんでした', true));
-    }
-  });
 
-  setButton?.addEventListener('click', closeDropdown);
-
-  exportButton?.addEventListener('click', event => {
+    const apply = event.target.closest('[data-pair-apply]');
+    if (!apply) return;
     event.preventDefault();
-    event.stopImmediatePropagation();
-    exportCsv().catch(error => setSheetStatus(error?.message || 'CSVを出力できませんでした', true));
-  }, { capture: true });
+    const source = apply.dataset.pairSource;
+    const entry = dropdownItems(source).find(item => item.id === apply.dataset.pairApply);
+    if (entry) applyEntry(entry, source).catch(error => setFeedback(error?.message || '適用できませんでした', true));
+  });
 
   document.addEventListener('pointerdown', event => {
-    if (!openSlot || !dropdown || dropdown.hidden) return;
+    if (!openSource || !dropdown || dropdown.hidden) return;
     if (dropdown.contains(event.target)) return;
-    if (Object.values(listButtons).some(button => button?.contains(event.target))) return;
+    if (triggerButtons().some(button => button.contains(event.target))) return;
     closeDropdown();
   });
+
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && openSlot) closeDropdown();
+    if (event.key === 'Escape' && openSource) closeDropdown();
   });
 
   window.addEventListener('hitsound-selection-change', () => queueMicrotask(renderAll));
@@ -523,7 +516,7 @@
   });
 
   const style = document.createElement('style');
-  style.dataset.feature = 'favorite-split-dropdown-v3';
+  style.dataset.feature = 'favorite-unified-dropdown-v4';
   style.textContent = `
     .judgment-panel{position:relative!important}
     .judgment-actions{
@@ -543,7 +536,8 @@
       padding:0 5px!important;background:transparent!important;color:rgba(255,255,255,.78)!important;
       font-size:9px!important;font-weight:850!important;line-height:1.1!important;white-space:nowrap!important;
     }
-    .favorite-split .favorite-list-button[aria-expanded="true"]{background:rgba(121,212,236,.14)!important;color:#f1fcff!important}
+    .favorite-split .favorite-list-button[aria-expanded="true"],
+    .judgment-actions .preset-action[aria-expanded="true"]{background:rgba(121,212,236,.15)!important;color:#f1fcff!important}
     .favorite-split .favorite-one[aria-pressed="true"]{
       color:#fff3c7!important;background:rgba(137,109,39,.42)!important;
       box-shadow:inset 0 0 12px rgba(244,212,125,.15)!important;
@@ -561,23 +555,55 @@
     .favorite-quick-dropdown[hidden]{display:none!important}
     .favorite-quick-dropdown{
       position:absolute;z-index:80;top:calc(100% + 5px);left:50%;transform:translateX(-50%);
-      width:min(344px,calc(100vw - 28px));max-height:min(310px,48dvh);overflow:auto;overscroll-behavior:contain;
+      width:min(356px,calc(100vw - 24px));max-height:min(362px,54dvh);overflow:auto;overscroll-behavior:contain;
       padding:8px;border:1px solid rgba(121,212,236,.38);border-radius:12px;
       background:linear-gradient(180deg,rgba(28,46,55,.985),rgba(19,32,39,.99));box-shadow:0 15px 38px rgba(0,0,0,.48);
     }
     .favorite-dropdown-head{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px;color:#eefbff;font-size:11px}
     .favorite-dropdown-head span{color:rgba(255,255,255,.58);font-variant-numeric:tabular-nums}
-    .favorite-dropdown-list{display:grid;gap:5px}
-    .favorite-dropdown-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:5px}
+    .favorite-dropdown-list{display:grid;gap:6px}
+    .favorite-dropdown-row{
+      display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:5px;padding:2px;
+      border:1px solid transparent;border-radius:10px;background:transparent;
+    }
+    .favorite-dropdown-row:not(:has(.favorite-dropdown-delete)){grid-template-columns:minmax(0,1fr)}
+    .favorite-dropdown-row.is-current-selection{
+      border-color:rgba(139,224,244,.68);
+      background:rgba(91,177,199,.18);
+      box-shadow:inset 0 0 0 1px rgba(218,250,255,.07),0 0 12px rgba(75,232,255,.08);
+    }
     .favorite-dropdown-apply,.favorite-dropdown-delete{min-height:44px!important;border-radius:8px!important}
-    .favorite-dropdown-apply{padding:0 10px!important;text-align:left!important;font-size:11px!important;font-weight:800!important}
-    .favorite-dropdown-delete{padding:0!important;color:#ffd0d2!important;background:rgba(121,48,55,.34)!important;font-size:17px!important;font-weight:900!important}
+    .favorite-dropdown-apply{
+      min-width:0;padding:0 10px!important;display:grid!important;
+      grid-template-columns:42px minmax(74px,1fr) minmax(74px,1fr);align-items:center;column-gap:11px;
+      border:1px solid rgba(255,255,255,.12)!important;background:rgba(255,255,255,.035)!important;
+      color:#fff!important;text-align:left!important;font-variant-numeric:tabular-nums;
+    }
+    .favorite-dropdown-row.is-current-selection .favorite-dropdown-apply{background:rgba(121,212,236,.08)!important}
+    .favorite-card-rank{
+      display:grid;place-items:center;align-self:stretch;border-right:1px solid rgba(255,255,255,.11);
+      color:rgba(255,255,255,.72);font-size:15px;font-weight:850;
+    }
+    .favorite-card-source{
+      min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;
+      color:#f3f7f9;font-size:14px;font-weight:900;letter-spacing:.035em;white-space:nowrap;
+    }
+    .favorite-card-source::before{content:"";width:10px;height:10px;flex:0 0 10px;border-radius:50%}
+    .favorite-card-source.don::before{background:#e8656c;box-shadow:0 0 7px rgba(232,101,108,.25)}
+    .favorite-card-source.kat::before{background:#68b9dc;box-shadow:0 0 7px rgba(104,185,220,.25)}
+    .favorite-dropdown-delete{
+      padding:0!important;color:#ffd0d2!important;background:rgba(121,48,55,.27)!important;
+      border:1px solid rgba(255,184,188,.14)!important;font-size:16px!important;font-weight:900!important;
+    }
     .favorite-dropdown-empty{margin:0;padding:14px 8px;color:rgba(255,255,255,.60);font-size:11px;text-align:center}
     @media(max-width:430px){
       .judgment-actions{grid-template-columns:108px 108px 78px!important;gap:6px!important}
       .favorite-split{grid-template-columns:40px minmax(0,1fr)}
       .favorite-split .favorite-list-button{font-size:8px!important;padding-inline:3px!important}
       .judgment-actions .preset-action{width:78px!important;min-width:78px!important;padding-inline:5px!important;font-size:8px!important}
+      .favorite-quick-dropdown{width:min(350px,calc(100vw - 18px));padding:7px}
+      .favorite-dropdown-apply{grid-template-columns:38px minmax(68px,1fr) minmax(68px,1fr);column-gap:8px;padding-inline:7px!important}
+      .favorite-card-source{font-size:13px;gap:6px}
     }
   `;
   document.head.appendChild(style);
