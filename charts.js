@@ -75,7 +75,8 @@ window.TEST_CHARTS = [
     "id": "shuuten-no-saki",
     "title": "終点の先が在るとするならば。(あ? edit)",
     "difficulty": "Finale Oni",
-    "file": "maps/shuuten-no-saki.osz"
+    "file": "maps/shuuten-no-saki.osz",
+    "revision": "20260826-shuuten-audiofix-v2"
   },
   {
     "id": "1208",
