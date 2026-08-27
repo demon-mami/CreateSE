@@ -93,10 +93,10 @@ test('favorite toggle glow reflects only the current pair', () => {
   assert.doesNotMatch(favoriteSlot, /classList\.toggle\('has-saved-pair'/);
 });
 
-test('chart rotation removes four old maps and adds four verified replacement maps', () => {
+test('chart rotations keep 15 maps and include the 20260828 replacements', () => {
   const blocks = [...charts.matchAll(/\{[\s\S]*?\}/g)].map(match => match[0]);
   assert.equal(blocks.length, 15);
-  for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls']) {
+  for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls','over-the-fullereneshift','sunglow','paralysis']) {
     assert.doesNotMatch(charts, new RegExp(`"id": "${removed}"`));
   }
   const expected = [
@@ -104,6 +104,9 @@ test('chart rotation removes four old maps and adds four verified replacement ma
     ['shuuten-no-saki', '終点の先が在るとするならば。(あ? edit)', 'Finale Oni', 'maps/shuuten-no-saki.osz'],
     ['1208', '#1208', 'Inner Oni', 'maps/1208.osz'],
     ['trancing-pulse-brz', 'Trancing Pulse (brz_bootleg_remix)', 'Taiko Master', 'maps/trancing-pulse-brz.osz'],
+    ['elna-dia', "El'na dia", "Burakonine's Tale of Greed", 'maps/elna-dia.osz'],
+    ['kaeru', 'KAERU', '^^ 1.13x', 'maps/kaeru.osz'],
+    ['dream-vandalism', 'Dream Vandalism', 'Inner Oni', 'maps/dream-vandalism.osz'],
   ];
   for (const [id, title, difficulty, file] of expected) {
     assert.ok(charts.includes(`"id": "${id}"`), `${id} is missing`);
@@ -112,7 +115,7 @@ test('chart rotation removes four old maps and adds four verified replacement ma
     assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
   }
   assert.match(charts, /"revision": "20260826-shuuten-audiofix-v2"/);
-  assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);
+  assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);
   assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
   assert.match(chartLoader, /function chartFileUrl\(chart\)/);
   assert.match(chartLoader, /encodeURIComponent\(chart\.revision\)/);
@@ -121,9 +124,12 @@ test('chart rotation removes four old maps and adds four verified replacement ma
   assert.match(pages, /cat \.map-assets\/maps-wave-20260826-\*\.part > \/tmp\/maps-wave-20260826\.zip/);
   assert.match(pages, /maps-wave-20260826\.sha256/);
   assert.match(pages, /unzip -q \/tmp\/maps-wave-20260826\.zip -d _site\/maps/);
+  assert.match(pages, /cat \.map-assets\/maps-wave-20260828-\*\.part > \/tmp\/maps-wave-20260828\.zip/);
+  assert.match(pages, /maps-wave-20260828\.sha256/);
+  assert.match(pages, /unzip -q \/tmp\/maps-wave-20260828\.zip -d _site\/maps/);
   assert.match(pages, /cat \.map-assets\/maps-shuuten-fix-20260826-\*\.part > \/tmp\/maps-shuuten-fix-20260826\.zip/);
   assert.match(pages, /maps-shuuten-fix-20260826\.sha256/);
-  assert.match(pages, /unzip -oq \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);
+  assert.match(pages, /unzip -qo \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);
 });
 
 test('app frame uses only the AudioContext engine clock for the lane', () => {
@@ -186,7 +192,7 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
-  assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);
+  assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);
   assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
 });
 
