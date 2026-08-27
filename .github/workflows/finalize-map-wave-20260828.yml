@@ -1,0 +1,184 @@
+name: Finalize chart rotation 20260828
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/finalize-map-wave-20260828.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Update chart registry, Pages and regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          charts = r'''window.TEST_CHARTS = [
+            {
+              "id": "tool-assisted-speedcore",
+              "title": "Tool-Assisted Speedcore (TQBF Frame Advance RMX)",
+              "difficulty": "Frame Perfect",
+              "entry": "tool-assisted-speedcore.osz"
+            },
+            {
+              "id": "everytime-we-touch-700",
+              "title": "Everytime We Touch [Fvrwvrd's 700 BPM Speedcore Edit]",
+              "difficulty": "ler's Elite Rizz",
+              "file": "maps/everytime-we-touch-700.osz"
+            },
+            {
+              "id": "fuzzy-future",
+              "title": "ファジィフューチャー",
+              "difficulty": "Future",
+              "file": "maps/fuzzy-future.osz"
+            },
+            {
+              "id": "wandering-melody-of-love",
+              "title": "迷える音色は恋の唄",
+              "difficulty": "Melodic Romance",
+              "file": "maps/wandering-melody-of-love.osz"
+            },
+            {
+              "id": "a-flying-dance-hall",
+              "title": "A flying Dance Hall",
+              "difficulty": "Skyglide Pavilion",
+              "file": "maps/a-flying-dance-hall.osz"
+            },
+            {
+              "id": "kusakusa-mimika",
+              "title": "草草！ミミカ",
+              "difficulty": "kusa sugite kusa",
+              "file": "maps/kusakusa-mimika.osz"
+            },
+            {
+              "id": "sainou-shredder",
+              "title": "才能シュレッダー",
+              "difficulty": "ll-taiko Sp.",
+              "file": "maps/sainou-shredder.osz"
+            },
+            {
+              "id": "12-squared-x-pi-minus-13",
+              "title": "12^2x3.14-13",
+              "difficulty": "13 Hours of Love",
+              "file": "maps/12-squared-x-pi-minus-13.osz"
+            },
+            {
+              "id": "if",
+              "title": "イフ",
+              "difficulty": "arc & Hivie's Cold Truths under the Radiant Sunlight",
+              "file": "maps/if.osz"
+            },
+            {
+              "id": "shuuten-no-saki",
+              "title": "終点の先が在るとするならば。(あ? edit)",
+              "difficulty": "Finale Oni",
+              "file": "maps/shuuten-no-saki.osz",
+              "revision": "20260826-shuuten-audiofix-v2"
+            },
+            {
+              "id": "1208",
+              "title": "#1208",
+              "difficulty": "Inner Oni",
+              "file": "maps/1208.osz"
+            },
+            {
+              "id": "trancing-pulse-brz",
+              "title": "Trancing Pulse (brz_bootleg_remix)",
+              "difficulty": "Taiko Master",
+              "file": "maps/trancing-pulse-brz.osz"
+            },
+            {
+              "id": "elna-dia",
+              "title": "El'na dia",
+              "difficulty": "Burakonine's Tale of Greed",
+              "file": "maps/elna-dia.osz"
+            },
+            {
+              "id": "kaeru",
+              "title": "KAERU",
+              "difficulty": "^^ 1.13x",
+              "file": "maps/kaeru.osz"
+            },
+            {
+              "id": "dream-vandalism",
+              "title": "Dream Vandalism",
+              "difficulty": "Inner Oni",
+              "file": "maps/dream-vandalism.osz"
+            }
+          ];
+          '''
+          Path('charts.js').write_text(charts, encoding='utf-8')
+
+          index = Path('index.html').read_text(encoding='utf-8')
+          old_cache = 'charts.js?v=0.5-shuuten-cache-bust'
+          new_cache = 'charts.js?v=0.6-20260828-rotation'
+          if old_cache not in index:
+              raise RuntimeError('old charts.js cache key not found')
+          Path('index.html').write_text(index.replace(old_cache, new_cache, 1), encoding='utf-8')
+
+          pages_path = Path('.github/workflows/pages.yml')
+          pages = pages_path.read_text(encoding='utf-8')
+          marker = '''          # Overwrite only Shuuten with the repaired MP3-frame-preserving OSZ.\n'''
+          wave = '''          # Rebuild and verify the 2026-08-28 replacement-map wave.\n          cat .map-assets/maps-wave-20260828-*.part > /tmp/maps-wave-20260828.zip\n          (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-wave-20260828.sha256")\n          unzip -q /tmp/maps-wave-20260828.zip -d _site/maps\n\n'''
+          if marker not in pages:
+              raise RuntimeError('Pages insertion marker not found')
+          pages = pages.replace(marker, wave + marker, 1)
+          pages_path.write_text(pages, encoding='utf-8')
+
+          tests_path = Path('tests/workbench-static.test.mjs')
+          tests = tests_path.read_text(encoding='utf-8')
+          tests = tests.replace(
+              "test('chart rotation removes four old maps and adds four verified replacement maps', () => {",
+              "test('chart rotations keep 15 maps and include the 20260828 replacements', () => {",
+              1,
+          )
+          old_removed = "for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls']) {"
+          new_removed = "for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls','over-the-fullereneshift','sunglow','paralysis']) {"
+          if old_removed not in tests:
+              raise RuntimeError('removed chart regression list not found')
+          tests = tests.replace(old_removed, new_removed, 1)
+
+          old_expected_tail = "    ['trancing-pulse-brz', 'Trancing Pulse (brz_bootleg_remix)', 'Taiko Master', 'maps/trancing-pulse-brz.osz'],\n  ];"
+          new_expected_tail = "    ['trancing-pulse-brz', 'Trancing Pulse (brz_bootleg_remix)', 'Taiko Master', 'maps/trancing-pulse-brz.osz'],\n    ['elna-dia', \"El'na dia\", \"Burakonine's Tale of Greed\", 'maps/elna-dia.osz'],\n    ['kaeru', 'KAERU', '^^ 1.13x', 'maps/kaeru.osz'],\n    ['dream-vandalism', 'Dream Vandalism', 'Inner Oni', 'maps/dream-vandalism.osz'],\n  ];"
+          if old_expected_tail not in tests:
+              raise RuntimeError('expected chart tail not found')
+          tests = tests.replace(old_expected_tail, new_expected_tail, 1)
+
+          tests = tests.replace(
+              r"assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);",
+              r"assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);",
+          )
+          pages_marker = "  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260826\\.zip -d _site\\/maps/);\n"
+          pages_add = pages_marker + "  assert.match(pages, /cat \\.map-assets\\/maps-wave-20260828-\\*\\.part > \\/tmp\\/maps-wave-20260828\\.zip/);\n  assert.match(pages, /maps-wave-20260828\\.sha256/);\n  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260828\\.zip -d _site\\/maps/);\n"
+          if pages_marker not in tests:
+              raise RuntimeError('20260826 Pages regression marker not found')
+          tests = tests.replace(pages_marker, pages_add, 1)
+          tests_path.write_text(tests, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit finalized rotation and remove one-shot workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/import-map-wave-20260828.yml
+          git rm .github/workflows/finalize-map-wave-20260828.yml
+          git add charts.js index.html .github/workflows/pages.yml tests/workbench-static.test.mjs
+          git commit -m 'Rotate three charts for 20260828'
+          git push
