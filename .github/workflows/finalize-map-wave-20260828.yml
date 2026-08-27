@@ -18,6 +18,26 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+            /charts.js
+            /app-v4.js
+            /object-timeline-v2.js
+            /hitsound-controller.js
+            /hitsound-favorites.js
+            /favorite-slot-ui.js
+            /candidates.js
+            /chart-loader.js
+            /hitsound-grid.js
+            /workbench-ui.js
+            /orientation-guard.js
+            /hitsounds-current111-abc-v5.zip
+            /tests/
+            /.github/workflows/pages.yml
+            /.github/workflows/import-map-wave-20260828.yml
+            /.github/workflows/finalize-map-wave-20260828.yml
 
       - name: Update chart registry, Pages and regression checks
         shell: bash
@@ -160,6 +180,10 @@ jobs:
           tests = tests.replace(
               r"assert.match(html, /charts\.js\?v=0\.5-shuuten-cache-bust/);",
               r"assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);",
+          )
+          tests = tests.replace(
+              r"assert.match(pages, /unzip -oq \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);",
+              r"assert.match(pages, /unzip -qo \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);",
           )
           pages_marker = "  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260826\\.zip -d _site\\/maps/);\n"
           pages_add = pages_marker + "  assert.match(pages, /cat \\.map-assets\\/maps-wave-20260828-\\*\\.part > \\/tmp\\/maps-wave-20260828\\.zip/);\n  assert.match(pages, /maps-wave-20260828\\.sha256/);\n  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260828\\.zip -d _site\\/maps/);\n"
