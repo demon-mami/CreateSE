@@ -1,21 +1,9 @@
 window.TEST_CHARTS = [
   {
-    "id": "over-the-fullereneshift",
-    "title": "Over the Fullereneshift",
-    "difficulty": "Eternity",
-    "entry": "over-the-fullereneshift.osz"
-  },
-  {
     "id": "tool-assisted-speedcore",
     "title": "Tool-Assisted Speedcore (TQBF Frame Advance RMX)",
     "difficulty": "Frame Perfect",
     "entry": "tool-assisted-speedcore.osz"
-  },
-  {
-    "id": "sunglow",
-    "title": "Sunglow (Sped Up Ver.)",
-    "difficulty": "Blazing Hope of the Dazzling Sun",
-    "entry": "sunglow.osz"
   },
   {
     "id": "everytime-we-touch-700",
@@ -28,12 +16,6 @@ window.TEST_CHARTS = [
     "title": "ファジィフューチャー",
     "difficulty": "Future",
     "file": "maps/fuzzy-future.osz"
-  },
-  {
-    "id": "paralysis",
-    "title": "Paralysis",
-    "difficulty": "Roxy- & Maeda's Hell Oni",
-    "file": "maps/paralysis.osz"
   },
   {
     "id": "wandering-melody-of-love",
@@ -89,5 +71,23 @@ window.TEST_CHARTS = [
     "title": "Trancing Pulse (brz_bootleg_remix)",
     "difficulty": "Taiko Master",
     "file": "maps/trancing-pulse-brz.osz"
+  },
+  {
+    "id": "elna-dia",
+    "title": "El'na dia",
+    "difficulty": "Burakonine's Tale of Greed",
+    "file": "maps/elna-dia.osz"
+  },
+  {
+    "id": "kaeru",
+    "title": "KAERU",
+    "difficulty": "^^ 1.13x",
+    "file": "maps/kaeru.osz"
+  },
+  {
+    "id": "dream-vandalism",
+    "title": "Dream Vandalism",
+    "difficulty": "Inner Oni",
+    "file": "maps/dream-vandalism.osz"
   }
 ];
