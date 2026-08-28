@@ -23,7 +23,7 @@
   const SILENT_ID = controller.SILENT_ID;
   const LEGACY_DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5';
   const ACTIVE_SIDE_STORAGE_KEY = 'osutaiko-hitsound-lab:active-side:v1';
-  const CUSTOM_SLOT_COUNT = 4;
+  const CUSTOM_SLOT_COUNT = 8;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
   const CUSTOM_STORE_NAME = 'sounds';
   const MAX_CUSTOM_FILE_BYTES = 8 * 1024 * 1024;
@@ -278,17 +278,6 @@
     return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
   }
 
-  async function deleteCustomRecord(id) {
-    const db = await openCustomDb();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(CUSTOM_STORE_NAME, 'readwrite');
-      transaction.objectStore(CUSTOM_STORE_NAME).delete(id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error('ユーザー音源を削除できません。'));
-      transaction.onabort = () => reject(transaction.error || new Error('ユーザー音源の削除が中断されました。'));
-    });
-  }
-
   function renderCustomSlots() {
     const fragment = document.createDocumentFragment();
 
@@ -322,18 +311,7 @@
         soundFace.textContent = record.sourceNumber;
         soundButton.append(soundFace);
 
-        const deleteButton = document.createElement('button');
-        deleteButton.type = 'button';
-        deleteButton.className = 'hs-key custom-sound-delete';
-        deleteButton.dataset.deleteCustom = id;
-        deleteButton.disabled = customBusy;
-        deleteButton.title = `${record.name} を削除`;
-        deleteButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を削除`);
-        const deleteFace = document.createElement('span');
-        deleteFace.textContent = '×';
-        deleteButton.append(deleteFace);
-
-        item.append(soundButton, deleteButton);
+        item.append(soundButton);
       }
       fragment.append(item);
     }
@@ -550,35 +528,6 @@
     window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
   }
 
-  async function removeCustomSound(id) {
-    const record = customRecords.get(id);
-    if (!record || customBusy) return;
-
-    customBusy = true;
-    customRecords.delete(id);
-    renderCustomSlots();
-
-    let deleteError = null;
-    try {
-      await Promise.all([
-        controller.unregisterCustomSource(id),
-        deleteCustomRecord(id).catch(error => { deleteError = error; }),
-      ]);
-    } finally {
-      customBusy = false;
-      renderCustomSlots();
-      paint();
-    }
-
-    if (deleteError) {
-      console.warn('保存済みユーザー音源を削除できませんでした。', deleteError);
-      setCustomStatus('画面から削除しましたが保存データを削除できませんでした。', { error: true });
-    } else {
-      setCustomStatus(`${record.sourceNumber} ${record.name} を削除しました`);
-    }
-    window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
-  }
-
   function setActiveSide(side) {
     if (side !== 'don' && side !== 'kat') return;
     controller.stopPreview();
@@ -648,16 +597,6 @@
 
   customSlots.addEventListener('click', event => {
     if (customBusy || !customReady) return;
-
-    const deleteButton = event.target.closest('[data-delete-custom]');
-    if (deleteButton && customSlots.contains(deleteButton)) {
-      const record = customRecords.get(deleteButton.dataset.deleteCustom);
-      if (!record || !window.confirm(`${record.sourceNumber} ${record.name} をMy Soundから削除しますか？`)) return;
-      removeCustomSound(deleteButton.dataset.deleteCustom).catch(error => {
-        setCustomStatus(error.message || 'My Soundを削除できませんでした。', { error: true });
-      });
-      return;
-    }
 
     const addButton = event.target.closest('[data-upload-slot]');
     if (addButton && customSlots.contains(addButton)) {

@@ -3,7 +3,7 @@
 
   const CANDIDATES = Array.isArray(window.HITSOUND_CANDIDATES) ? window.HITSOUND_CANDIDATES : [];
   const SILENT_ID = '__SILENT__';
-  const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-4]__$/;
+  const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-8]__$/;
   const SELECTION_STORAGE_KEY = 'osutaiko-hitsound-lab:selection:current111-abc-v5';
   const previewAudio = document.getElementById('samplePreviewAudio');
   if (!CANDIDATES.length) return;

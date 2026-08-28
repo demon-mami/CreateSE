@@ -13,6 +13,7 @@ const candidates = read('candidates.js');
 const charts = read('charts.js');
 const chartLoader = read('chart-loader.js');
 const grid = read('hitsound-grid.js');
+const gridCss = read('hitsound-grid.css');
 const workbench = read('workbench-ui.js');
 const pages = read('.github/workflows/pages.yml');
 const orientation = read('orientation-guard.js');
@@ -91,6 +92,18 @@ test('favorite toggle glow reflects only the current pair', () => {
   assert.match(favoriteSlot, /button\.textContent = isOne \? \(currentSaved \? '♥' : '♡'\) : \(currentSaved \? '★' : '☆'\);/);
   assert.doesNotMatch(favoriteSlot, /items\.length \? '♥'|items\.length \? '★'/);
   assert.doesNotMatch(favoriteSlot, /classList\.toggle\('has-saved-pair'/);
+});
+
+test('My Sound provides eight slots without delete controls', () => {
+  assert.match(html, /hitsound-grid\.css\?v=4\.4-my-sound-8/);
+  assert.match(html, /hitsound-grid\.js\?v=4\.3-my-sound-8/);
+  assert.match(html, /id="customSoundCount"[^>]*>0 \/ 8<\/span>/);
+  assert.ok(controller.includes('const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-8]__$/;'));
+  assert.match(grid, /const CUSTOM_SLOT_COUNT = 8;/);
+  assert.doesNotMatch(grid, /data-delete-custom|custom-sound-delete|deleteCustomRecord|removeCustomSound/);
+  assert.doesNotMatch(gridCss, /custom-sound-delete/);
+  assert.match(gridCss, /grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/);
+  assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:5px\}/);
 });
 
 test('chart rotations keep 15 maps and include the 20260828 replacements', () => {
@@ -189,7 +202,7 @@ test('supported device orientation is fixed to iPhone portrait and iPad landscap
 test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /app-v4\.js\?v=4\.2-engine-clock-fixed-ui/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
-  assert.match(html, /hitsound-controller\.js\?v=4\.2-direct-only/);
+  assert.match(html, /hitsound-controller\.js\?v=4\.3-custom8/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
   assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);
