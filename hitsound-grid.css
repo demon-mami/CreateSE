@@ -216,12 +216,40 @@
 }
 .custom-sound-grid .custom-sound-key,
 .custom-sound-grid .custom-sound-add{min-width:0}
-.custom-sound-key>span{padding:0 6px}
+.custom-sound-key>span{padding:0 27px 0 6px}
 .custom-sound-add>span{
   border-style:dashed;
   color:rgba(255,255,255,.55);
   font-size:15px;
 }
+.custom-sound-grid .custom-sound-replace{
+  position:absolute;
+  top:0;
+  right:0;
+  z-index:4;
+  width:27px;
+  min-width:27px;
+  padding:0 0 4px;
+}
+.custom-sound-replace::before{display:none}
+.custom-sound-replace>span{
+  height:30px;
+  border:0;
+  border-radius:0 10px 10px 0;
+  background:rgba(255,255,255,.035);
+  box-shadow:inset 1px 0 rgba(255,255,255,.09);
+  color:rgba(255,255,255,.58);
+  font-size:13px;
+}
+.custom-sound-replace:active>span{
+  background:rgba(255,255,255,.095);
+  color:rgba(255,255,255,.92);
+}
+.custom-sound-key.selected-don + .custom-sound-replace>span,
+.custom-sound-key.selected-kat + .custom-sound-replace>span{transform:translateY(4px)}
+.custom-sound-key.selected-don + .custom-sound-replace>span{color:#8b3440}
+.custom-sound-key.selected-kat + .custom-sound-replace>span{color:#326c85}
+.custom-sound-key.selected-don.selected-kat + .custom-sound-replace>span{color:#594f58}
 .custom-sound-grid .hs-key:disabled{cursor:default;opacity:.46}
 .custom-sound-grid .hs-key:disabled>span{transform:none!important}
 
@@ -359,7 +387,8 @@
   .hs-action-button>span{height:31px}
   .hs-family-row,.hs-family-grid{gap:5px}
   .custom-sound-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
-  .custom-sound-key>span{padding-inline:5px}
+  .custom-sound-key>span{padding:0 25px 0 5px}
+  .custom-sound-grid .custom-sound-replace{width:25px;min-width:25px}
   .hs-key>span{height:29px}
   .favorite-set-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
   #hitsoundGrid{padding:7px;gap:6px}

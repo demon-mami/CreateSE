@@ -40,6 +40,7 @@
   let customReady = false;
   let customBusy = false;
   let uploadTargetSlot = null;
+  let uploadReplace = false;
   let renderedRowCapacity = 0;
 
   const familyOf = candidate => candidate?.originalFamily || candidate?.family || 'Other';
@@ -311,7 +312,18 @@
         soundFace.textContent = record.sourceNumber;
         soundButton.append(soundFace);
 
-        item.append(soundButton);
+        const replaceButton = document.createElement('button');
+        replaceButton.type = 'button';
+        replaceButton.className = 'hs-key custom-sound-replace';
+        replaceButton.dataset.replaceSlot = String(slot);
+        replaceButton.disabled = customBusy;
+        replaceButton.title = `${record.sourceNumber} ${record.name} を変更`;
+        replaceButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を別のWAVへ変更`);
+        const replaceFace = document.createElement('span');
+        replaceFace.textContent = '↻';
+        replaceButton.append(replaceFace);
+
+        item.append(soundButton, replaceButton);
       }
       fragment.append(item);
     }
@@ -417,12 +429,17 @@
     }
   }
 
-  function requestCustomUpload(slot) {
+  function requestCustomUpload(slot, { replace = false } = {}) {
     if (!customReady || customBusy || slot < 1 || slot > CUSTOM_SLOT_COUNT) return;
-    if (customRecords.has(customIdForSlot(slot))) return;
+    const id = customIdForSlot(slot);
+    const occupied = customRecords.has(id);
+    if (replace ? !occupied : occupied) return;
     uploadTargetSlot = slot;
+    uploadReplace = replace;
     customInput.value = '';
-    setCustomStatus(`My Sound ${slot} に追加するWAVを選択してください`);
+    setCustomStatus(replace
+      ? `My Sound ${slot} を変更するWAVを選択してください`
+      : `My Sound ${slot} に追加するWAVを選択してください`);
     customInput.click();
   }
 
@@ -470,9 +487,10 @@
     }
   }
 
-  async function addCustomSound(file, slot) {
+  async function saveCustomSound(file, slot, { replace = false } = {}) {
     const id = customIdForSlot(slot);
-    if (!file || customBusy || customRecords.has(id)) return;
+    const existing = customRecords.get(id) || null;
+    if (!file || customBusy || (replace ? !existing : !!existing)) return;
 
     customBusy = true;
     renderCustomSlots();
@@ -495,20 +513,24 @@
         bytes,
       });
       customRecords.set(id, record);
-
       try {
         await writeCustomRecord(record);
       } catch (error) {
         persistenceError = error;
         console.warn('ユーザー音源をブラウザに保存できませんでした。', error);
       }
-      setCustomStatus(`${record.sourceNumber} ${record.name} を追加しました`);
+      setCustomStatus(`${record.sourceNumber} ${record.name} を${replace ? '変更' : '追加'}しました`);
     } catch (error) {
       if (record) {
-        customRecords.delete(id);
-        await controller.unregisterCustomSource(id).catch(() => {});
+        if (replace && existing) {
+          const restored = controller.registerCustomSource(id, existing);
+          customRecords.set(id, restored);
+        } else {
+          customRecords.delete(id);
+          await controller.unregisterCustomSource(id).catch(() => {});
+        }
       }
-      setCustomStatus(error instanceof Error ? error.message : '音源を追加できませんでした。', { error: true });
+      setCustomStatus(error instanceof Error ? error.message : `音源を${replace ? '変更' : '追加'}できませんでした。`, { error: true });
       throw error;
     } finally {
       customBusy = false;
@@ -517,13 +539,26 @@
     }
 
     if (persistenceError) {
-      setCustomStatus('音源は使用できますが保存できませんでした。次回は再追加してください。', { error: true });
+      setCustomStatus(replace
+        ? '変更した音源は現在使用できますが保存できませんでした。次回起動時は以前の音源に戻ります。'
+        : '音源は使用できますが保存できませんでした。次回は再追加してください。', { error: true });
     }
 
-    try {
-      await chooseSound(id, { preview: false });
-    } catch (error) {
-      setCustomStatus(`音源は追加しましたが選択を反映できませんでした。${error.message}`, { error: true });
+    if (replace) {
+      const selection = controller.getSelection();
+      if (selection.don === id || selection.kat === id) {
+        try {
+          await controller.applyPair();
+        } catch (error) {
+          setCustomStatus(`音源は変更しましたが再生側へ反映できませんでした。${error.message}`, { error: true });
+        }
+      }
+    } else {
+      try {
+        await chooseSound(id, { preview: false });
+      } catch (error) {
+        setCustomStatus(`音源は追加しましたが選択を反映できませんでした。${error.message}`, { error: true });
+      }
     }
     window.dispatchEvent(new CustomEvent('hitsound-custom-sources-change'));
   }
@@ -598,6 +633,12 @@
   customSlots.addEventListener('click', event => {
     if (customBusy || !customReady) return;
 
+    const replaceButton = event.target.closest('[data-replace-slot]');
+    if (replaceButton && customSlots.contains(replaceButton)) {
+      requestCustomUpload(Number(replaceButton.dataset.replaceSlot), { replace: true });
+      return;
+    }
+
     const addButton = event.target.closest('[data-upload-slot]');
     if (addButton && customSlots.contains(addButton)) {
       requestCustomUpload(Number(addButton.dataset.uploadSlot));
@@ -613,19 +654,23 @@
   customInput.addEventListener('change', () => {
     const file = customInput.files?.[0] || null;
     const slot = uploadTargetSlot;
+    const replace = uploadReplace;
     uploadTargetSlot = null;
+    uploadReplace = false;
     customInput.value = '';
     if (!slot) return;
     if (!file) {
-      setCustomStatus('音源の追加をキャンセルしました');
+      setCustomStatus(`音源の${replace ? '変更' : '追加'}をキャンセルしました`);
       return;
     }
     setCustomStatus(`${file.name} を確認しています…`);
-    addCustomSound(file, slot).catch(() => {});
+    saveCustomSound(file, slot, { replace }).catch(() => {});
   });
   customInput.addEventListener('cancel', () => {
+    const replace = uploadReplace;
     uploadTargetSlot = null;
-    setCustomStatus('音源の追加をキャンセルしました');
+    uploadReplace = false;
+    setCustomStatus(`音源の${replace ? '変更' : '追加'}をキャンセルしました`);
   });
 
   window.addEventListener('hitsound-selection-change', paint);
