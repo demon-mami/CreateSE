@@ -217,6 +217,16 @@
 .custom-sound-grid .custom-sound-key,
 .custom-sound-grid .custom-sound-add{min-width:0}
 .custom-sound-key>span{padding:0 27px 0 6px}
+.custom-sound-label{
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  text-align:center;
+  font-size:9px;
+  letter-spacing:-.02em;
+}
 .custom-sound-add>span{
   border-style:dashed;
   color:rgba(255,255,255,.55);

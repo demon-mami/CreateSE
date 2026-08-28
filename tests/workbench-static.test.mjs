@@ -95,8 +95,8 @@ test('favorite toggle glow reflects only the current pair', () => {
 });
 
 test('My Sound provides eight slots without delete controls', () => {
-  assert.match(html, /hitsound-grid\.css\?v=4\.5-my-sound-replace/);
-  assert.match(html, /hitsound-grid\.js\?v=4\.4-my-sound-replace/);
+  assert.match(html, /hitsound-grid\.css\?v=4\.6-filename-label/);
+  assert.match(html, /hitsound-grid\.js\?v=4\.5-filename-label/);
   assert.match(html, /id="customSoundCount"[^>]*>0 \/ 8<\/span>/);
   assert.ok(controller.includes('const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-8]__$/;'));
   assert.match(grid, /const CUSTOM_SLOT_COUNT = 8;/);
@@ -107,6 +107,12 @@ test('My Sound provides eight slots without delete controls', () => {
   assert.match(grid, /async function saveCustomSound\(file, slot, \{ replace = false \} = \{\}\)/);
   assert.match(grid, /if \(replace\) \{[\s\S]*?controller\.applyPair\(\)/);
   assert.match(gridCss, /custom-sound-replace/);
+  assert.match(html, /<title>まみ専用 SE確認<\/title>/);
+  assert.match(html, /<h1>まみ専用 SE確認<\/h1>/);
+  assert.match(grid, /function customDisplayName\(record\)/);
+  assert.match(grid, /soundLabel\.className = 'custom-sound-label'/);
+  assert.match(grid, /soundLabel\.textContent = customDisplayName\(record\)/);
+  assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-overflow:ellipsis;[\s\S]*?font-size:9px/);
   assert.match(gridCss, /grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/);
   assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:5px\}/);
 });

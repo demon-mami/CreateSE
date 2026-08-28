@@ -279,6 +279,14 @@
     return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
   }
 
+  function customDisplayName(record) {
+    const fallback = String(record?.sourceNumber || 'My Sound');
+    const fileName = String(record?.name || '').trim();
+    if (!fileName) return fallback;
+    const baseName = fileName.replace(/\.[^.]+$/, '').trim();
+    return baseName || fallback;
+  }
+
   function renderCustomSlots() {
     const fragment = document.createDocumentFragment();
 
@@ -309,7 +317,10 @@
         soundButton.title = record.name;
         soundButton.setAttribute('aria-label', `${record.sourceNumber} ${record.name} を選択`);
         const soundFace = document.createElement('span');
-        soundFace.textContent = record.sourceNumber;
+        const soundLabel = document.createElement('span');
+        soundLabel.className = 'custom-sound-label';
+        soundLabel.textContent = customDisplayName(record);
+        soundFace.append(soundLabel);
         soundButton.append(soundFace);
 
         const replaceButton = document.createElement('button');
@@ -519,7 +530,7 @@
         persistenceError = error;
         console.warn('ユーザー音源をブラウザに保存できませんでした。', error);
       }
-      setCustomStatus(`${record.sourceNumber} ${record.name} を${replace ? '変更' : '追加'}しました`);
+      setCustomStatus(`${record.name} を${replace ? '変更' : '追加'}しました`);
     } catch (error) {
       if (record) {
         if (replace && existing) {
