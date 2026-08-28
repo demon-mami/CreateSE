@@ -1,0 +1,125 @@
+name: My Sound filename labels and title v2 20260828
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/my-sound-filename-title-v2-20260828.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Update My Sound labels and title
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 occurrence, got {count}')
+              return text.replace(old, new, 1)
+
+          p = Path('hitsound-grid.js')
+          s = p.read_text(encoding='utf-8')
+          marker = '  function renderCustomSlots() {\n'
+          helper = '\n'.join([
+              '  function customDisplayName(record) {',
+              "    const fallback = String(record?.sourceNumber || 'My Sound');",
+              "    const fileName = String(record?.name || '').trim();",
+              '    if (!fileName) return fallback;',
+              "    const baseName = fileName.replace(/\\.[^.]+$/, '').trim();",
+              '    return baseName || fallback;',
+              '  }',
+              '',
+              '',
+          ])
+          s = replace_once(s, marker, helper + marker, 'custom display helper')
+          old_face = '\n'.join([
+              "        const soundFace = document.createElement('span');",
+              '        soundFace.textContent = record.sourceNumber;',
+              '        soundButton.append(soundFace);',
+          ])
+          new_face = '\n'.join([
+              "        const soundFace = document.createElement('span');",
+              "        const soundLabel = document.createElement('span');",
+              "        soundLabel.className = 'custom-sound-label';",
+              '        soundLabel.textContent = customDisplayName(record);',
+              '        soundFace.append(soundLabel);',
+              '        soundButton.append(soundFace);',
+          ])
+          s = replace_once(s, old_face, new_face, 'custom filename label')
+          s = replace_once(
+              s,
+              "      setCustomStatus(`${record.sourceNumber} ${record.name} を${replace ? '変更' : '追加'}しました`);",
+              "      setCustomStatus(`${record.name} を${replace ? '変更' : '追加'}しました`);",
+              'custom status filename',
+          )
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('hitsound-grid.css')
+          s = p.read_text(encoding='utf-8')
+          css_marker = '.custom-sound-key>span{padding:0 27px 0 6px}\n'
+          css_extra = '\n'.join([
+              '.custom-sound-label{',
+              '  flex:1 1 auto;',
+              '  min-width:0;',
+              '  overflow:hidden;',
+              '  white-space:nowrap;',
+              '  text-overflow:ellipsis;',
+              '  text-align:center;',
+              '  font-size:9px;',
+              '  letter-spacing:-.02em;',
+              '}',
+              '',
+          ])
+          s = replace_once(s, css_marker, css_marker + css_extra, 'custom filename ellipsis css')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, '<title>osu!taiko Hitsound Lab</title>', '<title>まみ専用 SE確認</title>', 'document title')
+          s = replace_once(s, '<h1>Hitsound Lab</h1>', '<h1>まみ専用 SE確認</h1>', 'visible title')
+          s = replace_once(s, './hitsound-grid.css?v=4.5-my-sound-replace', './hitsound-grid.css?v=4.6-filename-label', 'grid css cache')
+          s = replace_once(s, './hitsound-grid.js?v=4.4-my-sound-replace', './hitsound-grid.js?v=4.5-filename-label', 'grid js cache')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('tests/workbench-static.test.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('hitsound-grid\\.css\\?v=4\\.5-my-sound-replace', 'hitsound-grid\\.css\\?v=4\\.6-filename-label')
+          s = s.replace('hitsound-grid\\.js\\?v=4\\.4-my-sound-replace', 'hitsound-grid\\.js\\?v=4\\.5-filename-label')
+          anchor = '  assert.match(gridCss, /custom-sound-replace/);\n'
+          checks = '\n'.join([
+              '  assert.match(html, /<title>まみ専用 SE確認<\\/title>/);',
+              '  assert.match(html, /<h1>まみ専用 SE確認<\\/h1>/);',
+              '  assert.match(grid, /function customDisplayName\\(record\\)/);',
+              "  assert.match(grid, /soundLabel\\.className = 'custom-sound-label'/);",
+              '  assert.match(grid, /soundLabel\\.textContent = customDisplayName\\(record\\)/);',
+              '  assert.match(gridCss, /\\.custom-sound-label\\{[\\s\\S]*?text-overflow:ellipsis;[\\s\\S]*?font-size:9px/);',
+              '',
+          ])
+          s = replace_once(s, anchor, anchor + checks, 'filename label regression checks')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add hitsound-grid.js hitsound-grid.css index.html tests/workbench-static.test.mjs
+          git commit -m 'Show My Sound filenames and rename app title'
+          git push
