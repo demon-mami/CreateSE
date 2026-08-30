@@ -161,6 +161,26 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 .transport-row{display:grid;grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr);gap:10px;padding-inline:6px}
 .transport-button,.play-button{height:44px;min-height:44px;font-size:13px}
 .play-button{width:auto;color:#10242b!important;font-size:14px;background:#79d4ec!important}
+.music-volume-control{
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;
+  padding:0 6px;min-width:0
+}
+.music-volume-label{
+  color:rgba(255,255,255,.70);font-size:11px;font-weight:800;letter-spacing:.015em;white-space:nowrap
+}
+.music-volume-options{
+  min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:hidden;
+  border:1px solid rgba(255,255,255,.17);border-radius:9px;background:rgba(10,17,21,.24)
+}
+.music-volume-button{
+  min-width:0;min-height:44px;padding:0 3px;border:0;border-left:1px solid rgba(255,255,255,.11);
+  border-radius:0;background:transparent;color:rgba(255,255,255,.68);font-size:11px;font-weight:800;
+  font-variant-numeric:tabular-nums
+}
+.music-volume-button:first-child{border-left:0}
+.music-volume-button[aria-pressed="true"]{
+  background:rgba(121,212,236,.23);color:#e9fbff;box-shadow:inset 0 0 0 1px rgba(121,212,236,.34)
+}
 .time-row{display:flex;align-items:center;justify-content:center;gap:7px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
 .song-time{position:static;min-height:0;padding:0;border:0;background:none;font-size:15px;color:#fff}
 .loop-panel{padding:7px;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(10,17,21,.26)}

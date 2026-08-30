@@ -4,6 +4,7 @@
   const OBJECT_TIMELINE_SPAN_MS = 1000;
   const START_DELAY_SEC = 0.10;
   const MUSIC_GAIN = 0.65;
+  const MUSIC_GAIN_OPTIONS = Object.freeze([0.65, 0.70, 0.75, 0.80, 0.85]);
   const EFFECT_GAIN = 1.00;
   const MASTER_GAIN_DB = -3.0;
   const MASTER_GAIN = 10 ** (MASTER_GAIN_DB / 20);
@@ -45,6 +46,7 @@
   const decodedHitsoundPromises = new Map();
   let hsLoadPromise = null;
   let musicGain = null;
+  let currentMusicGain = MUSIC_GAIN;
   let effectGain = null;
   let masterGain = null;
   let musicSource = null;
@@ -67,6 +69,7 @@
   let lastDebugPaint = 0;
   const cssTokenCache = new Map();
   const overviewSize = { width: 0, height: 0 };
+  const musicGainButtons = Array.from(document.querySelectorAll('[data-music-gain]'));
 
   const setStatus = text => { if (el.status) el.status.textContent = text; };
   const clearError = () => {
@@ -404,6 +407,26 @@
     return promise;
   }
 
+  function syncMusicGainButtons() {
+    for (const button of musicGainButtons) {
+      const value = Number(button.dataset.musicGain);
+      button.setAttribute('aria-pressed', Math.abs(value - currentMusicGain) < 1e-6 ? 'true' : 'false');
+    }
+  }
+
+  function setMusicGainValue(value) {
+    const next = Number(value);
+    if (!MUSIC_GAIN_OPTIONS.includes(next)) return false;
+    currentMusicGain = next;
+    syncMusicGainButtons();
+    if (musicGain && ac) {
+      const now = ac.currentTime;
+      musicGain.gain.cancelScheduledValues(now);
+      musicGain.gain.setTargetAtTime(next, now, 0.008);
+    }
+    return true;
+  }
+
   async function ensureContext(resume = false) {
     const Context = window.AudioContext || window.webkitAudioContext;
     if (!Context) throw new Error('Web Audio APIに対応していません。');
@@ -412,7 +435,7 @@
       musicGain = ac.createGain();
       effectGain = ac.createGain();
       masterGain = ac.createGain();
-      musicGain.gain.value = MUSIC_GAIN;
+      musicGain.gain.value = currentMusicGain;
       effectGain.gain.value = EFFECT_GAIN;
       masterGain.gain.value = MASTER_GAIN;
       musicGain.connect(masterGain);
@@ -963,6 +986,10 @@
     return clampSec(durationSec() * q);
   }
 
+  for (const button of musicGainButtons) {
+    button.addEventListener('click', () => setMusicGainValue(button.dataset.musicGain));
+  }
+
   el.oszInput?.addEventListener('change', async event => {
     const file = event.target.files && event.target.files[0];
     if (file) await loadOsz(file);
@@ -1109,6 +1136,7 @@
     applyHitsoundPairBytes,
   };
 
+  syncMusicGainButtons();
   setPlayState(false);
   raf = requestAnimationFrame(frame);
 })();

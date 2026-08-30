@@ -214,7 +214,7 @@ test('supported device orientation is fixed to iPhone portrait and iPad landscap
 });
 
 test('runtime cache keys point at the stripped implementation', () => {
-  assert.match(html, /app-v4\.js\?v=4\.3-master-minus3db/);
+  assert.match(html, /app-v4\.js\?v=4\.4-music-volume-five/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.3-custom8/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
@@ -230,12 +230,21 @@ test('Pages publishes every runtime asset needed by the fixed timeline', () => {
   ]) assert.match(pages, new RegExp(`cp ${asset.replaceAll('.', '\\.')} _site\\/`));
 });
 
-test('audio levels preserve Music Effect relation with fixed master headroom', () => {
+test('Music Volume switches across five fixed gains while Effect and Master remain fixed', () => {
   assert.match(app, /const MUSIC_GAIN = 0\.65;/);
+  assert.match(app, /const MUSIC_GAIN_OPTIONS = Object\.freeze\(\[0\.65, 0\.70, 0\.75, 0\.80, 0\.85\]\);/);
+  assert.match(app, /let currentMusicGain = MUSIC_GAIN;/);
+  assert.match(app, /function setMusicGainValue\(value\)/);
+  assert.match(app, /musicGain\.gain\.setTargetAtTime\(next, now, 0\.008\)/);
+  assert.match(app, /musicGain\.gain\.value = currentMusicGain;/);
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
   assert.match(app, /const MASTER_GAIN_DB = -3\.0;/);
-  assert.match(app, /const MASTER_GAIN = 10 \*\* \(MASTER_GAIN_DB \/ 20\);/);
   assert.match(app, /masterGain\.gain\.value = MASTER_GAIN;/);
+  assert.match(html, /class="music-volume-control"/);
+  for (const value of ['0.65','0.70','0.75','0.80','0.85']) {
+    assert.ok(html.includes(`data-music-gain="${value}"`), `Music gain ${value} control is missing`);
+  }
+  assert.match(html, /workbench\.css\?v=2\.2-music-volume-five/);
   assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
 });
 
