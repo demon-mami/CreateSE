@@ -1,0 +1,61 @@
+name: Apply fixed master headroom 20260830
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-master-headroom-20260830.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Apply Music 0.65 and Master -3 dB
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 occurrence, got {count}')
+              return text.replace(old, new, 1)
+
+          p = Path('app-v4.js')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, '  const MUSIC_GAIN = 0.70;\n  const EFFECT_GAIN = 1.00;\n', '  const MUSIC_GAIN = 0.65;\n  const EFFECT_GAIN = 1.00;\n  const MASTER_GAIN_DB = -3.0;\n  const MASTER_GAIN = 10 ** (MASTER_GAIN_DB / 20);\n', 'audio gain constants')
+          s = replace_once(s, '      masterGain.gain.value = 1;\n', '      masterGain.gain.value = MASTER_GAIN;\n', 'master gain assignment')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, './app-v4.js?v=4.2-engine-clock-fixed-ui', './app-v4.js?v=4.3-master-minus3db', 'app cache key')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('tests/workbench-static.test.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, "  assert.match(html, /app-v4\\.js\\?v=4\\.2-engine-clock-fixed-ui/);", "  assert.match(html, /app-v4\\.js\\?v=4\\.3-master-minus3db/);", 'app cache test')
+          s = replace_once(s, "test('audio levels remain Music 0.70 and Effect 1.00', () => {\n  assert.match(app, /const MUSIC_GAIN = 0\\.70;/);\n  assert.match(app, /const EFFECT_GAIN = 1\\.00;/);\n});", "test('audio levels preserve Music Effect relation with fixed master headroom', () => {\n  assert.match(app, /const MUSIC_GAIN = 0\\.65;/);\n  assert.match(app, /const EFFECT_GAIN = 1\\.00;/);\n  assert.match(app, /const MASTER_GAIN_DB = -3\\.0;/);\n  assert.match(app, /const MASTER_GAIN = 10 \\*\\* \\(MASTER_GAIN_DB \\/ 20\\);/);\n  assert.match(app, /masterGain\\.gain\\.value = MASTER_GAIN;/);\n  assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);\n});", 'audio level regression test')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit headroom change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app-v4.js index.html tests/workbench-static.test.mjs
+          git commit -m 'Set Music 0.65 with fixed -3 dB master headroom'
+          git push
