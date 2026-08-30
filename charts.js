@@ -73,10 +73,10 @@ window.TEST_CHARTS = [
     "file": "maps/trancing-pulse-brz.osz"
   },
   {
-    "id": "elna-dia",
-    "title": "El'na dia",
-    "difficulty": "Burakonine's Tale of Greed",
-    "file": "maps/elna-dia.osz"
+    "id": "the-intertwined-stars",
+    "title": "The Intertwined Stars",
+    "difficulty": "Fate",
+    "file": "maps/the-intertwined-stars.osz"
   },
   {
     "id": "kaeru",

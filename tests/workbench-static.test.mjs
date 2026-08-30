@@ -117,10 +117,10 @@ test('My Sound provides eight slots without delete controls', () => {
   assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:5px\}/);
 });
 
-test('chart rotations keep 15 maps and include the 20260828 replacements', () => {
+test('chart rotations keep 15 maps and include The Intertwined Stars replacement', () => {
   const blocks = [...charts.matchAll(/\{[\s\S]*?\}/g)].map(match => match[0]);
   assert.equal(blocks.length, 15);
-  for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls','over-the-fullereneshift','sunglow','paralysis']) {
+  for (const removed of ['what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls','over-the-fullereneshift','sunglow','paralysis','elna-dia']) {
     assert.doesNotMatch(charts, new RegExp(`"id": "${removed}"`));
   }
   const expected = [
@@ -128,7 +128,7 @@ test('chart rotations keep 15 maps and include the 20260828 replacements', () =>
     ['shuuten-no-saki', '終点の先が在るとするならば。(あ? edit)', 'Finale Oni', 'maps/shuuten-no-saki.osz'],
     ['1208', '#1208', 'Inner Oni', 'maps/1208.osz'],
     ['trancing-pulse-brz', 'Trancing Pulse (brz_bootleg_remix)', 'Taiko Master', 'maps/trancing-pulse-brz.osz'],
-    ['elna-dia', "El'na dia", "Burakonine's Tale of Greed", 'maps/elna-dia.osz'],
+    ['the-intertwined-stars', 'The Intertwined Stars', 'Fate', 'maps/the-intertwined-stars.osz'],
     ['kaeru', 'KAERU', '^^ 1.13x', 'maps/kaeru.osz'],
     ['dream-vandalism', 'Dream Vandalism', 'Inner Oni', 'maps/dream-vandalism.osz'],
   ];
@@ -139,7 +139,7 @@ test('chart rotations keep 15 maps and include the 20260828 replacements', () =>
     assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
   }
   assert.match(charts, /"revision": "20260826-shuuten-audiofix-v2"/);
-  assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);
+  assert.match(html, /charts\.js\?v=0\.7-20260830-intertwined/);
   assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
   assert.match(chartLoader, /function chartFileUrl\(chart\)/);
   assert.match(chartLoader, /encodeURIComponent\(chart\.revision\)/);
@@ -151,6 +151,9 @@ test('chart rotations keep 15 maps and include the 20260828 replacements', () =>
   assert.match(pages, /cat \.map-assets\/maps-wave-20260828-\*\.part > \/tmp\/maps-wave-20260828\.zip/);
   assert.match(pages, /maps-wave-20260828\.sha256/);
   assert.match(pages, /unzip -q \/tmp\/maps-wave-20260828\.zip -d _site\/maps/);
+  assert.match(pages, /cat \.map-assets\/maps-wave-20260830-intertwined-\*\.part > \/tmp\/maps-wave-20260830-intertwined\.zip/);
+  assert.match(pages, /maps-wave-20260830-intertwined\.sha256/);
+  assert.match(pages, /unzip -q \/tmp\/maps-wave-20260830-intertwined\.zip -d _site\/maps/);
   assert.match(pages, /cat \.map-assets\/maps-shuuten-fix-20260826-\*\.part > \/tmp\/maps-shuuten-fix-20260826\.zip/);
   assert.match(pages, /maps-shuuten-fix-20260826\.sha256/);
   assert.match(pages, /unzip -qo \/tmp\/maps-shuuten-fix-20260826\.zip -d _site\/maps/);
@@ -216,7 +219,7 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /hitsound-controller\.js\?v=4\.3-custom8/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
-  assert.match(html, /charts\.js\?v=0\.6-20260828-rotation/);
+  assert.match(html, /charts\.js\?v=0\.7-20260830-intertwined/);
   assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
 });
 
