@@ -3,8 +3,10 @@
 
   const OBJECT_TIMELINE_SPAN_MS = 1000;
   const START_DELAY_SEC = 0.10;
-  const MUSIC_GAIN = 0.70;
+  const MUSIC_GAIN = 0.65;
   const EFFECT_GAIN = 1.00;
+  const MASTER_GAIN_DB = -3.0;
+  const MASTER_GAIN = 10 ** (MASTER_GAIN_DB / 20);
   const EFFECT_SCHEDULE_AHEAD_SEC = 0.50;
   const EFFECT_RESCHEDULE_LEAD_SEC = 0.03;
   const EFFECT_SCHEDULER_INTERVAL_MS = 40;
@@ -412,7 +414,7 @@
       masterGain = ac.createGain();
       musicGain.gain.value = MUSIC_GAIN;
       effectGain.gain.value = EFFECT_GAIN;
-      masterGain.gain.value = 1;
+      masterGain.gain.value = MASTER_GAIN;
       musicGain.connect(masterGain);
       effectGain.connect(masterGain);
       masterGain.connect(ac.destination);

@@ -211,7 +211,7 @@ test('supported device orientation is fixed to iPhone portrait and iPad landscap
 });
 
 test('runtime cache keys point at the stripped implementation', () => {
-  assert.match(html, /app-v4\.js\?v=4\.2-engine-clock-fixed-ui/);
+  assert.match(html, /app-v4\.js\?v=4\.3-master-minus3db/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
   assert.match(html, /hitsound-controller\.js\?v=4\.3-custom8/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
@@ -227,9 +227,13 @@ test('Pages publishes every runtime asset needed by the fixed timeline', () => {
   ]) assert.match(pages, new RegExp(`cp ${asset.replaceAll('.', '\\.')} _site\\/`));
 });
 
-test('audio levels remain Music 0.70 and Effect 1.00', () => {
-  assert.match(app, /const MUSIC_GAIN = 0\.70;/);
+test('audio levels preserve Music Effect relation with fixed master headroom', () => {
+  assert.match(app, /const MUSIC_GAIN = 0\.65;/);
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
+  assert.match(app, /const MASTER_GAIN_DB = -3\.0;/);
+  assert.match(app, /const MASTER_GAIN = 10 \*\* \(MASTER_GAIN_DB \/ 20\);/);
+  assert.match(app, /masterGain\.gain\.value = MASTER_GAIN;/);
+  assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
 });
 
 test('Current111 and favorite-derived fixed sets remain intact', () => {
