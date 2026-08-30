@@ -1,0 +1,71 @@
+name: Finalize The Intertwined Stars rotation v3 20260830
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/finalize-intertwined-stars-v3-20260830.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Rotate chart registry and regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 occurrence, got {count}')
+              return text.replace(old, new, 1)
+
+          p = Path('charts.js')
+          s = p.read_text(encoding='utf-8')
+          old = "\n".join(['  {','    \"id\": \"elna-dia\",','    \"title\": \"El\'na dia\",','    \"difficulty\": \"Burakonine\'s Tale of Greed\",','    \"file\": \"maps/elna-dia.osz\"','  },'])
+          new = "\n".join(['  {','    \"id\": \"the-intertwined-stars\",','    \"title\": \"The Intertwined Stars\",','    \"difficulty\": \"Fate\",','    \"file\": \"maps/the-intertwined-stars.osz\"','  },'])
+          s = replace_once(s, old, new, 'chart rotation')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, './charts.js?v=0.6-20260828-rotation', './charts.js?v=0.7-20260830-intertwined', 'charts cache')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('tests/workbench-static.test.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, "test('chart rotations keep 15 maps and include the 20260828 replacements', () => {", "test('chart rotations keep 15 maps and include The Intertwined Stars replacement', () => {", 'chart test title')
+          s = replace_once(s, "'over-the-fullereneshift','sunglow','paralysis']", "'over-the-fullereneshift','sunglow','paralysis','elna-dia']", 'removed chart list')
+          s = replace_once(s, "    ['elna-dia', \"El'na dia\", \"Burakonine's Tale of Greed\", 'maps/elna-dia.osz'],\n", "    ['the-intertwined-stars', 'The Intertwined Stars', 'Fate', 'maps/the-intertwined-stars.osz'],\n", 'expected replacement chart')
+          old_cache = 'charts\\.js\\?v=0\\.6-20260828-rotation'
+          new_cache = 'charts\\.js\\?v=0\\.7-20260830-intertwined'
+          if s.count(old_cache) != 2:
+              raise RuntimeError(f'chart cache regression: expected 2 occurrences, got {s.count(old_cache)}')
+          s = s.replace(old_cache, new_cache)
+          marker = "  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260828\\.zip -d _site\\/maps/);\n"
+          addition = marker + "  assert.match(pages, /cat \\.map-assets\\/maps-wave-20260830-intertwined-\\*\\.part > \\/tmp\\/maps-wave-20260830-intertwined\\.zip/);\n  assert.match(pages, /maps-wave-20260830-intertwined\\.sha256/);\n  assert.match(pages, /unzip -q \\/tmp\\/maps-wave-20260830-intertwined\\.zip -d _site\\/maps/);\n"
+          s = replace_once(s, marker, addition, 'new map bundle regression')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit chart rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add charts.js index.html tests/workbench-static.test.mjs
+          git commit -m 'Replace Elna dia with The Intertwined Stars'
+          git push
