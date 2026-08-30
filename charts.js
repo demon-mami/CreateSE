@@ -79,10 +79,10 @@ window.TEST_CHARTS = [
     "file": "maps/the-intertwined-stars.osz"
   },
   {
-    "id": "kaeru",
-    "title": "KAERU",
-    "difficulty": "^^ 1.13x",
-    "file": "maps/kaeru.osz"
+    "id": "onii-chan-migite-kinshi",
+    "title": "お兄ちゃん、右手の使用を禁止します！ (TamolarM Bootleg Remix)",
+    "difficulty": "Cute Sisters -Full-",
+    "file": "maps/onii-chan-migite-kinshi.osz"
   },
   {
     "id": "dream-vandalism",
