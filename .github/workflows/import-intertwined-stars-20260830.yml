@@ -1,0 +1,102 @@
+name: Import verified The Intertwined Stars 20260830
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-intertwined-stars-20260830.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download source beatmapset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/map-source
+          OUT=/tmp/map-source/2106403.osz
+          if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 \
+            "https://mirror.hinamizawa.ai/api/v1/hinai/d/2106403" -o "$OUT"; then
+            exit 0
+          fi
+          rm -f "$OUT"
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 \
+            "https://catboy.best/d/2106403" -o "$OUT"
+
+      - name: Verify uploaded-source identity and build minimal OSZ
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, re, zipfile
+
+          source = Path('/tmp/map-source/2106403.osz')
+          output = Path('/tmp/the-intertwined-stars.osz')
+          expected_version = 'Fate'
+          expected_osu = 'cdb8599d473191a7742bfb4827b7ef6dc49c21d3d818d800e6f2171ce08da9f0'
+          expected_audio = '323b59933d2cc1e00e348b1ddb0dfbf901b19fea23a51aceb927c6de986adbab'
+
+          sha = lambda data: hashlib.sha256(data).hexdigest()
+          with zipfile.ZipFile(source) as src:
+              selected = None
+              for name in src.namelist():
+                  if not name.lower().endswith('.osu'):
+                      continue
+                  data = src.read(name)
+                  text = data.decode('utf-8-sig', errors='replace')
+                  mode = re.search(r'^Mode:(.*)$', text, re.M)
+                  version = re.search(r'^Version:(.*)$', text, re.M)
+                  title = re.search(r'^Title:(.*)$', text, re.M)
+                  if mode and mode.group(1).strip() == '1' and version and version.group(1).strip() == expected_version:
+                      if not title or title.group(1).strip() != 'The Intertwined Stars':
+                          raise RuntimeError('target title differs from uploaded source')
+                      selected = (name, data, text)
+                      break
+              if selected is None:
+                  raise RuntimeError('target difficulty Fate not found')
+
+              osu_name, osu_bytes, osu_text = selected
+              if sha(osu_bytes) != expected_osu:
+                  raise RuntimeError('target osu content differs from uploaded source')
+
+              m = re.search(r'^AudioFilename:(.*)$', osu_text, re.M)
+              if not m:
+                  raise RuntimeError('AudioFilename missing')
+              audio_name = m.group(1).strip()
+              audio_bytes = src.read(audio_name)
+              if sha(audio_bytes) != expected_audio:
+                  raise RuntimeError('audio differs from uploaded source')
+
+              with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as dst:
+                  dst.writestr(osu_name, osu_bytes)
+                  dst.writestr(audio_name, audio_bytes)
+
+          bundle = Path('/tmp/maps-wave-20260830-intertwined.zip')
+          with zipfile.ZipFile(bundle, 'w', compression=zipfile.ZIP_STORED) as z:
+              z.write(output, arcname='the-intertwined-stars.osz')
+          print('verified', output.name, output.stat().st_size)
+          print('bundle_sha256', sha(bundle.read_bytes()))
+          PY
+
+      - name: Split and commit verified bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .map-assets/maps-wave-20260830-intertwined-*.part .map-assets/maps-wave-20260830-intertwined.sha256
+          split -b 785000 -d -a 3 --additional-suffix=.part /tmp/maps-wave-20260830-intertwined.zip .map-assets/maps-wave-20260830-intertwined-
+          HASH="$(sha256sum /tmp/maps-wave-20260830-intertwined.zip | awk '{print $1}')"
+          printf '%s  maps-wave-20260830-intertwined.zip\n' "$HASH" > .map-assets/maps-wave-20260830-intertwined.sha256
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .map-assets/maps-wave-20260830-intertwined-*.part .map-assets/maps-wave-20260830-intertwined.sha256
+          git commit -m 'Add verified The Intertwined Stars map asset'
+          git push
