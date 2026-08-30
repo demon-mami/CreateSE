@@ -1,0 +1,187 @@
+name: Add five-step Music Volume switch 20260830
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/add-music-volume-switch-20260830.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Add playback Music Volume switch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 occurrence, got {count}')
+              return text.replace(old, new, 1)
+
+          # Playback panel UI and cache keys.
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          transport = "\n".join([
+              '          <div class="transport-row">',
+              '            <button id="playButton" class="play-button" type="button" aria-label="曲を再生" aria-pressed="false" disabled>▶</button>',
+              '          </div>',
+          ])
+          volume = "\n".join([
+              transport,
+              '',
+              '          <div class="music-volume-control" role="group" aria-label="Music Volume">',
+              '            <span class="music-volume-label">Music Volume</span>',
+              '            <div class="music-volume-options">',
+              '              <button class="music-volume-button" type="button" data-music-gain="0.65" aria-pressed="true">0.65</button>',
+              '              <button class="music-volume-button" type="button" data-music-gain="0.70" aria-pressed="false">0.70</button>',
+              '              <button class="music-volume-button" type="button" data-music-gain="0.75" aria-pressed="false">0.75</button>',
+              '              <button class="music-volume-button" type="button" data-music-gain="0.80" aria-pressed="false">0.80</button>',
+              '              <button class="music-volume-button" type="button" data-music-gain="0.85" aria-pressed="false">0.85</button>',
+              '            </div>',
+              '          </div>',
+          ])
+          s = replace_once(s, transport, volume, 'Music Volume UI')
+          s = replace_once(s, './workbench.css?v=2.1-no-ranges', './workbench.css?v=2.2-music-volume-five', 'workbench cache key')
+          s = replace_once(s, './app-v4.js?v=4.3-master-minus3db', './app-v4.js?v=4.4-music-volume-five', 'app cache key')
+          p.write_text(s, encoding='utf-8')
+
+          # Compact five-segment playback control.
+          p = Path('workbench.css')
+          s = p.read_text(encoding='utf-8')
+          marker = '.play-button{width:auto;color:#10242b!important;font-size:14px;background:#79d4ec!important}\n'
+          addition = marker + """.music-volume-control{
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;
+  padding:0 6px;min-width:0
+}
+.music-volume-label{
+  color:rgba(255,255,255,.70);font-size:11px;font-weight:800;letter-spacing:.015em;white-space:nowrap
+}
+.music-volume-options{
+  min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:hidden;
+  border:1px solid rgba(255,255,255,.17);border-radius:9px;background:rgba(10,17,21,.24)
+}
+.music-volume-button{
+  min-width:0;min-height:44px;padding:0 3px;border:0;border-left:1px solid rgba(255,255,255,.11);
+  border-radius:0;background:transparent;color:rgba(255,255,255,.68);font-size:11px;font-weight:800;
+  font-variant-numeric:tabular-nums
+}
+.music-volume-button:first-child{border-left:0}
+.music-volume-button[aria-pressed="true"]{
+  background:rgba(121,212,236,.23);color:#e9fbff;box-shadow:inset 0 0 0 1px rgba(121,212,236,.34)
+}
+"""
+          s = replace_once(s, marker, addition, 'Music Volume CSS')
+          p.write_text(s, encoding='utf-8')
+
+          # Runtime gain selection: default 0.65, no persistence, short smoothing during playback.
+          p = Path('app-v4.js')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(
+              s,
+              '  const MUSIC_GAIN = 0.65;\n  const EFFECT_GAIN = 1.00;\n',
+              '  const MUSIC_GAIN = 0.65;\n  const MUSIC_GAIN_OPTIONS = Object.freeze([0.65, 0.70, 0.75, 0.80, 0.85]);\n  const EFFECT_GAIN = 1.00;\n',
+              'Music gain options',
+          )
+          s = replace_once(
+              s,
+              '  let musicGain = null;\n  let effectGain = null;\n',
+              '  let musicGain = null;\n  let currentMusicGain = MUSIC_GAIN;\n  let effectGain = null;\n',
+              'current Music gain state',
+          )
+          s = replace_once(
+              s,
+              "  const cssTokenCache = new Map();\n  const overviewSize = { width: 0, height: 0 };\n",
+              "  const cssTokenCache = new Map();\n  const overviewSize = { width: 0, height: 0 };\n  const musicGainButtons = Array.from(document.querySelectorAll('[data-music-gain]'));\n",
+              'Music gain button collection',
+          )
+          ensure_marker = '  async function ensureContext(resume = false) {\n'
+          helpers = """  function syncMusicGainButtons() {
+    for (const button of musicGainButtons) {
+      const value = Number(button.dataset.musicGain);
+      button.setAttribute('aria-pressed', Math.abs(value - currentMusicGain) < 1e-6 ? 'true' : 'false');
+    }
+  }
+
+  function setMusicGainValue(value) {
+    const next = Number(value);
+    if (!MUSIC_GAIN_OPTIONS.includes(next)) return false;
+    currentMusicGain = next;
+    syncMusicGainButtons();
+    if (musicGain && ac) {
+      const now = ac.currentTime;
+      musicGain.gain.cancelScheduledValues(now);
+      musicGain.gain.setTargetAtTime(next, now, 0.008);
+    }
+    return true;
+  }
+
+"""
+          s = replace_once(s, ensure_marker, helpers + ensure_marker, 'Music gain runtime helpers')
+          s = replace_once(s, '      musicGain.gain.value = MUSIC_GAIN;\n', '      musicGain.gain.value = currentMusicGain;\n', 'initial selected Music gain')
+          listener_marker = "  el.oszInput?.addEventListener('change', async event => {\n"
+          listeners = """  for (const button of musicGainButtons) {
+    button.addEventListener('click', () => setMusicGainValue(button.dataset.musicGain));
+  }
+
+"""
+          s = replace_once(s, listener_marker, listeners + listener_marker, 'Music gain listeners')
+          s = replace_once(s, '  setPlayState(false);\n  raf = requestAnimationFrame(frame);\n', '  syncMusicGainButtons();\n  setPlayState(false);\n  raf = requestAnimationFrame(frame);\n', 'initial Music gain UI sync')
+          p.write_text(s, encoding='utf-8')
+
+          # Regression coverage.
+          p = Path('tests/workbench-static.test.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, 'app-v4\\.js\\?v=4\\.3-master-minus3db', 'app-v4\\.js\\?v=4\\.4-music-volume-five', 'app cache regression')
+          audio_test = """test('audio levels preserve Music Effect relation with fixed master headroom', () => {
+  assert.match(app, /const MUSIC_GAIN = 0\\.65;/);
+  assert.match(app, /const EFFECT_GAIN = 1\\.00;/);
+  assert.match(app, /const MASTER_GAIN_DB = -3\\.0;/);
+  assert.match(app, /const MASTER_GAIN = 10 \\*\\* \\(MASTER_GAIN_DB \\/ 20\\);/);
+  assert.match(app, /masterGain\\.gain\\.value = MASTER_GAIN;/);
+  assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
+});"""
+          new_audio_test = """test('Music Volume switches across five fixed gains while Effect and Master remain fixed', () => {
+  assert.match(app, /const MUSIC_GAIN = 0\\.65;/);
+  assert.match(app, /const MUSIC_GAIN_OPTIONS = Object\\.freeze\\(\\[0\\.65, 0\\.70, 0\\.75, 0\\.80, 0\\.85\\]\\);/);
+  assert.match(app, /let currentMusicGain = MUSIC_GAIN;/);
+  assert.match(app, /function setMusicGainValue\\(value\\)/);
+  assert.match(app, /musicGain\\.gain\\.setTargetAtTime\\(next, now, 0\\.008\\)/);
+  assert.match(app, /musicGain\\.gain\\.value = currentMusicGain;/);
+  assert.match(app, /const EFFECT_GAIN = 1\\.00;/);
+  assert.match(app, /const MASTER_GAIN_DB = -3\\.0;/);
+  assert.match(app, /masterGain\\.gain\\.value = MASTER_GAIN;/);
+  assert.match(html, /class=\"music-volume-control\"/);
+  for (const value of ['0.65','0.70','0.75','0.80','0.85']) {
+    assert.ok(html.includes(`data-music-gain=\"${value}\"`), `Music gain ${value} control is missing`);
+  }
+  assert.match(html, /workbench\\.css\\?v=2\\.2-music-volume-five/);
+  assert.match(gridCss, /custom-sound-replace/);
+  assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
+});"""
+          s = replace_once(s, audio_test, new_audio_test, 'Music Volume regression test')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit Music Volume switch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html workbench.css app-v4.js tests/workbench-static.test.mjs
+          git commit -m 'Add five-step Music Volume switch'
+          git push
