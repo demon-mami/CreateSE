@@ -18,10 +18,10 @@ window.TEST_CHARTS = [
     "file": "maps/fuzzy-future.osz"
   },
   {
-    "id": "wandering-melody-of-love",
-    "title": "迷える音色は恋の唄",
-    "difficulty": "Melodic Romance",
-    "file": "maps/wandering-melody-of-love.osz"
+    "id": "shoujo-rei",
+    "title": "少女レイ",
+    "difficulty": "Hell Oni",
+    "file": "maps/shoujo-rei.osz"
   },
   {
     "id": "a-flying-dance-hall",
