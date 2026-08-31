@@ -1,0 +1,103 @@
+name: Finalize Shoujo Rei rotation 20260831
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/finalize-shoujo-rei-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Rotate Wandering Melody to Shoujo Rei and run regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{label}: expected 1 occurrence, got {count}')
+              return text.replace(old, new, 1)
+
+          p = Path('charts.js')
+          s = p.read_text(encoding='utf-8')
+          old = "\n".join([
+              '  {',
+              '    "id": "wandering-melody-of-love",',
+              '    "title": "迷える音色は恋の唄",',
+              '    "difficulty": "Melodic Romance",',
+              '    "file": "maps/wandering-melody-of-love.osz"',
+              '  },',
+          ])
+          new = "\n".join([
+              '  {',
+              '    "id": "shoujo-rei",',
+              '    "title": "少女レイ",',
+              '    "difficulty": "Hell Oni",',
+              '    "file": "maps/shoujo-rei.osz"',
+              '  },',
+          ])
+          s = replace_once(s, old, new, 'chart rotation')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(s, './charts.js?v=0.8-20260830-oniichan', './charts.js?v=0.9-20260831-shoujo-rei', 'charts cache')
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('tests/workbench-static.test.mjs')
+          s = p.read_text(encoding='utf-8')
+          s = replace_once(
+              s,
+              "test('chart rotations keep 15 maps and include Onii-chan replacement', () => {",
+              "test('chart rotations keep 15 maps and include Shoujo Rei replacement', () => {",
+              'chart test title',
+          )
+          s = replace_once(
+              s,
+              "'over-the-fullereneshift','sunglow','paralysis','elna-dia','kaeru']",
+              "'over-the-fullereneshift','sunglow','paralysis','elna-dia','kaeru','wandering-melody-of-love']",
+              'removed chart list',
+          )
+          expected_marker = "    ['the-intertwined-stars', 'The Intertwined Stars', 'Fate', 'maps/the-intertwined-stars.osz'],\n"
+          expected_add = expected_marker + "    ['shoujo-rei', '少女レイ', 'Hell Oni', 'maps/shoujo-rei.osz'],\n"
+          s = replace_once(s, expected_marker, expected_add, 'expected Shoujo Rei chart')
+
+          old_cache = r'charts\.js\?v=0\.8-20260830-oniichan'
+          new_cache = r'charts\.js\?v=0\.9-20260831-shoujo-rei'
+          if s.count(old_cache) != 2:
+              raise RuntimeError(f'chart cache regression: expected 2 occurrences, got {s.count(old_cache)}')
+          s = s.replace(old_cache, new_cache)
+
+          marker = r"  assert.match(pages, /unzip -q \/tmp\/maps-wave-20260830-oniichan\.zip -d _site\/maps/);" + "\n"
+          addition = marker + (
+              r"  assert.match(pages, /cat \.map-assets\/maps-wave-20260831-shoujo-rei-\*\.part > \/tmp\/maps-wave-20260831-shoujo-rei\.zip/);" + "\n"
+              r"  assert.match(pages, /maps-wave-20260831-shoujo-rei\.sha256/);" + "\n"
+              r"  assert.match(pages, /unzip -q \/tmp\/maps-wave-20260831-shoujo-rei\.zip -d _site\/maps/);" + "\n"
+          )
+          s = replace_once(s, marker, addition, 'Shoujo Rei bundle regression')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+      - name: Commit chart rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add charts.js index.html tests/workbench-static.test.mjs
+          git commit -m 'Replace Wandering Melody with Shoujo Rei'
+          git push
