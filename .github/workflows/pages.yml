@@ -86,6 +86,11 @@ jobs:
           (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-wave-20260830-oniichan.sha256")
           unzip -q /tmp/maps-wave-20260830-oniichan.zip -d _site/maps
 
+          # Rebuild and verify the Shoujo Rei replacement map.
+          cat .map-assets/maps-wave-20260831-shoujo-rei-*.part > /tmp/maps-wave-20260831-shoujo-rei.zip
+          (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-wave-20260831-shoujo-rei.sha256")
+          unzip -q /tmp/maps-wave-20260831-shoujo-rei.zip -d _site/maps
+
           # Overwrite only Shuuten with the repaired MP3-frame-preserving OSZ.
           cat .map-assets/maps-shuuten-fix-20260826-*.part > /tmp/maps-shuuten-fix-20260826.zip
           (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-shuuten-fix-20260826.sha256")
