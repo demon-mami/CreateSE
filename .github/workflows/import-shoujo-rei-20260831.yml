@@ -1,0 +1,125 @@
+name: Import verified Shoujo Rei 20260831
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-shoujo-rei-20260831.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download official target osu
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 2 --retry-delay 1 --connect-timeout 10 --max-time 60 \
+            "https://osu.ppy.sh/osu/4563601" -o /tmp/target.osu
+
+      - name: Verify target and resolve matching official-pack audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from io import BytesIO
+          import hashlib, html, re, subprocess, zipfile
+
+          expected_osu = '358adaf0982eecf4d19d6fcc69f59d5f32380d0bf5b27fff4d7f53d0511661cb'
+          expected_audio = 'f85ff24d135c73cdd60c333430dfae9672512b35cae8d4e2be31fbb0caaaebbd'
+          expected_version = 'Hell Oni'
+          expected_title_unicode = '少女レイ'
+          target_name = 'ragey - Shoujo Rei (hac) [Hell Oni].osu'
+
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+
+          osu_bytes = Path('/tmp/target.osu').read_bytes()
+          if sha(osu_bytes) != expected_osu:
+              raise RuntimeError(f'official BeatmapID 4563601 differs from uploaded osu: {sha(osu_bytes)}')
+          text = osu_bytes.decode('utf-8-sig', errors='strict')
+          def field(name):
+              m = re.search(rf'^{re.escape(name)}:(.*)$', text, re.M)
+              return m.group(1).strip() if m else None
+          if field('Mode') != '1': raise RuntimeError('target is not Mode 1')
+          if field('Version') != expected_version: raise RuntimeError('target Version mismatch')
+          if field('TitleUnicode') != expected_title_unicode: raise RuntimeError('target TitleUnicode mismatch')
+          if field('AudioFilename') != 'audio.mp3': raise RuntimeError('target AudioFilename mismatch')
+
+          audio_bytes = None
+          audio_source = None
+          for pack_id in ('SL95', 'ST60'):
+              page = Path(f'/tmp/{pack_id}.html')
+              subprocess.run([
+                  'curl','-fL','--retry','2','--retry-delay','1','--connect-timeout','10','--max-time','30',
+                  f'https://osu.ppy.sh/beatmaps/packs/{pack_id}','-o',str(page)
+              ], check=True)
+              page_text = page.read_text(encoding='utf-8', errors='ignore')
+              matches = re.findall(r'https://packs\.ppy\.sh/[^\"\'<> ]+', page_text)
+              if not matches:
+                  continue
+              pack_url = html.unescape(matches[0])
+              pack_path = Path(f'/tmp/{pack_id}.zip')
+              subprocess.run([
+                  'curl','-fL','--retry','2','--retry-delay','2','--connect-timeout','15','--max-time','360',
+                  pack_url,'-o',str(pack_path)
+              ], check=True)
+              with zipfile.ZipFile(pack_path) as pz:
+                  candidates = [n for n in pz.namelist() if n.lower().endswith('.osz') and 'Shoujo Rei' in n and 'ragey' in n]
+                  for candidate in candidates:
+                      with zipfile.ZipFile(BytesIO(pz.read(candidate))) as src:
+                          names = src.namelist()
+                          possible_audio = []
+                          for n in names:
+                              if n.lower().endswith(('.mp3','.ogg','.wav')):
+                                  possible_audio.append(n)
+                          for n in possible_audio:
+                              data = src.read(n)
+                              if sha(data) == expected_audio:
+                                  audio_bytes = data
+                                  audio_source = f'{pack_id}:{candidate}:{n}'
+                                  break
+                          if audio_bytes is not None:
+                              break
+              if audio_bytes is not None:
+                  break
+
+          if audio_bytes is None:
+              raise RuntimeError('matching official-pack audio was not found')
+
+          output = Path('/tmp/shoujo-rei.osz')
+          with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as dst:
+              dst.writestr(target_name, osu_bytes)
+              dst.writestr('audio.mp3', audio_bytes)
+
+          bundle = Path('/tmp/maps-wave-20260831-shoujo-rei.zip')
+          with zipfile.ZipFile(bundle, 'w', compression=zipfile.ZIP_STORED) as z:
+              z.write(output, arcname='shoujo-rei.osz')
+
+          print('audio_source', audio_source)
+          print('verified_osu_sha256', sha(osu_bytes))
+          print('verified_audio_sha256', sha(audio_bytes))
+          print('bundle_sha256', sha(bundle.read_bytes()))
+          PY
+
+      - name: Split and commit verified bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .map-assets/maps-wave-20260831-shoujo-rei-*.part .map-assets/maps-wave-20260831-shoujo-rei.sha256
+          split -b 785000 -d -a 3 --additional-suffix=.part /tmp/maps-wave-20260831-shoujo-rei.zip .map-assets/maps-wave-20260831-shoujo-rei-
+          HASH="$(sha256sum /tmp/maps-wave-20260831-shoujo-rei.zip | awk '{print $1}')"
+          printf '%s  maps-wave-20260831-shoujo-rei.zip\n' "$HASH" > .map-assets/maps-wave-20260831-shoujo-rei.sha256
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .map-assets/maps-wave-20260831-shoujo-rei-*.part .map-assets/maps-wave-20260831-shoujo-rei.sha256
+          git commit -m 'Add verified Shoujo Rei map asset'
+          git push
