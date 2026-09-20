@@ -6,8 +6,11 @@
   const MUSIC_GAIN = 0.65;
   const MUSIC_GAIN_OPTIONS = Object.freeze([0.65, 0.70, 0.75, 0.80, 0.85]);
   const EFFECT_GAIN = 1.00;
-  const MASTER_GAIN_DB = -3.0;
-  const MASTER_GAIN = 10 ** (MASTER_GAIN_DB / 20);
+  // Final gain is applied only after Music + Hitsound are summed.
+  // 0.30 mirrors an osu! Master Volume of 30% and keeps transient headroom
+  // without changing the Music/Effect or Hitsound-to-Hitsound level ratios.
+  const MASTER_GAIN = 0.30;
+  const MASTER_GAIN_DB = 20 * Math.log10(MASTER_GAIN);
   const EFFECT_SCHEDULE_AHEAD_SEC = 0.50;
   const EFFECT_RESCHEDULE_LEAD_SEC = 0.03;
   const EFFECT_SCHEDULER_INTERVAL_MS = 40;
@@ -939,6 +942,7 @@
       `enginePosition: ${n(enginePosition() * 1000)} ms`,
       `transportStartCtx: ${n(transportStartCtx)} s`,
       `transportOffset: ${n(transportOffset)} s`,
+      `mixGain: music=${currentMusicGain.toFixed(2)} effect=${EFFECT_GAIN.toFixed(2)} master=${MASTER_GAIN.toFixed(2)} (${MASTER_GAIN_DB.toFixed(2)} dB)`,
     ].join('\n');
   }
 
