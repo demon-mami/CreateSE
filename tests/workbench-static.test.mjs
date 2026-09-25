@@ -124,7 +124,7 @@ test('chart rotations keep 15 maps and title-only additions hide difficulty UI',
     'what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls',
     'over-the-fullereneshift','sunglow','paralysis','elna-dia','kaeru','wandering-melody-of-love',
     'everytime-we-touch-700','fuzzy-future','a-flying-dance-hall','shuuten-no-saki','dream-vandalism','1208',
-    'fake-promise','kusakusa-mimika',
+    'fake-promise','kusakusa-mimika','true-love-fake-lover','kusodeka-ppv4-waraeru',
   ]) {
     assert.doesNotMatch(charts, new RegExp(`"id": "${removed}"`));
   }
@@ -145,8 +145,8 @@ test('chart rotations keep 15 maps and title-only additions hide difficulty UI',
     assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
   }
   for (const [id, title, file] of [
-    ['true-love-fake-lover', 'True Love, Fake Lover', 'maps/true-love-fake-lover.osz'],
-    ['kusodeka-ppv4-waraeru', 'クソデカppv4 笑える', 'maps/kusodeka-ppv4-waraeru.osz'],
+    ['dance-number-o-tomo-ni', 'ダンスナンバーを共に', 'maps/dance-number-o-tomo-ni.osz'],
+    ['white-devil', 'White Devil', 'maps/white-devil.osz'],
   ]) {
     const block = blocks.find(x => x.includes(`"id": "${id}"`));
     assert.ok(block, `${id} is missing`);
@@ -158,7 +158,7 @@ test('chart rotations keep 15 maps and title-only additions hide difficulty UI',
   assert.match(chartLoader, /function keepChartInfoVisible\(chart = null\)/);
   assert.match(chartLoader, /const hideDifficulty = chart\?\.hideDifficulty === true;/);
   assert.match(chartLoader, /el\.chartInfo\.hidden = hideDifficulty/);
-  assert.match(html, /charts\.js\?v=1\.1-20260926-titleonly2/);
+  assert.match(html, /charts\.js\?v=1\.2-20260926-titleonly2b/);
   assert.match(html, /chart-loader\.js\?v=0\.8-titleonly/);
   assert.match(chartLoader, /fetch\(url, \{ cache: 'no-cache' \}\)/);
   assert.match(pages, /maps-wave-20260926-rotation\.sha256/);
@@ -224,7 +224,7 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /hitsound-controller\.js\?v=4\.4-custom16/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
-  assert.match(html, /charts\.js\?v=1\.1-20260926-titleonly2/);
+  assert.match(html, /charts\.js\?v=1\.2-20260926-titleonly2b/);
   assert.match(html, /chart-loader\.js\?v=0\.8-titleonly/);
 });
 
