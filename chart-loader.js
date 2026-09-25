@@ -22,8 +22,10 @@
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 
-  function keepChartInfoVisible() {
-    if (el.chartInfo) el.chartInfo.hidden = false;
+  function keepChartInfoVisible(chart = null) {
+    const hideDifficulty = chart?.hideDifficulty === true;
+    if (el.chartInfo) el.chartInfo.hidden = hideDifficulty;
+    if (hideDifficulty && el.difficulty) el.difficulty.textContent = '';
   }
 
   function setInputFile(input, file) {
@@ -81,18 +83,18 @@
   function enforceDisplay(chart) {
     if (!chart || chart !== currentChart) return;
     if (el.title) el.title.textContent = chart.title;
-    if (el.difficulty) el.difficulty.textContent = chart.difficulty;
-    keepChartInfoVisible();
+    keepChartInfoVisible(chart);
+    if (el.difficulty && !chart.hideDifficulty) el.difficulty.textContent = chart.difficulty || '—';
   }
 
   async function loadChart(chart) {
     const mySerial = ++serial;
     currentChart = chart;
     window.CreateSEViewer?.resetChart?.('譜面読込中');
-    keepChartInfoVisible();
+    keepChartInfoVisible(chart);
     if (el.status) el.status.textContent = '譜面読込中';
     if (el.title) el.title.textContent = chart.title;
-    if (el.difficulty) el.difficulty.textContent = chart.difficulty;
+    if (el.difficulty && !chart.hideDifficulty) el.difficulty.textContent = chart.difficulty || '—';
 
     const bytes = await chartBytes(chart);
     if (mySerial !== serial) return;

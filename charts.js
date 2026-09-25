@@ -12,12 +12,6 @@ window.TEST_CHARTS = [
     "file": "maps/shoujo-rei.osz"
   },
   {
-    "id": "kusakusa-mimika",
-    "title": "草草！ミミカ",
-    "difficulty": "kusa sugite kusa",
-    "file": "maps/kusakusa-mimika.osz"
-  },
-  {
     "id": "sainou-shredder",
     "title": "才能シュレッダー",
     "difficulty": "ll-taiko Sp.",
@@ -78,15 +72,21 @@ window.TEST_CHARTS = [
     "file": "maps/dash-daaash-tv-size.osz"
   },
   {
-    "id": "fake-promise",
-    "title": "FAKE PROMISE",
-    "difficulty": "DECEPTION",
-    "file": "maps/fake-promise.osz"
-  },
-  {
     "id": "destin-victorica-nightcore",
     "title": "Destin Victorica (Harddance Mix) (Nightcore Mix)",
     "difficulty": "Miraculous Fate",
     "file": "maps/destin-victorica-nightcore.osz"
+  },
+  {
+    "id": "true-love-fake-lover",
+    "title": "True Love, Fake Lover",
+    "file": "maps/true-love-fake-lover.osz",
+    "hideDifficulty": true
+  },
+  {
+    "id": "kusodeka-ppv4-waraeru",
+    "title": "クソデカppv4 笑える",
+    "file": "maps/kusodeka-ppv4-waraeru.osz",
+    "hideDifficulty": true
   }
 ];

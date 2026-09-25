@@ -1,5 +1,5 @@
 {
-  "bundle_sha256": "d7178c749b8489e363055322afdbdfd50742b6002199fbc04258dbd1b1ab6d89",
+  "bundle_sha256": "0bd8cbab93a663e33d923edfcca9d54473cf290de3eb1a73739a75fbb99120b9",
   "maps": [
     {
       "slug": "iron-rose",
@@ -90,6 +90,38 @@
       "output": "destin-victorica-nightcore.osz",
       "output_sha256": "0179d1fc7e1255a886f8174a5c88d7876106e4b27687f43da022272155fbde80",
       "output_size": 9143616
+    },
+    {
+      "slug": "true-love-fake-lover",
+      "setid": "2359059",
+      "beatmapid": "5083405",
+      "title": "True Love, Fake Lover",
+      "osu_sha": "53f42f9c515014fc497eb09ac085b62a65c56de4b4ef8226778bdfd2bc8de9b3",
+      "audio_sha": "2c9cd0a1c8c5fc4ac52b03905b9ad5fc9af1f2faab45a2b5fe539ee1c27c9614",
+      "difficulty_internal": "ler & A-40's fake summer",
+      "display_difficulty": false,
+      "source_url": "https://api.nerinyan.moe/d/2359059",
+      "osu_entry": "3zo - True Love, Fake Lover (ler1211) [ler & A-40's fake summer].osu",
+      "audio_entry": "audio.mp3",
+      "output": "true-love-fake-lover.osz",
+      "output_sha256": "4d225e41a61c0b7dacf5800aff2afe85b320e665edf1707b656fe7b37dc17b6b",
+      "output_size": 11079532
+    },
+    {
+      "slug": "kusodeka-ppv4-waraeru",
+      "setid": "2347062",
+      "beatmapid": "5047625",
+      "title": "クソデカppv4 笑える",
+      "osu_sha": "60a0d25215554132e7698fbd928fce28dcec0f62d2d52a2b0d1e11f872940e8b",
+      "audio_sha": "4a02642ce1b22e98688ba8f1184d0babeeb4a92689f3525de594add7cb47f173",
+      "difficulty_internal": "Collab Oni",
+      "display_difficulty": false,
+      "source_url": "https://api.nerinyan.moe/d/2347062",
+      "osu_entry": "Cyclickk - Kusodeka ppv4 Waraeru (CarsqL) [Collab Oni].osu",
+      "audio_entry": "audio.mp3",
+      "output": "kusodeka-ppv4-waraeru.osz",
+      "output_sha256": "df65d20d9d01a261a1384bf5f733b170ef7b4c2cebe7043f05f80b2303b6f9b1",
+      "output_size": 4898868
     }
   ]
 }

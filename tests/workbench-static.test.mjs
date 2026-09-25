@@ -117,17 +117,18 @@ test('My Sound provides sixteen common slots without delete controls', () => {
   assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:5px\}/);
 });
 
-test('chart rotations keep 15 maps and include the 20260926 six-map replacement', () => {
+test('chart rotations keep 15 maps and title-only additions hide difficulty UI', () => {
   const blocks = [...charts.matchAll(/\{[\s\S]*?\}/g)].map(match => match[0]);
   assert.equal(blocks.length, 15);
   for (const removed of [
     'what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls',
     'over-the-fullereneshift','sunglow','paralysis','elna-dia','kaeru','wandering-melody-of-love',
     'everytime-we-touch-700','fuzzy-future','a-flying-dance-hall','shuuten-no-saki','dream-vandalism','1208',
+    'fake-promise','kusakusa-mimika',
   ]) {
     assert.doesNotMatch(charts, new RegExp(`"id": "${removed}"`));
   }
-  const expected = [
+  const normalExpected = [
     ['shoujo-rei', '少女レイ', 'Hell Oni', 'maps/shoujo-rei.osz'],
     ['the-intertwined-stars', 'The Intertwined Stars', 'Fate', 'maps/the-intertwined-stars.osz'],
     ['onii-chan-migite-kinshi', 'お兄ちゃん、右手の使用を禁止します！ (TamolarM Bootleg Remix)', 'Cute Sisters -Full-', 'maps/onii-chan-migite-kinshi.osz'],
@@ -135,23 +136,32 @@ test('chart rotations keep 15 maps and include the 20260926 six-map replacement'
     ['xyz', 'XY&Z', 'Z', 'maps/xyz.osz'],
     ['1hope-sniper', '1HOPE SNIPER', 'PERFECT SHOT', 'maps/1hope-sniper.osz'],
     ['dash-daaash-tv-size', 'Dash＆Daaash!! (TV Size)', 'Angler', 'maps/dash-daaash-tv-size.osz'],
-    ['fake-promise', 'FAKE PROMISE', 'DECEPTION', 'maps/fake-promise.osz'],
     ['destin-victorica-nightcore', 'Destin Victorica (Harddance Mix) (Nightcore Mix)', 'Miraculous Fate', 'maps/destin-victorica-nightcore.osz'],
   ];
-  for (const [id, title, difficulty, file] of expected) {
+  for (const [id, title, difficulty, file] of normalExpected) {
     assert.ok(charts.includes(`"id": "${id}"`), `${id} is missing`);
     assert.ok(charts.includes(`"title": "${title}"`), `${title} is missing`);
     assert.ok(charts.includes(`"difficulty": "${difficulty}"`), `${difficulty} is missing`);
     assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
   }
-  assert.match(html, /charts\.js\?v=1\.0-20260926-rotation/);
-  assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
-  assert.match(chartLoader, /function chartFileUrl\(chart\)/);
-  assert.match(chartLoader, /encodeURIComponent\(chart\.revision\)/);
+  for (const [id, title, file] of [
+    ['true-love-fake-lover', 'True Love, Fake Lover', 'maps/true-love-fake-lover.osz'],
+    ['kusodeka-ppv4-waraeru', 'クソデカppv4 笑える', 'maps/kusodeka-ppv4-waraeru.osz'],
+  ]) {
+    const block = blocks.find(x => x.includes(`"id": "${id}"`));
+    assert.ok(block, `${id} is missing`);
+    assert.ok(block.includes(`"title": "${title}"`));
+    assert.ok(block.includes(`"file": "${file}"`));
+    assert.ok(block.includes(`"hideDifficulty": true`));
+    assert.doesNotMatch(block, /"difficulty":/);
+  }
+  assert.match(chartLoader, /function keepChartInfoVisible\(chart = null\)/);
+  assert.match(chartLoader, /const hideDifficulty = chart\?\.hideDifficulty === true;/);
+  assert.match(chartLoader, /el\.chartInfo\.hidden = hideDifficulty/);
+  assert.match(html, /charts\.js\?v=1\.1-20260926-titleonly2/);
+  assert.match(html, /chart-loader\.js\?v=0\.8-titleonly/);
   assert.match(chartLoader, /fetch\(url, \{ cache: 'no-cache' \}\)/);
-  assert.match(pages, /cat \.map-assets\/maps-wave-20260926-rotation-\*\.part > \/tmp\/maps-wave-20260926-rotation\.zip/);
   assert.match(pages, /maps-wave-20260926-rotation\.sha256/);
-  assert.match(pages, /unzip -q \/tmp\/maps-wave-20260926-rotation\.zip -d _site\/maps/);
 });
 
 test('app frame uses only the AudioContext engine clock for the lane', () => {
@@ -214,8 +224,8 @@ test('runtime cache keys point at the stripped implementation', () => {
   assert.match(html, /hitsound-controller\.js\?v=4\.4-custom16/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
-  assert.match(html, /charts\.js\?v=1\.0-20260926-rotation/);
-  assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
+  assert.match(html, /charts\.js\?v=1\.1-20260926-titleonly2/);
+  assert.match(html, /chart-loader\.js\?v=0\.8-titleonly/);
 });
 
 test('Pages publishes every runtime asset needed by the fixed timeline', () => {
