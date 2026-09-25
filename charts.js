@@ -6,28 +6,10 @@ window.TEST_CHARTS = [
     "entry": "tool-assisted-speedcore.osz"
   },
   {
-    "id": "everytime-we-touch-700",
-    "title": "Everytime We Touch [Fvrwvrd's 700 BPM Speedcore Edit]",
-    "difficulty": "ler's Elite Rizz",
-    "file": "maps/everytime-we-touch-700.osz"
-  },
-  {
-    "id": "fuzzy-future",
-    "title": "ファジィフューチャー",
-    "difficulty": "Future",
-    "file": "maps/fuzzy-future.osz"
-  },
-  {
     "id": "shoujo-rei",
     "title": "少女レイ",
     "difficulty": "Hell Oni",
     "file": "maps/shoujo-rei.osz"
-  },
-  {
-    "id": "a-flying-dance-hall",
-    "title": "A flying Dance Hall",
-    "difficulty": "Skyglide Pavilion",
-    "file": "maps/a-flying-dance-hall.osz"
   },
   {
     "id": "kusakusa-mimika",
@@ -54,19 +36,6 @@ window.TEST_CHARTS = [
     "file": "maps/if.osz"
   },
   {
-    "id": "shuuten-no-saki",
-    "title": "終点の先が在るとするならば。(あ? edit)",
-    "difficulty": "Finale Oni",
-    "file": "maps/shuuten-no-saki.osz",
-    "revision": "20260826-shuuten-audiofix-v2"
-  },
-  {
-    "id": "1208",
-    "title": "#1208",
-    "difficulty": "Inner Oni",
-    "file": "maps/1208.osz"
-  },
-  {
     "id": "trancing-pulse-brz",
     "title": "Trancing Pulse (brz_bootleg_remix)",
     "difficulty": "Taiko Master",
@@ -85,9 +54,39 @@ window.TEST_CHARTS = [
     "file": "maps/onii-chan-migite-kinshi.osz"
   },
   {
-    "id": "dream-vandalism",
-    "title": "Dream Vandalism",
-    "difficulty": "Inner Oni",
-    "file": "maps/dream-vandalism.osz"
+    "id": "iron-rose",
+    "title": "IRON ROSE",
+    "difficulty": "Scent of Despair",
+    "file": "maps/iron-rose.osz"
+  },
+  {
+    "id": "xyz",
+    "title": "XY&Z",
+    "difficulty": "Z",
+    "file": "maps/xyz.osz"
+  },
+  {
+    "id": "1hope-sniper",
+    "title": "1HOPE SNIPER",
+    "difficulty": "PERFECT SHOT",
+    "file": "maps/1hope-sniper.osz"
+  },
+  {
+    "id": "dash-daaash-tv-size",
+    "title": "Dash＆Daaash!! (TV Size)",
+    "difficulty": "Angler",
+    "file": "maps/dash-daaash-tv-size.osz"
+  },
+  {
+    "id": "fake-promise",
+    "title": "FAKE PROMISE",
+    "difficulty": "DECEPTION",
+    "file": "maps/fake-promise.osz"
+  },
+  {
+    "id": "destin-victorica-nightcore",
+    "title": "Destin Victorica (Harddance Mix) (Nightcore Mix)",
+    "difficulty": "Miraculous Fate",
+    "file": "maps/destin-victorica-nightcore.osz"
   }
 ];
