@@ -188,7 +188,7 @@
   gap:6px;
 }
 
-/* Eight browser-local user sounds: one row on wide layouts, two balanced rows on iPhone. */
+/* Sixteen browser-local user sounds: two rows on wide layouts, four rows on iPhone. */
 .hs-custom-family{
   padding-bottom:7px;
   border-bottom:1px solid rgba(255,255,255,.10);
