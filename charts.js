@@ -78,15 +78,15 @@ window.TEST_CHARTS = [
     "file": "maps/destin-victorica-nightcore.osz"
   },
   {
-    "id": "true-love-fake-lover",
-    "title": "True Love, Fake Lover",
-    "file": "maps/true-love-fake-lover.osz",
+    "id": "dance-number-o-tomo-ni",
+    "title": "ダンスナンバーを共に",
+    "file": "maps/dance-number-o-tomo-ni.osz",
     "hideDifficulty": true
   },
   {
-    "id": "kusodeka-ppv4-waraeru",
-    "title": "クソデカppv4 笑える",
-    "file": "maps/kusodeka-ppv4-waraeru.osz",
+    "id": "white-devil",
+    "title": "White Devil",
+    "file": "maps/white-devil.osz",
     "hideDifficulty": true
   }
 ];
