@@ -94,12 +94,12 @@ test('favorite toggle glow reflects only the current pair', () => {
   assert.doesNotMatch(favoriteSlot, /classList\.toggle\('has-saved-pair'/);
 });
 
-test('My Sound provides eight slots without delete controls', () => {
-  assert.match(html, /hitsound-grid\.css\?v=4\.6-filename-label/);
-  assert.match(html, /hitsound-grid\.js\?v=4\.5-filename-label/);
-  assert.match(html, /id="customSoundCount"[^>]*>0 \/ 8<\/span>/);
-  assert.ok(controller.includes('const CUSTOM_ID_PATTERN = /^__CUSTOM_[1-8]__$/;'));
-  assert.match(grid, /const CUSTOM_SLOT_COUNT = 8;/);
+test('My Sound provides sixteen common slots without delete controls', () => {
+  assert.match(html, /hitsound-grid\.css\?v=4\.7-custom16/);
+  assert.match(html, /hitsound-grid\.js\?v=4\.6-custom16/);
+  assert.match(html, /id="customSoundCount"[^>]*>0 \/ 16<\/span>/);
+  assert.ok(controller.includes('const CUSTOM_ID_PATTERN = /^__CUSTOM_(?:[1-9]|1[0-6])__$/;'));
+  assert.match(grid, /const CUSTOM_SLOT_COUNT = 16;/);
   assert.doesNotMatch(grid, /data-delete-custom|custom-sound-delete|deleteCustomRecord|removeCustomSound/);
   assert.doesNotMatch(gridCss, /custom-sound-delete/);
   assert.match(grid, /replaceButton\.dataset\.replaceSlot = String\(slot\)/);
@@ -221,9 +221,9 @@ test('supported device orientation is fixed to iPhone portrait and iPad landscap
 });
 
 test('runtime cache keys point at the stripped implementation', () => {
-  assert.match(html, /app-v4\.js\?v=4\.5-postmix-headroom/);
+  assert.match(html, /app-v4\.js\?v=4\.6-music02-06/);
   assert.match(html, /object-timeline-v2\.js\?v=4\.1-fixed-geometry-no-fade/);
-  assert.match(html, /hitsound-controller\.js\?v=4\.3-custom8/);
+  assert.match(html, /hitsound-controller\.js\?v=4\.4-custom16/);
   assert.match(html, /hitsound-favorites\.js\?v=5\.1-set30-favorite-union/);
   assert.match(html, /favorite-slot-ui\.js\?v=5\.0-max30-seed15/);
   assert.match(html, /charts\.js\?v=0\.9-20260831-shoujo-rei/);
@@ -237,32 +237,23 @@ test('Pages publishes every runtime asset needed by the fixed timeline', () => {
   ]) assert.match(pages, new RegExp(`cp ${asset.replaceAll('.', '\\.')} _site\\/`));
 });
 
-test('Music Volume keeps five ratios while post-sum Master reserves transient headroom', () => {
-  assert.match(app, /const MUSIC_GAIN = 0\.65;/);
-  assert.match(app, /const MUSIC_GAIN_OPTIONS = Object\.freeze\(\[0\.65, 0\.70, 0\.75, 0\.80, 0\.85\]\);/);
-  assert.match(app, /let currentMusicGain = MUSIC_GAIN;/);
-  assert.match(app, /function setMusicGainValue\(value\)/);
-  assert.match(app, /musicGain\.gain\.setTargetAtTime\(next, now, 0\.008\)/);
-  assert.match(app, /musicGain\.gain\.value = currentMusicGain;/);
+test('Music Volume uses five low-gain steps with dB labels while post-sum Master remains fixed', () => {
+  assert.match(app, /const MUSIC_GAIN = 0\.20;/);
+  assert.match(app, /const MUSIC_GAIN_OPTIONS = Object\.freeze\(\[0\.20, 0\.30, 0\.40, 0\.50, 0\.60\]\);/);
   assert.match(app, /const EFFECT_GAIN = 1\.00;/);
   assert.match(app, /const MASTER_GAIN = 0\.30;/);
-  assert.match(app, /const MASTER_GAIN_DB = 20 \* Math\.log10\(MASTER_GAIN\);/);
   assert.match(app, /musicGain\.connect\(masterGain\);/);
   assert.match(app, /effectGain\.connect\(masterGain\);/);
   assert.match(app, /masterGain\.connect\(ac\.destination\);/);
-  assert.match(app, /masterGain\.gain\.value = MASTER_GAIN;/);
-  assert.match(app, /mixGain: music=\$\{currentMusicGain\.toFixed\(2\)\} effect=\$\{EFFECT_GAIN\.toFixed\(2\)\} master=\$\{MASTER_GAIN\.toFixed\(2\)\}/);
-  assert.match(html, /class="music-volume-control"/);
-  for (const value of ['0.65','0.70','0.75','0.80','0.85']) {
-    assert.ok(html.includes(`data-music-gain="${value}"`), `Music gain ${value} control is missing`);
+  const expected = [
+    ['0.20','0.2(-14.0dB)'], ['0.30','0.3(-10.5dB)'], ['0.40','0.4(-8.0dB)'],
+    ['0.50','0.5(-6.0dB)'], ['0.60','0.6(-4.4dB)'],
+  ];
+  for (const [value, label] of expected) {
+    assert.ok(html.includes(`data-music-gain="${value}"`));
+    assert.ok(html.includes(`>${label}</button>`));
   }
-  // Conservative reference: both source Music and Hitsound reach +2 dBTP at once,
-  // with Music at the maximum 0.85 setting. Master 0.30 still leaves ~3.1 dB.
-  const plus2 = 10 ** (2 / 20);
-  const coherentMax = plus2 + plus2 * 0.85;
-  const postMasterDb = 20 * Math.log10(coherentMax * 0.30);
-  assert.ok(postMasterDb < -3.0, `reference post-master peak should remain below -3 dBTP, got ${postMasterDb}`);
-  assert.match(html, /workbench\.css\?v=2\.2-music-volume-five/);
+  assert.match(html, /workbench\.css\?v=2\.3-music02-06-custom16/);
   assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
 });
 
