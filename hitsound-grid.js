@@ -23,7 +23,7 @@
   const SILENT_ID = controller.SILENT_ID;
   const LEGACY_DELETE_CANDIDATE_STORAGE_KEY = 'osutaiko-hitsound-lab:deletion-candidates:current111-abc-v5';
   const ACTIVE_SIDE_STORAGE_KEY = 'osutaiko-hitsound-lab:active-side:v1';
-  const CUSTOM_SLOT_COUNT = 8;
+  const CUSTOM_SLOT_COUNT = 16;
   const CUSTOM_DB_NAME = 'CreateSE-custom-sounds-v1';
   const CUSTOM_STORE_NAME = 'sounds';
   const MAX_CUSTOM_FILE_BYTES = 8 * 1024 * 1024;
