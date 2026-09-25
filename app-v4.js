@@ -3,8 +3,8 @@
 
   const OBJECT_TIMELINE_SPAN_MS = 1000;
   const START_DELAY_SEC = 0.10;
-  const MUSIC_GAIN = 0.65;
-  const MUSIC_GAIN_OPTIONS = Object.freeze([0.65, 0.70, 0.75, 0.80, 0.85]);
+  const MUSIC_GAIN = 0.20;
+  const MUSIC_GAIN_OPTIONS = Object.freeze([0.20, 0.30, 0.40, 0.50, 0.60]);
   const EFFECT_GAIN = 1.00;
   // Final gain is applied only after Music + Hitsound are summed.
   // 0.30 mirrors an osu! Master Volume of 30% and keeps transient headroom
