@@ -1,0 +1,286 @@
+name: Rotate six beatmaps 20260926
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rotate-six-beatmaps-20260926.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build verified OSZ assets and update registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, re, subprocess, zipfile, shutil
+
+          ROOT = Path.cwd()
+          TMP = Path('/tmp/createse-rotation-20260926')
+          if TMP.exists():
+              shutil.rmtree(TMP)
+          (TMP / 'sets').mkdir(parents=True)
+          (TMP / 'maps').mkdir(parents=True)
+
+          maps = [
+              dict(slug='iron-rose', setid='2390049', beatmapid='5172892',
+                   title='IRON ROSE', difficulty='Scent of Despair',
+                   osu_sha='1c0c389a262b6a468cb0d57dbd6766f5e90259c5b4d4498479658811ef0254e0',
+                   audio_sha='b60264d15883c1891ff6142ced8c2f7233eb63ef48ec6f70194438e4e32ca7af'),
+              dict(slug='xyz', setid='2224235', beatmapid='4717158',
+                   title='XY&Z', difficulty='Z',
+                   osu_sha='99ccd8643922bd0b64d0559c01e721755e75f823dd36418cb0f8282eb1afc5de',
+                   audio_sha='0399b4374eb9e0a54999f7bc9ccacdbeae843d9cb04b1926d9c50194a415449c'),
+              dict(slug='1hope-sniper', setid='2117199', beatmapid='4446310',
+                   title='1HOPE SNIPER', difficulty='PERFECT SHOT',
+                   osu_sha='0b0cbe22e8e8bfa12189c78e301e001f7e5a7245669389a77372ab80b5821dca',
+                   audio_sha='d5b0cbe58e100b85ef0875b2bf8784947c0c413d2cd40ae63e2436b85fe97db8'),
+              dict(slug='dash-daaash-tv-size', setid='2078023', beatmapid='4351160',
+                   title='Dash＆Daaash!! (TV Size)', difficulty='Angler',
+                   osu_sha='18b51cc694d70452b640f5ee0ac07ddfa5666fe9a5f4f8881709b0e013cedde5',
+                   audio_sha='99e7a2bae2de29af1938bc764fc93897bdfcba5f67a7f29af12cd44beb8dc5fe'),
+              dict(slug='fake-promise', setid='1764190', beatmapid='3610921',
+                   title='FAKE PROMISE', difficulty='DECEPTION',
+                   osu_sha='685b6565422c82846f5636967982f5c66641118421a4ab5b65c17ed6b5a09565',
+                   audio_sha='0eb9aee6458bf5d878a9dcced55a091cd6c426f52f6afc1486f425be1e63fc18'),
+              dict(slug='destin-victorica-nightcore', setid='1807333', beatmapid='3706571',
+                   title='Destin Victorica (Harddance Mix) (Nightcore Mix)', difficulty='Miraculous Fate',
+                   osu_sha='c761e0193d19a0348df9e73256a2fdc16e8d8217ed276f5c645164fa2f81fc7f',
+                   audio_sha='a19fb86a4e0ec62b2846b5aec94873101a8ea618763135ed73c5bc542ee6bccd'),
+          ]
+
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def parse_meta(data):
+              text = data.decode('utf-8-sig', errors='replace')
+              section = ''
+              out = {}
+              for raw in text.splitlines():
+                  line = raw.strip()
+                  if line.startswith('[') and line.endswith(']'):
+                      section = line[1:-1]
+                      continue
+                  if ':' in line and section in ('General', 'Metadata'):
+                      k, v = line.split(':', 1)
+                      out[k.strip()] = v.strip()
+              return out
+
+          def download_set(item):
+              dst = TMP / 'sets' / f"{item['setid']}.osz"
+              urls = [
+                  f"https://api.nerinyan.moe/d/{item['setid']}",
+                  f"https://catboy.best/d/{item['setid']}",
+              ]
+              errors = []
+              for url in urls:
+                  try:
+                      if dst.exists():
+                          dst.unlink()
+                      subprocess.run([
+                          'curl','-fL','--retry','2','--retry-delay','2',
+                          '--connect-timeout','20','--max-time','180',
+                          '-A','Mozilla/5.0 CreateSE-map-verifier',
+                          '-o', str(dst), url
+                      ], check=True)
+                      with zipfile.ZipFile(dst) as z:
+                          z.testzip()
+                          names = z.namelist()
+                          target = None
+                          target_data = None
+                          for name in names:
+                              if not name.lower().endswith('.osu'):
+                                  continue
+                              data = z.read(name)
+                              if sha(data) == item['osu_sha']:
+                                  target = name
+                                  target_data = data
+                                  break
+                          if target is None:
+                              raise RuntimeError('target .osu SHA not found')
+                          meta = parse_meta(target_data)
+                          if meta.get('Mode') != '1':
+                              raise RuntimeError(f"Mode mismatch: {meta.get('Mode')}")
+                          if meta.get('BeatmapID') != item['beatmapid']:
+                              raise RuntimeError(f"BeatmapID mismatch: {meta.get('BeatmapID')}")
+                          title = meta.get('TitleUnicode') or meta.get('Title')
+                          if title != item['title']:
+                              raise RuntimeError(f"title mismatch: {title!r}")
+                          if meta.get('Version') != item['difficulty']:
+                              raise RuntimeError(f"difficulty mismatch: {meta.get('Version')!r}")
+                          audio_name = meta.get('AudioFilename')
+                          if not audio_name:
+                              raise RuntimeError('AudioFilename missing')
+                          audio_entry = None
+                          for name in names:
+                              if name.replace('\\','/').split('/')[-1].lower() == audio_name.replace('\\','/').split('/')[-1].lower():
+                                  candidate = z.read(name)
+                                  if sha(candidate) == item['audio_sha']:
+                                      audio_entry = name
+                                      audio_data = candidate
+                                      break
+                          if audio_entry is None:
+                              raise RuntimeError('matching audio SHA not found')
+                          return dst, target, target_data, audio_name, audio_data, url
+                  except Exception as e:
+                      errors.append(f"{url}: {e}")
+              raise RuntimeError(f"Could not verify beatmapset {item['setid']}: " + ' | '.join(errors))
+
+          manifest = []
+          for item in maps:
+              src, target_name, osu_data, audio_name, audio_data, source_url = download_set(item)
+              out_path = TMP / 'maps' / f"{item['slug']}.osz"
+              with zipfile.ZipFile(out_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as out:
+                  out.writestr(Path(target_name).name, osu_data)
+                  out.writestr(Path(audio_name).name, audio_data)
+              with zipfile.ZipFile(out_path) as check:
+                  check.testzip()
+              manifest.append({
+                  **item,
+                  'source_url': source_url,
+                  'osu_entry': Path(target_name).name,
+                  'audio_entry': Path(audio_name).name,
+                  'output': out_path.name,
+                  'output_sha256': sha(out_path.read_bytes()),
+                  'output_size': out_path.stat().st_size,
+              })
+
+          bundle = TMP / 'maps-wave-20260926-rotation.zip'
+          with zipfile.ZipFile(bundle, 'w', compression=zipfile.ZIP_STORED) as z:
+              for item in maps:
+                  p = TMP / 'maps' / f"{item['slug']}.osz"
+                  z.write(p, arcname=p.name)
+          bundle_hash = sha(bundle.read_bytes())
+
+          asset_dir = ROOT / '.map-assets'
+          for p in asset_dir.glob('maps-wave-20260926-rotation-*.part'):
+              p.unlink()
+          part_size = 9 * 1024 * 1024
+          data = bundle.read_bytes()
+          for i in range(0, len(data), part_size):
+              (asset_dir / f"maps-wave-20260926-rotation-{i // part_size:02d}.part").write_bytes(data[i:i+part_size])
+          (asset_dir / 'maps-wave-20260926-rotation.sha256').write_text(
+              f"{bundle_hash}  maps-wave-20260926-rotation.zip\n", encoding='utf-8')
+          (asset_dir / 'maps-wave-20260926-rotation.manifest.json').write_text(
+              json.dumps({'bundle_sha256': bundle_hash, 'maps': manifest}, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8')
+
+          # Update the registry: remove six requested maps and append six verified replacements.
+          charts_path = ROOT / 'charts.js'
+          charts_text = charts_path.read_text(encoding='utf-8')
+          prefix = 'window.TEST_CHARTS = '
+          if not charts_text.startswith(prefix):
+              raise RuntimeError('charts.js format changed')
+          charts = json.loads(charts_text[len(prefix):].strip().removesuffix(';'))
+          remove_ids = {
+              'everytime-we-touch-700','fuzzy-future','a-flying-dance-hall',
+              'shuuten-no-saki','dream-vandalism','1208'
+          }
+          charts = [c for c in charts if c.get('id') not in remove_ids]
+          charts.extend([
+              {'id':'iron-rose','title':'IRON ROSE','difficulty':'Scent of Despair','file':'maps/iron-rose.osz'},
+              {'id':'xyz','title':'XY&Z','difficulty':'Z','file':'maps/xyz.osz'},
+              {'id':'1hope-sniper','title':'1HOPE SNIPER','difficulty':'PERFECT SHOT','file':'maps/1hope-sniper.osz'},
+              {'id':'dash-daaash-tv-size','title':'Dash＆Daaash!! (TV Size)','difficulty':'Angler','file':'maps/dash-daaash-tv-size.osz'},
+              {'id':'fake-promise','title':'FAKE PROMISE','difficulty':'DECEPTION','file':'maps/fake-promise.osz'},
+              {'id':'destin-victorica-nightcore','title':'Destin Victorica (Harddance Mix) (Nightcore Mix)','difficulty':'Miraculous Fate','file':'maps/destin-victorica-nightcore.osz'},
+          ])
+          if len(charts) != 15:
+              raise RuntimeError(f'expected 15 registered charts, got {len(charts)}')
+          charts_path.write_text(prefix + json.dumps(charts, ensure_ascii=False, indent=2) + ';\n', encoding='utf-8')
+
+          # Cache-bust charts.js.
+          index = ROOT / 'index.html'
+          text = index.read_text(encoding='utf-8')
+          old = './charts.js?v=0.9-20260831-shoujo-rei'
+          new = './charts.js?v=1.0-20260926-rotation'
+          if text.count(old) != 1:
+              raise RuntimeError(f'index chart cache key count={text.count(old)}')
+          index.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Publish the new bundle in Pages.
+          pages = ROOT / '.github/workflows/pages.yml'
+          text = pages.read_text(encoding='utf-8')
+          marker = '''          # Overwrite only Shuuten with the repaired MP3-frame-preserving OSZ.
+'''
+          block = '''          # Rebuild and verify the 2026-09-26 six-map rotation.
+          cat .map-assets/maps-wave-20260926-rotation-*.part > /tmp/maps-wave-20260926-rotation.zip
+          (cd /tmp && sha256sum -c "$GITHUB_WORKSPACE/.map-assets/maps-wave-20260926-rotation.sha256")
+          unzip -q /tmp/maps-wave-20260926-rotation.zip -d _site/maps
+
+'''
+          if text.count(marker) != 1:
+              raise RuntimeError('pages insertion marker changed')
+          pages.write_text(text.replace(marker, block + marker, 1), encoding='utf-8')
+
+          # Replace the chart-rotation regression with the new registry requirements.
+          tests = ROOT / 'tests/workbench-static.test.mjs'
+          text = tests.read_text(encoding='utf-8')
+          start = text.index("test('chart rotations keep 15 maps")
+          end = text.index("\ntest('app frame uses only the AudioContext engine clock for the lane'", start)
+          replacement = r'''test('chart rotations keep 15 maps and include the 20260926 six-map replacement', () => {
+            const blocks = [...charts.matchAll(/\{[\s\S]*?\}/g)].map(match => match[0]);
+            assert.equal(blocks.length, 15);
+            for (const removed of [
+              'what-hurts-the-most','navi-98','monochrome-asterisk-makina-remix','pacific-girls',
+              'over-the-fullereneshift','sunglow','paralysis','elna-dia','kaeru','wandering-melody-of-love',
+              'everytime-we-touch-700','fuzzy-future','a-flying-dance-hall','shuuten-no-saki','dream-vandalism','1208',
+            ]) {
+              assert.doesNotMatch(charts, new RegExp(`"id": "${removed}"`));
+            }
+            const expected = [
+              ['shoujo-rei', '少女レイ', 'Hell Oni', 'maps/shoujo-rei.osz'],
+              ['the-intertwined-stars', 'The Intertwined Stars', 'Fate', 'maps/the-intertwined-stars.osz'],
+              ['onii-chan-migite-kinshi', 'お兄ちゃん、右手の使用を禁止します！ (TamolarM Bootleg Remix)', 'Cute Sisters -Full-', 'maps/onii-chan-migite-kinshi.osz'],
+              ['iron-rose', 'IRON ROSE', 'Scent of Despair', 'maps/iron-rose.osz'],
+              ['xyz', 'XY&Z', 'Z', 'maps/xyz.osz'],
+              ['1hope-sniper', '1HOPE SNIPER', 'PERFECT SHOT', 'maps/1hope-sniper.osz'],
+              ['dash-daaash-tv-size', 'Dash＆Daaash!! (TV Size)', 'Angler', 'maps/dash-daaash-tv-size.osz'],
+              ['fake-promise', 'FAKE PROMISE', 'DECEPTION', 'maps/fake-promise.osz'],
+              ['destin-victorica-nightcore', 'Destin Victorica (Harddance Mix) (Nightcore Mix)', 'Miraculous Fate', 'maps/destin-victorica-nightcore.osz'],
+            ];
+            for (const [id, title, difficulty, file] of expected) {
+              assert.ok(charts.includes(`"id": "${id}"`), `${id} is missing`);
+              assert.ok(charts.includes(`"title": "${title}"`), `${title} is missing`);
+              assert.ok(charts.includes(`"difficulty": "${difficulty}"`), `${difficulty} is missing`);
+              assert.ok(charts.includes(`"file": "${file}"`), `${file} is missing`);
+            }
+            assert.match(html, /charts\.js\?v=1\.0-20260926-rotation/);
+            assert.match(html, /chart-loader\.js\?v=0\.7-no-force-cache/);
+            assert.match(chartLoader, /function chartFileUrl\(chart\)/);
+            assert.match(chartLoader, /encodeURIComponent\(chart\.revision\)/);
+            assert.match(chartLoader, /fetch\(url, \{ cache: 'no-cache' \}\)/);
+            assert.match(pages, /cat \.map-assets\/maps-wave-20260926-rotation-\*\.part > \/tmp\/maps-wave-20260926-rotation\.zip/);
+            assert.match(pages, /maps-wave-20260926-rotation\.sha256/);
+            assert.match(pages, /unzip -q \/tmp\/maps-wave-20260926-rotation\.zip -d _site\/maps/);
+          });
+          '''
+          tests.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+
+          print(json.dumps({'bundle_sha256': bundle_hash, 'maps': manifest}, ensure_ascii=False, indent=2))
+          PY
+
+          node --test tests/workbench-static.test.mjs
+
+          # Keep the updater one-shot.
+          git rm .github/workflows/rotate-six-beatmaps-20260926.yml
+
+      - name: Commit rotation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add charts.js index.html tests/workbench-static.test.mjs .github/workflows/pages.yml .map-assets/
+          git commit -m 'Rotate six registered beatmaps'
+          git push
