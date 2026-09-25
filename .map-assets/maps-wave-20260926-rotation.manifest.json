@@ -1,5 +1,5 @@
 {
-  "bundle_sha256": "0bd8cbab93a663e33d923edfcca9d54473cf290de3eb1a73739a75fbb99120b9",
+  "bundle_sha256": "4dbcde5f534235e4f3a03113234fb35ed7aab59f44161e6a94eb16fb40843f96",
   "maps": [
     {
       "slug": "iron-rose",
@@ -92,36 +92,36 @@
       "output_size": 9143616
     },
     {
-      "slug": "true-love-fake-lover",
-      "setid": "2359059",
-      "beatmapid": "5083405",
-      "title": "True Love, Fake Lover",
-      "osu_sha": "53f42f9c515014fc497eb09ac085b62a65c56de4b4ef8226778bdfd2bc8de9b3",
-      "audio_sha": "2c9cd0a1c8c5fc4ac52b03905b9ad5fc9af1f2faab45a2b5fe539ee1c27c9614",
-      "difficulty_internal": "ler & A-40's fake summer",
+      "slug": "dance-number-o-tomo-ni",
+      "setid": "1757221",
+      "beatmapid": "3595962",
+      "title": "ダンスナンバーを共に",
+      "difficulty_internal": "2199 style",
+      "osu_sha": "bda3802c0327745498579550442a3f8fa48cd9fba35aaa350e8390f30e336fb8",
+      "audio_sha": "e56848b289cf4137d15156bdfd1c0c87f9418fd345ed347e4ec36e602a1da2ef",
       "display_difficulty": false,
-      "source_url": "https://api.nerinyan.moe/d/2359059",
-      "osu_entry": "3zo - True Love, Fake Lover (ler1211) [ler & A-40's fake summer].osu",
-      "audio_entry": "audio.mp3",
-      "output": "true-love-fake-lover.osz",
-      "output_sha256": "4d225e41a61c0b7dacf5800aff2afe85b320e665edf1707b656fe7b37dc17b6b",
-      "output_size": 11079532
+      "source_url": "https://catboy.best/d/1757221",
+      "osu_entry": "Nanahoshi Kangengakudan - Dance Number o Tomo ni (gaston_2199) [2199 Style].osu",
+      "audio_entry": "audio.ogg",
+      "output": "dance-number-o-tomo-ni.osz",
+      "output_sha256": "827d7703c1afebff76ad88b33ec44308d4cfe03a01ddf937557cd3ab91f16262",
+      "output_size": 5535405
     },
     {
-      "slug": "kusodeka-ppv4-waraeru",
-      "setid": "2347062",
-      "beatmapid": "5047625",
-      "title": "クソデカppv4 笑える",
-      "osu_sha": "60a0d25215554132e7698fbd928fce28dcec0f62d2d52a2b0d1e11f872940e8b",
-      "audio_sha": "4a02642ce1b22e98688ba8f1184d0babeeb4a92689f3525de594add7cb47f173",
-      "difficulty_internal": "Collab Oni",
+      "slug": "white-devil",
+      "setid": "2194042",
+      "beatmapid": "4641645",
+      "title": "White Devil",
+      "difficulty_internal": "-",
+      "osu_sha": "39a17886777b0ef17267671365cf723b7752e10dda741f8ba94d3f6e71339661",
+      "audio_sha": "a0dde735b4606721fa304441b498cfee68eb753091b50067b2801bbd97351445",
       "display_difficulty": false,
-      "source_url": "https://api.nerinyan.moe/d/2347062",
-      "osu_entry": "Cyclickk - Kusodeka ppv4 Waraeru (CarsqL) [Collab Oni].osu",
+      "source_url": "https://api.nerinyan.moe/d/2194042",
+      "osu_entry": "WyvernP - White Devil (Alchyr) [-].osu",
       "audio_entry": "audio.mp3",
-      "output": "kusodeka-ppv4-waraeru.osz",
-      "output_sha256": "df65d20d9d01a261a1384bf5f733b170ef7b4c2cebe7043f05f80b2303b6f9b1",
-      "output_size": 4898868
+      "output": "white-devil.osz",
+      "output_sha256": "2166058a5c08056a92c39627a4a846a36e95f044340e8ebf2b49b8ad260c138a",
+      "output_size": 3794815
     }
   ]
 }
