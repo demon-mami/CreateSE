@@ -113,7 +113,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 #hitsoundGrid[data-active-side="kat"] #hitsoundSources .hs-key.selected-kat{
   box-shadow:0 0 0 1px rgba(176,211,226,.40),0 0 10px rgba(110,179,207,.22)
 }
-.custom-sound-grid{grid-template-columns:repeat(4,minmax(80px,1fr))!important;gap:7px!important}
+.custom-sound-grid{grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:7px!important}
 .custom-sound-add>span{padding:0 6px!important;font-size:22px!important;line-height:1;text-align:center}
 .custom-sound-delete{width:44px!important;min-width:44px!important}
 .custom-sound-delete>span{height:44px!important}
@@ -174,8 +174,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
 }
 .music-volume-button{
   min-width:0;min-height:44px;padding:0 3px;border:0;border-left:1px solid rgba(255,255,255,.11);
-  border-radius:0;background:transparent;color:rgba(255,255,255,.68);font-size:11px;font-weight:800;
-  font-variant-numeric:tabular-nums
+  border-radius:0;background:transparent;color:rgba(255,255,255,.68);font-size:9px;font-weight:800;
+  letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums
 }
 .music-volume-button:first-child{border-left:0}
 .music-volume-button[aria-pressed="true"]{
@@ -237,7 +237,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-v
   .source-panel{height:100%;padding:0 7px calc(var(--dock-mini-height) + env(safe-area-inset-bottom) + 12px)}
   .hs-toolbar{grid-template-columns:1fr;padding-top:7px;gap:5px}.hs-toolbar-label{display:none}
   #hitsoundGrid{padding:7px}.hs-family-row,.hs-family-grid{gap:6px!important}
-  .custom-sound-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .custom-sound-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
   .audition-panel{position:fixed;z-index:60;left:calc(7px + env(safe-area-inset-left));right:calc(7px + env(safe-area-inset-right));bottom:calc(5px + env(safe-area-inset-bottom));height:var(--dock-mini-height);padding:0;overflow:hidden;border-radius:15px;box-shadow:0 -10px 32px rgba(3,9,12,.38);transform:translateZ(0);transition:height 480ms cubic-bezier(.22,1,.36,1),border-radius 480ms cubic-bezier(.22,1,.36,1),box-shadow 480ms ease}
   .audition-panel.is-transitioning{touch-action:none}
   .audition-panel.is-transitioning .dock-mini,.audition-panel.is-transitioning .dock-expanded{pointer-events:none!important}
