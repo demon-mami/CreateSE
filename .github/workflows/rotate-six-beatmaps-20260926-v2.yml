@@ -25,14 +25,15 @@ jobs:
           python /tmp/update.py
           python -c 'from pathlib import Path; p=Path("tests/workbench-static.test.mjs"); s=p.read_text(); old=r"charts\.js\?v=0\.9-20260831-shoujo-rei"; new=r"charts\.js\?v=1\.0-20260926-rotation"; assert s.count(old) == 1, s.count(old); p.write_text(s.replace(old, new, 1))'
           node --test tests/workbench-static.test.mjs
-          git rm .github/workflows/rotate-six-beatmaps-20260926.yml .github/workflows/rotate-six-beatmaps-20260926-v2.yml
+          # Pages workflow is applied separately via the GitHub API because Actions cannot update workflows.
+          git checkout HEAD -- .github/workflows/pages.yml
 
-      - name: Commit rotation
+      - name: Commit rotation assets and registry
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add charts.js index.html tests/workbench-static.test.mjs .github/workflows/pages.yml .map-assets/
+          git add charts.js index.html tests/workbench-static.test.mjs .map-assets/
           git commit -m 'Rotate six registered beatmaps'
           git push
