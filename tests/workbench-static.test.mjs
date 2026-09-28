@@ -14,6 +14,7 @@ const charts = read('charts.js');
 const chartLoader = read('chart-loader.js');
 const grid = read('hitsound-grid.js');
 const gridCss = read('hitsound-grid.css');
+const workbenchCss = read('workbench.css');
 const workbench = read('workbench-ui.js');
 const pages = read('.github/workflows/pages.yml');
 const orientation = read('orientation-guard.js');
@@ -95,7 +96,7 @@ test('favorite toggle glow reflects only the current pair', () => {
 });
 
 test('My Sound provides sixteen common slots without delete controls', () => {
-  assert.match(html, /hitsound-grid\.css\?v=4\.7-custom16/);
+  assert.match(html, /hitsound-grid\.css\?v=4\.8-custom16-2col/);
   assert.match(html, /hitsound-grid\.js\?v=4\.6-custom16/);
   assert.match(html, /id="customSoundCount"[^>]*>0 \/ 16<\/span>/);
   assert.ok(controller.includes('const CUSTOM_ID_PATTERN = /^__CUSTOM_(?:[1-9]|1[0-6])__$/;'));
@@ -113,8 +114,12 @@ test('My Sound provides sixteen common slots without delete controls', () => {
   assert.match(grid, /soundLabel\.className = 'custom-sound-label'/);
   assert.match(grid, /soundLabel\.textContent = customDisplayName\(record\)/);
   assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-overflow:ellipsis;[\s\S]*?font-size:9px/);
-  assert.match(gridCss, /grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/);
-  assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:5px\}/);
+  assert.match(gridCss, /\.custom-sound-grid\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px\}/);
+  assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-align:left;[\s\S]*?font-size:10px/);
+  assert.match(workbenchCss, /\.custom-sound-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important;gap:7px!important\}/);
+  assert.match(workbenchCss, /@media\(max-width:899px\)[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important\}/);
+  assert.match(html, /workbench\.css\?v=2\.4-mysound-2col/);
 });
 
 test('chart rotations keep 15 maps and title-only additions hide difficulty UI', () => {
