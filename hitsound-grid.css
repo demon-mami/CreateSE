@@ -188,7 +188,7 @@
   gap:6px;
 }
 
-/* Sixteen browser-local user sounds: two rows on wide layouts, four rows on iPhone. */
+/* Sixteen browser-local user sounds: two wide columns x eight rows on every supported layout. */
 .hs-custom-family{
   padding-bottom:7px;
   border-bottom:1px solid rgba(255,255,255,.10);
@@ -206,8 +206,8 @@
 }
 .custom-sound-grid{
   display:grid;
-  grid-template-columns:repeat(8,minmax(0,1fr));
-  gap:6px;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
 }
 .custom-sound-grid.busy{pointer-events:none;opacity:.72}
 .custom-sound-slot{
@@ -223,9 +223,9 @@
   overflow:hidden;
   white-space:nowrap;
   text-overflow:ellipsis;
-  text-align:center;
-  font-size:9px;
-  letter-spacing:-.02em;
+  text-align:left;
+  font-size:10px;
+  letter-spacing:-.015em;
 }
 .custom-sound-add>span{
   border-style:dashed;
@@ -396,9 +396,9 @@
   .hs-toolbar-actions{grid-template-columns:40px 40px repeat(3,minmax(52px,1fr));gap:5px}
   .hs-action-button>span{height:31px}
   .hs-family-row,.hs-family-grid{gap:5px}
-  .custom-sound-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
-  .custom-sound-key>span{padding:0 25px 0 5px}
-  .custom-sound-grid .custom-sound-replace{width:25px;min-width:25px}
+  .custom-sound-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .custom-sound-key>span{padding:0 27px 0 8px}
+  .custom-sound-grid .custom-sound-replace{width:27px;min-width:27px}
   .hs-key>span{height:29px}
   .favorite-set-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
   #hitsoundGrid{padding:7px;gap:6px}
