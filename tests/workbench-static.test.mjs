@@ -256,7 +256,7 @@ test('Music Volume uses five low-gain steps with dB labels while post-sum Master
     assert.ok(html.includes(`data-music-gain="${value}"`));
     assert.ok(html.includes(`>${label}</button>`));
   }
-  assert.match(html, /workbench\.css\?v=2\.3-music02-06-custom16/);
+  assert.match(html, /workbench\.css\?v=2\.4-mysound-2col/);
   assert.doesNotMatch(app, /createDynamicsCompressor|DynamicsCompressorNode|limiter|soft.?clip|normalize/i);
 });
 
