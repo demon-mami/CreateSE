@@ -113,7 +113,7 @@ test('My Sound provides sixteen common slots without delete controls', () => {
   assert.match(grid, /function customDisplayName\(record\)/);
   assert.match(grid, /soundLabel\.className = 'custom-sound-label'/);
   assert.match(grid, /soundLabel\.textContent = customDisplayName\(record\)/);
-  assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-overflow:ellipsis;[\s\S]*?font-size:9px/);
+  assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-overflow:ellipsis;[\s\S]*?font-size:10px/);
   assert.match(gridCss, /\.custom-sound-grid\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(gridCss, /@media\(max-width:430px\)\{[\s\S]*?\.custom-sound-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px\}/);
   assert.match(gridCss, /\.custom-sound-label\{[\s\S]*?text-align:left;[\s\S]*?font-size:10px/);
